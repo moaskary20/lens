@@ -72,4 +72,55 @@ class Egypt
 
         return $options;
     }
+
+    /**
+     * Licensed Egyptian banks used for payouts and bank wallets.
+     *
+     * @return array<string, string>
+     */
+    public static function banks(): array
+    {
+        return [
+            'National Bank of Egypt' => 'National Bank of Egypt (NBE)',
+            'Banque Misr' => 'Banque Misr',
+            'Banque du Caire' => 'Banque du Caire',
+            'CIB' => 'Commercial International Bank (CIB)',
+            'QNB Alahli' => 'QNB Alahli',
+            'Alex Bank' => 'Alex Bank',
+            'HSBC Egypt' => 'HSBC Egypt',
+            'Arab African International Bank' => 'Arab African International Bank',
+            'Faisal Islamic Bank' => 'Faisal Islamic Bank of Egypt',
+            'Abu Dhabi Islamic Bank' => 'Abu Dhabi Islamic Bank (ADIB)',
+            'Housing and Development Bank' => 'Housing and Development Bank',
+            'Credit Agricole Egypt' => 'Credit Agricole Egypt',
+            'Emirates NBD Egypt' => 'Emirates NBD Egypt',
+            'Arab Bank' => 'Arab Bank',
+            'SAIB' => 'Société Arabe Internationale de Banque (SAIB)',
+            'Egyptian Gulf Bank' => 'Egyptian Gulf Bank',
+            'Export Development Bank of Egypt' => 'Export Development Bank of Egypt',
+            'Suez Canal Bank' => 'Suez Canal Bank',
+            'Agricultural Bank of Egypt' => 'Agricultural Bank of Egypt',
+            'Nasser Social Bank' => 'Nasser Social Bank',
+            'EBank' => 'EBank',
+            'The United Bank' => 'The United Bank',
+            'Attijariwafa Bank Egypt' => 'Attijariwafa Bank Egypt',
+            'Al Ahli Bank of Kuwait Egypt' => 'Al Ahli Bank of Kuwait — Egypt',
+            'Egypt Post' => 'Egypt Post',
+        ];
+    }
+
+    /**
+     * Egyptian telecom mobile wallets.
+     *
+     * @return array<string, string>
+     */
+    public static function telecomWallets(): array
+    {
+        return [
+            'vodafone' => 'Vodafone Cash',
+            'orange' => 'Orange Cash',
+            'etisalat' => 'e& cash (Etisalat)',
+            'we' => 'WE Pay',
+        ];
+    }
 }

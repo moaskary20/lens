@@ -42,11 +42,22 @@ class VendorChecklistTest extends TestCase
             ->assertSee('Profession / job title')
             ->assertSee('Phone')
             ->assertSee('WhatsApp')
-            ->assertSee('Bank name')
-            ->assertSee('InstaPay / wallet')
+            ->assertSee('Payout method')
+            ->assertSee('Bank account')
+            ->assertSee('Mobile wallet')
+            ->assertSee('PayPal')
             ->assertSee('Services / categories')
             ->assertSee('Previous projects')
             ->assertSee('Half-day price (6 hours)');
+
+        $this->actingAs($admin)
+            ->get('/admin/vendors/create')
+            ->assertOk()
+            ->assertSeeText('Bank & payouts')
+            ->assertSeeText('Payout method')
+            ->assertSeeText('Bank account')
+            ->assertSeeText('Mobile wallet')
+            ->assertSeeText('PayPal');
     }
 
     public function test_vendor_panel_exposes_profile_gallery_requests_chat_earnings_and_ratings(): void
@@ -61,8 +72,10 @@ class VendorChecklistTest extends TestCase
             ->assertSee('Personal photo')
             ->assertSee('Services you offer')
             ->assertSee('Home governorate')
-            ->assertSee('Bank name')
-            ->assertSee('InstaPay / wallet')
+            ->assertSee('Payout method')
+            ->assertSee('Bank account')
+            ->assertSee('Mobile wallet')
+            ->assertSee('PayPal')
             ->assertSee('Vendor type')
             ->assertSee('Photographer')
             ->assertSee('Cameras')

@@ -11,12 +11,14 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 
@@ -408,12 +410,120 @@ class VendorProfile
     public static function bankFields(): array
     {
         return [
-            TextInput::make('bank_name')->label('Bank name'),
-            TextInput::make('bank_account_holder')->label('Account holder'),
-            TextInput::make('bank_account_number')->label('Account number'),
-            TextInput::make('bank_iban')->label('IBAN'),
-            TextInput::make('instapay')->label('InstaPay / wallet'),
-            Textarea::make('transfer_notes')->label('Other transfer details')->rows(3)->columnSpanFull(),
+            ToggleButtons::make('payout_method')
+                ->label('Payout method')
+                ->options([
+                    'bank' => 'Bank account',
+                    'wallet' => 'Mobile wallet',
+                    'paypal' => 'PayPal',
+                ])
+                ->icons([
+                    'bank' => 'heroicon-o-building-library',
+                    'wallet' => 'heroicon-o-device-phone-mobile',
+                    'paypal' => 'heroicon-o-globe-alt',
+                ])
+                ->colors([
+                    'bank' => 'primary',
+                    'wallet' => 'warning',
+                    'paypal' => 'info',
+                ])
+                ->inline()
+                ->grouped()
+                ->live()
+                ->columnSpanFull(),
+            Section::make('Bank account')
+                ->description('Full bank details used to send payouts to this vendor.')
+                ->visible(fn (Get $get): bool => $get('payout_method') === 'bank')
+                ->schema([
+                    Select::make('bank_name')
+                        ->label('Bank')
+                        ->options(Egypt::banks())
+                        ->searchable()
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'bank'),
+                    Select::make('bank_account_type')
+                        ->label('Account type')
+                        ->options([
+                            'current' => 'Current',
+                            'savings' => 'Savings',
+                        ])
+                        ->native(false),
+                    TextInput::make('bank_account_holder')
+                        ->label('Account holder name')
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'bank'),
+                    TextInput::make('bank_account_number')
+                        ->label('Account number')
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'bank'),
+                    TextInput::make('bank_iban')
+                        ->label('IBAN')
+                        ->placeholder('EG00 ACCT-000003 0000 000'),
+                    TextInput::make('bank_swift')
+                        ->label('SWIFT / BIC')
+                        ->placeholder('BMISEGCXXXX'),
+                    TextInput::make('bank_branch')
+                        ->label('Branch name'),
+                    TextInput::make('bank_branch_code')
+                        ->label('Branch code'),
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
+            Section::make('Mobile wallet')
+                ->description('Add the phone number linked to the wallet, then choose an Egyptian telecom company or a bank.')
+                ->visible(fn (Get $get): bool => $get('payout_method') === 'wallet')
+                ->schema([
+                    TextInput::make('wallet_phone')
+                        ->label('Wallet phone number')
+                        ->tel()
+                        ->placeholder('010xxxxxxxx')
+                        ->helperText('Egyptian mobile number linked to this wallet.')
+                        ->rule('regex:/^01[0125][0-9]{8}$/')
+                        ->validationMessages([
+                            'regex' => 'Use an Egyptian mobile number such as 010xxxxxxxx.',
+                        ])
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'wallet')
+                        ->columnSpanFull(),
+                    Radio::make('wallet_network_type')
+                        ->label('Wallet issued by')
+                        ->options([
+                            'telecom' => 'Egyptian telecom company',
+                            'bank' => 'Bank',
+                        ])
+                        ->inline()
+                        ->live()
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'wallet')
+                        ->columnSpanFull(),
+                    Select::make('wallet_telecom')
+                        ->label('Telecom company')
+                        ->options(Egypt::telecomWallets())
+                        ->native(false)
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'wallet' && $get('wallet_network_type') === 'telecom')
+                        ->visible(fn (Get $get): bool => $get('wallet_network_type') === 'telecom'),
+                    Select::make('wallet_bank_name')
+                        ->label('Bank')
+                        ->options(Egypt::banks())
+                        ->searchable()
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'wallet' && $get('wallet_network_type') === 'bank')
+                        ->visible(fn (Get $get): bool => $get('wallet_network_type') === 'bank'),
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
+            Section::make('PayPal')
+                ->description('Send payouts to the vendor PayPal account.')
+                ->visible(fn (Get $get): bool => $get('payout_method') === 'paypal')
+                ->schema([
+                    TextInput::make('paypal_email')
+                        ->label('PayPal email')
+                        ->email()
+                        ->required(fn (Get $get): bool => $get('payout_method') === 'paypal'),
+                    TextInput::make('paypal_name')
+                        ->label('PayPal account name'),
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
+            Textarea::make('transfer_notes')
+                ->label('Other transfer details')
+                ->rows(3)
+                ->visible(fn (Get $get): bool => filled($get('payout_method')))
+                ->columnSpanFull(),
         ];
     }
 

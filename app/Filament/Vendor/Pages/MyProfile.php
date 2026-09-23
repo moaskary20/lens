@@ -72,10 +72,21 @@ class MyProfile extends Page
             'delivery_formats' => $vendor->delivery_formats,
             'turnaround_hours' => $vendor->turnaround_hours,
             'extras' => $vendor->extras,
+            'payout_method' => $vendor->payout_method,
             'bank_name' => $vendor->bank_name,
             'bank_account_holder' => $vendor->bank_account_holder,
             'bank_account_number' => $vendor->bank_account_number,
             'bank_iban' => $vendor->bank_iban,
+            'bank_swift' => $vendor->bank_swift,
+            'bank_branch' => $vendor->bank_branch,
+            'bank_branch_code' => $vendor->bank_branch_code,
+            'bank_account_type' => $vendor->bank_account_type,
+            'wallet_network_type' => $vendor->wallet_network_type,
+            'wallet_telecom' => $vendor->wallet_telecom,
+            'wallet_bank_name' => $vendor->wallet_bank_name,
+            'wallet_phone' => $vendor->wallet_phone,
+            'paypal_email' => $vendor->paypal_email,
+            'paypal_name' => $vendor->paypal_name,
             'instapay' => $vendor->instapay,
             'transfer_notes' => $vendor->transfer_notes,
         ]);
@@ -157,8 +168,8 @@ class MyProfile extends Page
                             ->visible(fn (): bool => Feature::enabled('filters') && (bool) auth()->user()?->roleCan('gear_tags')),
                     ])->columns(2),
                 ...VendorProfile::typeSections(),
-                Section::make('Bank & transfers')
-                    ->description('Account or InstaPay details used for payouts.')
+                Section::make('Bank & payouts')
+                    ->description('Add a bank account, an Egyptian mobile wallet, or PayPal.')
                     ->schema(VendorProfile::bankFields())
                     ->columns(2),
             ])
