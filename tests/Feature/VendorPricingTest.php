@@ -110,4 +110,14 @@ class VendorPricingTest extends TestCase
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
         $this->actingAs($admin)->get('/admin/pricing-models/'.$model->id.'/edit')->assertOk()->assertSee('Weekend 8 hours');
     }
+
+    public function test_pricing_model_form_requires_a_vendor_type(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/admin/pricing-models/create')
+            ->assertOk()
+            ->assertSee('Vendor type');
+    }
 }

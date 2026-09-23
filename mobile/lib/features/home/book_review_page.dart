@@ -6,78 +6,65 @@ import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/home/book_checkout_page.dart';
+import 'package:lens/features/home/book_draft.dart';
+import 'package:lens/features/home/book_project_catalog.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
 class BookReviewPage extends StatelessWidget {
-  const BookReviewPage({
-    super.key,
-    required this.vendor,
-    required this.home,
-    required this.dateLabel,
-    required this.time,
-    required this.packageName,
-    required this.packageDetails,
-    required this.location,
-    required this.brief,
-    required this.images,
-    this.projectName = '',
-  });
+  const BookReviewPage({super.key, required this.draft});
 
-  final VendorCard vendor;
-  final HomeData home;
-  final String dateLabel;
-  final String time;
-  final String packageName;
-  final String packageDetails;
-  final String location;
-  final String brief;
-  final List<String> images;
-  final String projectName;
+  final BookDraft draft;
 
-  String get _duration {
-    final part = packageDetails.split('•').first.trim();
-    return part.isEmpty ? '4 Hours' : part;
+  VendorCard get vendor => draft.vendor;
+  HomeData get home => draft.home;
+  String get projectName => draft.projectName;
+  String get dateLabel => draft.dateLabel;
+  String get time => draft.time;
+
+  String get _duration => draft.durationLabel;
+
+  String get _place => draft.location.trim();
+
+  String? get _coords {
+    if (draft.latitude == null || draft.longitude == null) {
+      return null;
+    }
+    return '${draft.latitude!.toStringAsFixed(5)}, ${draft.longitude!.toStringAsFixed(5)}';
   }
 
-  String get _place {
-    if (location.isNotEmpty) {
-      return location.contains(',') ? location : '$location, Cairo';
-    }
-    if (vendor.city.isNotEmpty) {
-      return vendor.city == 'Cairo' ? 'Zamalek, Cairo' : '${vendor.city}, Egypt';
-    }
-    return 'Zamalek, Cairo';
-  }
-
-  String get _briefText {
-    if (brief.trim().isNotEmpty) {
-      return brief.trim();
-    }
-    return 'Product photoshoot for our new campaign. Clean, modern style with natural lighting. We need a mix of close-up and lifestyle shots that show the work in real use.';
-  }
+  String get _briefText => draft.brief.trim();
 
   String get _role {
     if (vendor.tags.length >= 2) {
-      return '${vendor.tags[0]} & ${vendor.tags[1]} ${vendor.vendorTypeName}';
+      return '${vendor.tags[0]} • ${vendor.tags[1]}';
     }
     return vendor.vendorTypeName;
   }
 
-  double get _base {
-    final start = vendor.startingFrom ?? 4500;
-    return switch (packageName) {
-      'Half day' => start * 1.2,
-      'Full day' => start * 1.8,
-      _ => start,
-    };
-  }
+  double get _base => draft.sessionPrice;
 
-  double get _fee => _base * 0.05;
+  double get _fee => (_base * 0.10);
 
-  List<String> get _gallery {
-    final selected = images.isNotEmpty ? List<String>.from(images) : <String>[];
-    final rest = VendorPhotos.shots(vendor.vendorType, vendor.id).where((url) => !selected.contains(url));
-    return [...selected, ...rest];
+  List<String> get _gallery => List<String>.from(draft.images);
+
+  List<(String, String)> get _projectRows {
+    final rows = <(String, String)>[];
+    if (draft.projectName.trim().isNotEmpty) {
+      rows.add(('Project name', draft.projectName.trim()));
+    }
+    if (draft.projectType.trim().isNotEmpty) {
+      rows.add((BookProjectCatalog.typeLabel(vendor.vendorType), draft.projectType.trim()));
+    }
+    for (final field in BookProjectCatalog.extraFields(vendor.vendorType)) {
+      final value = draft.details[field.key]?.trim() ?? '';
+      if (value.isNotEmpty) {
+        rows.add((field.label, value));
+      }
+    }
+    if (draft.packageName.trim().isNotEmpty) {
+      rows.add(('Package', draft.packageName.trim()));
+    }
+    return rows;
   }
 
   @override
@@ -108,6 +95,8 @@ class BookReviewPage extends StatelessWidget {
                   const SizedBox(height: 10),
                   _location(context),
                   const SizedBox(height: 10),
+                  _projectCard(context),
+                  const SizedBox(height: 10),
                   _briefCard(context),
                   const SizedBox(height: 10),
                   _pricing(),
@@ -126,16 +115,7 @@ class BookReviewPage extends StatelessWidget {
                     child: FilledButton(
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => BookCheckoutPage(
-                            vendor: vendor,
-                            home: home,
-                            projectName: projectName,
-                            dateLabel: dateLabel,
-                            time: time,
-                            duration: _duration,
-                            location: _place,
-                            sessionPrice: _base,
-                          ),
+                          builder: (_) => BookCheckoutPage(draft: draft),
                         ),
                       ),
                       style: FilledButton.styleFrom(
@@ -374,8 +354,14 @@ class BookReviewPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_place, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                    const Text('Client location', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
+                    Text(
+                      _place.isEmpty ? 'No map pin selected' : _place,
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      _coords == null ? 'Pinned on Google Maps' : 'Google Maps  •  $_coords',
+                      style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -384,6 +370,46 @@ class BookReviewPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _projectCard(BuildContext context) {
+    final rows = _projectRows;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Text('Project', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w600))),
+              _edit(() => _popPages(context, 2)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (rows.isEmpty)
+            const Text('No project details yet.', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13))
+          else
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              _detail(rows[i].$1, rows[i].$2),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detail(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 118,
+          child: Text(label, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12.5, height: 1.3)),
+        ),
+        Expanded(
+          child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w700, height: 1.3)),
+        ),
+      ],
     );
   }
 
@@ -411,10 +437,17 @@ class BookReviewPage extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(_briefText, style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13, height: 1.4)),
+                child: Text(
+                  _briefText.isEmpty ? 'No brief added.' : _briefText,
+                  style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13, height: 1.4),
+                ),
               ),
             ],
           ),
+          if (draft.notes.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(draft.notes.trim(), style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12.5, height: 1.35)),
+          ],
           if (gallery.isNotEmpty) ...[
             const SizedBox(height: 12),
             Row(
@@ -478,9 +511,23 @@ class BookReviewPage extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
+              const Icon(Icons.photo_camera_outlined, color: Color(0xFF8E8B84), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  draft.packageName.trim().isEmpty ? 'Session price' : draft.packageName.trim(),
+                  style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 14),
+                ),
+              ),
+              Text(_egp(_base), style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
               const Icon(Icons.sell_outlined, color: Color(0xFF8E8B84), size: 20),
               const SizedBox(width: 8),
-              const Expanded(child: Text('Service Fee (5%)', style: TextStyle(color: Color(0xFFD0CBC3), fontSize: 14))),
+              const Expanded(child: Text('Lens platform fee (10%)', style: TextStyle(color: Color(0xFFD0CBC3), fontSize: 14))),
               Text(_egp(_fee), style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 14, fontWeight: FontWeight.w600)),
             ],
           ),

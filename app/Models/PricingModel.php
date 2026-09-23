@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PricingModel extends Model
 {
     protected $fillable = [
-        'slug', 'name_en', 'name_ar', 'description', 'is_active', 'sort_order',
+        'slug', 'vendor_type_id', 'name_en', 'name_ar', 'description', 'is_active', 'sort_order',
     ];
 
     protected function casts(): array
@@ -16,6 +17,22 @@ class PricingModel extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (PricingModel $model): void {
+            if ($model->vendor_type_id) {
+                VendorType::query()->whereKey($model->vendor_type_id)->update([
+                    'pricing_model_id' => $model->id,
+                ]);
+            }
+        });
+    }
+
+    public function vendorType(): BelongsTo
+    {
+        return $this->belongsTo(VendorType::class);
     }
 
     public function fields(): HasMany

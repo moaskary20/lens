@@ -19,13 +19,20 @@ class AppShell extends StatefulWidget {
 
   final Map<String, dynamic> bootstrap;
 
+  static void Function({bool guestPreview})? openBookingsTab;
+
+  static void showBookings({bool guestPreview = false}) {
+    openBookingsTab?.call(guestPreview: guestPreview);
+  }
+
   @override
-  State<AppShell> createState() => _AppShellState();
+  State<AppShell> createState() => AppShellState();
 }
 
-class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin {
+class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin {
   int _index = 0;
   bool _focusSearch = false;
+  bool _guestBookings = false;
   late final AnimationController _menu;
   late final Animation<double> _menuAnim;
 
@@ -37,10 +44,14 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     final home = HomeData.fromJson(widget.bootstrap);
     FavoritesStore.instance.hydrate(home);
     NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
+    AppShell.openBookingsTab = ({bool guestPreview = false}) => openBookings(guestPreview: guestPreview);
   }
 
   @override
   void dispose() {
+    if (AppShell.openBookingsTab != null) {
+      AppShell.openBookingsTab = null;
+    }
     _menu.dispose();
     super.dispose();
   }
@@ -56,7 +67,15 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     final searchIndex = bookingsOn ? 2 : 1;
     final pages = [
       HomePage(data: home, onOpenMenu: _openMenu, onOpenSearch: () => _openSearch(focus: true)),
-      if (bookingsOn) BookingsPage(home: home, onBack: () => setState(() => _index = 0)),
+      if (bookingsOn)
+        BookingsPage(
+          home: home,
+          asRoute: _guestBookings,
+          onBack: () => setState(() {
+            _index = 0;
+            _guestBookings = false;
+          }),
+        ),
       SearchPage(data: home, autofocus: _focusSearch && _index == searchIndex),
       ProfilePage(
         data: home,
@@ -160,6 +179,9 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
           index: visibleIndex,
           onSelect: (index) => setState(() {
             _index = index;
+            if (index != 1) {
+              _guestBookings = false;
+            }
             if (index != searchIndex) {
               _focusSearch = false;
             }
@@ -175,6 +197,18 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       ..translate(-width * 0.18 * t, 24.0 * t)
       ..rotateY(-0.72 * t)
       ..scale(1 - 0.14 * t, 1 - 0.08 * t);
+  }
+
+  void openBookings({bool guestPreview = false}) {
+    final bookingsOn = HomeData.fromJson(widget.bootstrap).on('bookings');
+    if (!bookingsOn) {
+      return;
+    }
+    setState(() {
+      _index = 1;
+      _guestBookings = guestPreview;
+      _focusSearch = false;
+    });
   }
 
   void _openSearch({bool focus = false}) {

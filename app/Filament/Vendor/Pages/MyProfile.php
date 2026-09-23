@@ -68,6 +68,7 @@ class MyProfile extends Page
             'default_travel_fee' => $vendor->default_travel_fee,
             'category_ids' => $vendor->categories()->pluck('categories.id')->all(),
             'filter_tag_ids' => $vendor->filterTags()->pluck('filter_tags.id')->all(),
+            'profile_filters' => VendorProfile::hydrateProfileFilters($vendor),
             'specialties' => $vendor->specialties,
             'delivery_formats' => $vendor->delivery_formats,
             'turnaround_hours' => $vendor->turnaround_hours,
@@ -147,7 +148,7 @@ class MyProfile extends Page
                             ->visible(fn (): bool => ! in_array($vendor->vendorType?->slug, ['photographer'], true)),
                         Select::make('filter_tag_ids')
                             ->label('Filter tags')
-                            ->helperText('Equipment, rooms, and experience tags clients use to find you.')
+                            ->helperText('Optional extra tags. The filter profile below matches the mobile filter screens.')
                             ->multiple()
                             ->searchable()
                             ->preload()
@@ -196,7 +197,8 @@ class MyProfile extends Page
         $state = $this->form->getState();
         $categoryIds = $state['category_ids'] ?? [];
         $filterTagIds = $state['filter_tag_ids'] ?? [];
-        unset($state['category_ids'], $state['filter_tag_ids'], $state['vendor_type_id']);
+        $profileFilters = is_array($state['profile_filters'] ?? null) ? $state['profile_filters'] : [];
+        unset($state['category_ids'], $state['filter_tag_ids'], $state['profile_filters'], $state['vendor_type_id']);
 
         $incomingExtras = is_array($state['extras'] ?? null) ? $state['extras'] : [];
         $existingExtras = $vendor->extras ?? [];
@@ -208,9 +210,10 @@ class MyProfile extends Page
         $vendor->update($state);
         $vendor->categories()->sync($categoryIds);
 
-        if (Feature::enabled('filters') && auth()->user()?->roleCan('gear_tags')) {
-            $vendor->filterTags()->sync($filterTagIds);
-        }
+        $extraIds = Feature::enabled('filters') && auth()->user()?->roleCan('gear_tags')
+            ? $filterTagIds
+            : [];
+        VendorProfile::syncProfileFilters($vendor, $profileFilters, $extraIds);
 
         Notification::make()->title('Profile saved')->success()->send();
     }

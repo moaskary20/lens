@@ -30,6 +30,47 @@ class ApiClient {
     return _decode(response, path);
   }
 
+  Future<Map<String, dynamic>> postForm(
+    String path,
+    Map<String, dynamic> body, {
+    List<http.MultipartFile> files = const [],
+  }) async {
+    final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'));
+    request.headers.addAll({
+      'Accept': 'application/json',
+      'X-Lens-Client': SessionStore.instance.email ?? LensConfig.clientEmail,
+    });
+    _writeFields(request, body);
+    request.files.addAll(files);
+    final streamed = await _client.send(request).timeout(const Duration(seconds: 60));
+    return _decode(await http.Response.fromStream(streamed), path);
+  }
+
+  void _writeFields(http.MultipartRequest request, Map<String, dynamic> body, [String? prefix]) {
+    body.forEach((key, value) {
+      final name = prefix == null ? key : '$prefix[$key]';
+      if (value == null) {
+        return;
+      }
+      if (value is Map<String, dynamic>) {
+        _writeFields(request, value, name);
+        return;
+      }
+      if (value is List) {
+        for (var index = 0; index < value.length; index++) {
+          final item = value[index];
+          if (item is Map<String, dynamic>) {
+            _writeFields(request, item, '$name[$index]');
+          } else if (item != null) {
+            request.fields['$name[$index]'] = '$item';
+          }
+        }
+        return;
+      }
+      request.fields[name] = value is bool ? (value ? '1' : '0') : '$value';
+    });
+  }
+
   Future<Map<String, dynamic>> deleteJson(String path) async {
     final response = await _client
         .delete(Uri.parse('$_baseUrl$path'), headers: _headers)

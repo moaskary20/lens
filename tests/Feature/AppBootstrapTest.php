@@ -26,6 +26,19 @@ class AppBootstrapTest extends TestCase
 
         $this->assertNotEmpty($payload->json('popular.0.vendors.0.cover_url'));
         $this->assertGreaterThan(1, count($payload->json('vendor_types')));
+        $this->assertNotEmpty($payload->json('cities'));
+        $this->assertNotEmpty($payload->json('banks'));
+        $this->assertNotEmpty($payload->json('telecom_wallets'));
+        $register = collect($payload->json('vendor_register'))->keyBy('slug');
+        $this->assertTrue($register->has('photographer'));
+        $this->assertContains('Camera type', collect($register['photographer']['fields'])->pluck('label')->all());
+        $this->assertContains('Lenses available', collect($register['photographer']['fields'])->pluck('label')->all());
+        $this->assertContains('Primary specialties', collect($register['photographer']['fields'])->pluck('label')->all());
+        $this->assertContains('Half-day price (6 hours)', collect($register['photographer']['pricing'])->pluck('label')->all());
+        $this->assertSame('Half day / full day', $register['photographer']['pricing_model']);
+        $this->assertNotEmpty($register['photographer']['pricing_models']);
+        $this->assertContains('Studio Type', collect($register['studio']['fields'])->pluck('label')->all());
+        $this->assertContains('Features & Equipment', collect($register['studio']['fields'])->pluck('label')->all());
 
         $popular = collect($payload->json('popular'))->keyBy('slug');
         $this->assertTrue($popular->has('studio'));

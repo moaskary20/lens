@@ -51,6 +51,12 @@ class PricingModelResource extends Resource
             Section::make('Model')
                 ->description('Admin defines the pricing logic. Vendors only fill in their amounts.')
                 ->schema([
+                    Select::make('vendor_type_id')->label('Vendor type')
+                        ->relationship('vendorType', 'name_en', fn ($query) => $query->where('is_active', true)->orderBy('sort_order'))
+                        ->required()
+                        ->searchable()
+                        ->preload()
+                        ->helperText('This model is assigned to the selected vendor type. Vendors of that type fill these amounts.'),
                     TextInput::make('name_en')->label('Name')->required(),
                     TextInput::make('name_ar')->label('Arabic name'),
                     TextInput::make('slug')->label('Slug')->required()->unique(ignoreRecord: true),
@@ -107,6 +113,7 @@ class PricingModelResource extends Resource
             ->reorderable('sort_order')
             ->columns([
                 TextColumn::make('name_en')->label('Model')->searchable(),
+                TextColumn::make('vendorType.name_en')->label('Vendor type')->placeholder('—'),
                 TextColumn::make('slug')->label('Slug'),
                 TextColumn::make('fields_count')->counts('fields')->label('Fields'),
                 IconColumn::make('is_active')->label('Enabled')->boolean(),

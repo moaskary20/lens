@@ -5,7 +5,7 @@ namespace App\Filament\Vendor\Resources;
 use App\Filament\Vendor\Concerns\OwnsVendorRecords;
 use App\Filament\Vendor\Resources\MyMessageResource\Pages;
 use App\Models\Conversation;
-use App\Models\Message;
+use App\Support\ChatThread;
 use App\Support\Feature;
 use BackedEnum;
 use Filament\Actions\EditAction;
@@ -62,20 +62,9 @@ class MyMessageResource extends Resource
         return $schema->components([
             Placeholder::make('thread')
                 ->hiddenLabel()
-                ->content(function (?Conversation $record): HtmlString {
-                    if (! $record) {
-                        return new HtmlString('<p>No conversation selected.</p>');
-                    }
-
-                    $lines = $record->messages()->with('sender')->orderBy('id')->get()->map(function (Message $message): string {
-                        $who = e($message->sender?->name ?? 'Unknown');
-                        $body = nl2br(e($message->body));
-
-                        return "<p class=\"mb-2\"><strong>{$who}:</strong> {$body}</p>";
-                    });
-
-                    return new HtmlString($lines->isEmpty() ? '<p>No messages yet.</p>' : $lines->implode(''));
-                })
+                ->content(fn (?Conversation $record): HtmlString => $record
+                    ? ChatThread::html($record)
+                    : new HtmlString('<p>No conversation selected.</p>'))
                 ->columnSpanFull(),
         ]);
     }

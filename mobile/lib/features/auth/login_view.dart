@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/auth/role_choice_page.dart';
+import 'package:lens/features/auth/user_register_page.dart';
+import 'package:lens/features/auth/vendor_register_page.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({
     super.key,
     this.intendedRole = 'client',
     this.startInRegister = false,
+    this.bootstrap = const {},
     this.onSuccess,
   });
 
   final String intendedRole;
   final bool startInRegister;
+  final Map<String, dynamic> bootstrap;
   final VoidCallback? onSuccess;
 
   @override
@@ -85,11 +89,13 @@ class _LoginViewState extends State<LoginView> {
     if (!mounted || role == null) {
       return;
     }
-    setState(() {
-      _register = true;
-      _role = role == 'vendor' ? 'vendor' : 'client';
-      _error = null;
-    });
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => role == 'vendor'
+            ? VendorRegisterPage(bootstrap: widget.bootstrap, onSuccess: widget.onSuccess)
+            : UserRegisterPage(bootstrap: widget.bootstrap, onSuccess: widget.onSuccess),
+      ),
+    );
   }
 
   @override

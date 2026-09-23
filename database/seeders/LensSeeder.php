@@ -233,6 +233,10 @@ class LensSeeder extends Seeder
             VendorType::query()->updateOrCreate(['slug' => $type['slug']], [...$type, 'is_active' => true, 'sort_order' => $i]);
         }
 
+        $halfFull->update(['vendor_type_id' => VendorType::query()->where('slug', 'photographer')->value('id')]);
+        $hourly->update(['vendor_type_id' => VendorType::query()->where('slug', 'studio')->value('id')]);
+        $perVideo->update(['vendor_type_id' => VendorType::query()->where('slug', 'ugc')->value('id')]);
+
         $categories = [
             ['slug' => 'fnb', 'name_ar' => 'طعام ومشروبات', 'name_en' => 'Food & Drinks'],
             ['slug' => 'wedding', 'name_ar' => 'أعراس ومناسبات', 'name_en' => 'Weddings & Parties'],

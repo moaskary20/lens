@@ -5,7 +5,9 @@ import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
+import 'package:lens/features/bookings/bookings_page.dart';
+import 'package:lens/features/home/vendor_chat_page.dart';
+import 'package:lens/features/shell/app_shell.dart';
 
 class BookConfirmedPage extends StatelessWidget {
   const BookConfirmedPage({
@@ -16,6 +18,7 @@ class BookConfirmedPage extends StatelessWidget {
     required this.dateLabel,
     required this.time,
     required this.location,
+    this.bookingId,
   });
 
   final VendorCard vendor;
@@ -24,6 +27,7 @@ class BookConfirmedPage extends StatelessWidget {
   final String dateLabel;
   final String time;
   final String location;
+  final int? bookingId;
 
   String get _title {
     if (projectName.trim().isNotEmpty) {
@@ -85,9 +89,7 @@ class BookConfirmedPage extends StatelessWidget {
                     height: 54,
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'Your booking')),
-                      ),
+                      onPressed: () => _openBookings(context),
                       style: FilledButton.styleFrom(
                         backgroundColor: LensColors.primary,
                         foregroundColor: Colors.white,
@@ -111,9 +113,7 @@ class BookConfirmedPage extends StatelessWidget {
                     height: 54,
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: 'Message ${vendor.displayName}')),
-                      ),
+                      onPressed: () => _openChat(context),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Color(0xFF3A3A3E), width: 1.2),
@@ -135,6 +135,41 @@ class BookConfirmedPage extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _openBookings(BuildContext context) {
+    if (AppShell.openBookingsTab != null) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      AppShell.showBookings(guestPreview: true);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => Scaffold(
+          backgroundColor: LensColors.charcoal,
+          body: BookingsPage(
+            home: home,
+            asRoute: true,
+            onBack: () => Navigator.of(routeContext).pop(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openChat(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VendorChatPage(
+          vendor: vendor,
+          projectName: projectName,
+          dateLabel: dateLabel,
+          time: time,
+          location: location,
+          bookingId: bookingId,
         ),
       ),
     );

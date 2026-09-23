@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Message extends Model
 {
     protected $fillable = [
-        'conversation_id', 'sender_id', 'body', 'is_flagged', 'read_at',
+        'conversation_id', 'sender_id', 'body', 'type', 'attachments', 'is_flagged', 'read_at',
     ];
 
     protected function casts(): array
@@ -16,6 +16,7 @@ class Message extends Model
         return [
             'is_flagged' => 'boolean',
             'read_at' => 'datetime',
+            'attachments' => 'array',
         ];
     }
 

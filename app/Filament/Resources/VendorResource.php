@@ -112,7 +112,7 @@ class VendorResource extends Resource
                         ->required()
                         ->live()
                         ->native(false)
-                        ->helperText('Choosing a type loads the matching profile: portfolio, gear, specialties, calendar, and add-ons.'),
+                        ->helperText('Choosing a type loads the Type profile tab — the same filter-screen fields clients use in the app.'),
                     TextInput::make('display_name')->label('Display name')->required(),
                     ...VendorProfile::personalFields(),
                     ...VendorProfile::contactFields(),
@@ -123,6 +123,7 @@ class VendorResource extends Resource
                     FileUpload::make('cover_image')->label('Cover image')->image()->directory('vendors/covers')->columnSpanFull(),
                     Select::make('categories')->label('Services / categories')->relationship('categories', 'name_en')->multiple()->preload(),
                     Select::make('filterTags')->label('Filter tags')
+                        ->helperText('Optional extra tags. The Type profile tab is the same catalog as the mobile filter screens.')
                         ->relationship(
                             'filterTags',
                             'name_en',

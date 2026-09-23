@@ -10,10 +10,11 @@ import 'package:lens/features/home/inbox.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
 class BookingsPage extends StatefulWidget {
-  const BookingsPage({super.key, required this.home, this.onBack});
+  const BookingsPage({super.key, required this.home, this.onBack, this.asRoute = false});
 
   final HomeData home;
   final VoidCallback? onBack;
+  final bool asRoute;
 
   @override
   State<BookingsPage> createState() => _BookingsPageState();
@@ -85,10 +86,10 @@ class _BookingsPageState extends State<BookingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (SessionStore.instance.isGuest) {
-      return const LoginView();
+    if (SessionStore.instance.isGuest && !widget.asRoute) {
+      return LoginView(bootstrap: widget.home.registerCatalog);
     }
-    if (SessionStore.instance.isClient) {
+    if (SessionStore.instance.isGuest || SessionStore.instance.isClient) {
       return _ClientBookings(
         home: widget.home,
         items: _items,
@@ -212,7 +213,7 @@ class _ClientBookings extends StatelessWidget {
             child: Row(
               children: [
                 IconButton(
-                  onPressed: onBack,
+                  onPressed: onBack ?? (Navigator.of(context).canPop() ? () => Navigator.of(context).pop() : null),
                   icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
                 ),
                 const Text('My Bookings', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),

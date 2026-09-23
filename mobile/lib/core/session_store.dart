@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 
@@ -73,6 +74,8 @@ class SessionStore extends ChangeNotifier {
     required String email,
     required String password,
     required String role,
+    Map<String, dynamic> extra = const {},
+    List<http.MultipartFile> files = const [],
   }) async {
     if (!LensConfig.useNetwork) {
       _account = SessionAccount(name: name.trim(), email: email.trim(), role: role);
@@ -80,12 +83,16 @@ class SessionStore extends ChangeNotifier {
       return;
     }
     try {
-      final payload = await _api.postJson('/app/auth/register', {
+      final body = {
         'name': name.trim(),
         'email': email.trim(),
         'password': password,
         'role': role,
-      });
+        ...extra,
+      };
+      final payload = files.isEmpty
+          ? await _api.postJson('/app/auth/register', body)
+          : await _api.postForm('/app/auth/register', body, files: files);
       _account = SessionAccount.fromJson(payload);
       notifyListeners();
     } on ApiException {

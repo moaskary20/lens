@@ -201,4 +201,48 @@ class Vendor extends Model
             ?->fields
             ->first(fn (PricingModelField $field): bool => $field->package_type === $packageType);
     }
+
+    /**
+     * @return list<array{key: string, label: string, price: float, duration_hours: int|null}>
+     */
+    public function bookablePackages(): array
+    {
+        $packages = [];
+        foreach ($this->resolvedPricingModel()?->fields ?? [] as $field) {
+            $amount = $field->amountFor($this);
+            if ($amount === null || $amount <= 0) {
+                continue;
+            }
+
+            $packages[] = [
+                'key' => $field->package_type,
+                'label' => $field->label,
+                'price' => (float) $amount,
+                'duration_hours' => $field->duration_hours ? (int) $field->duration_hours : null,
+            ];
+        }
+
+        if ($packages !== []) {
+            return $packages;
+        }
+
+        foreach ([
+            ['hourly', 'Price per hour per location', $this->hourly_price, 1],
+            ['half_day', 'Half-day price (6 hours)', $this->half_day_price, 6],
+            ['full_day', 'Full-day price (12 hours)', $this->full_day_price, 12],
+            ['per_video', 'Price per video', $this->per_video_price, null],
+        ] as [$key, $label, $price, $hours]) {
+            if ($price === null || (float) $price <= 0) {
+                continue;
+            }
+            $packages[] = [
+                'key' => $key,
+                'label' => $label,
+                'price' => (float) $price,
+                'duration_hours' => $hours,
+            ];
+        }
+
+        return $packages;
+    }
 }

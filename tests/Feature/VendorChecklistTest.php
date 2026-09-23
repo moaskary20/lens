@@ -78,9 +78,9 @@ class VendorChecklistTest extends TestCase
             ->assertSee('PayPal')
             ->assertSee('Vendor type')
             ->assertSee('Photographer')
-            ->assertSee('Cameras')
-            ->assertSee('Lenses')
-            ->assertSee('Lighting / strobes')
+            ->assertSee('Camera type')
+            ->assertSee('Lenses available')
+            ->assertSee('Lighting gear')
             ->assertSee('Filter tags')
             ->assertSee('Verified — you can receive bookings.');
 
@@ -105,8 +105,8 @@ class VendorChecklistTest extends TestCase
 
         $this->actingAs($studio)->get('/vendor/my-profile')
             ->assertOk()
-            ->assertSee('Room / space inventory')
-            ->assertSee('Available props')
+            ->assertSee('Studio Type')
+            ->assertSee('Features & Equipment')
             ->assertSee('Pending review by Lens staff.');
         $this->actingAs($studio)->get('/vendor/availability')
             ->assertOk()

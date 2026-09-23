@@ -1,62 +1,72 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/features/home/book_draft.dart';
+import 'package:lens/features/home/book_map_picker_page.dart';
+import 'package:lens/features/home/book_project_catalog.dart';
 import 'package:lens/features/home/book_review_page.dart';
-import 'package:lens/features/home/filter_page.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
 class BookProjectPage extends StatefulWidget {
-  const BookProjectPage({
-    super.key,
-    required this.vendor,
-    required this.home,
-    required this.dateLabel,
-    required this.time,
-    required this.packageName,
-    required this.packageDetails,
-  });
+  const BookProjectPage({super.key, required this.draft});
 
-  final VendorCard vendor;
-  final HomeData home;
-  final String dateLabel;
-  final String time;
-  final String packageName;
-  final String packageDetails;
+  final BookDraft draft;
 
   @override
   State<BookProjectPage> createState() => _BookProjectPageState();
 }
 
 class _BookProjectPageState extends State<BookProjectPage> {
-  static const _types = [
-    'Brand Campaign',
-    'Food Campaign',
-    'Product',
-    'Editorial',
-    'Social Content',
-    'Event',
-    'Menu / F&B',
-    'Personal',
-  ];
-
   final _name = TextEditingController();
   final _brief = TextEditingController();
   final _notes = TextEditingController();
-  String? _type;
-  String? _location;
-  late List<String> _images;
+  String? _error;
+  late List<BookPriceOption> _prices;
+  BookPriceOption? _price;
 
-  VendorCard get vendor => widget.vendor;
+  BookDraft get draft => widget.draft;
+  VendorCard get vendor => draft.vendor;
+
+  String get _typeLabel => BookProjectCatalog.typeLabel(vendor.vendorType);
+  List<String> get _typeOptions => BookProjectCatalog.typeOptions(vendor.vendorType);
+  List<BookProjectField> get _extras => BookProjectCatalog.extraFields(vendor.vendorType);
 
   @override
   void initState() {
     super.initState();
+    _name.text = draft.projectName;
+    _brief.text = draft.brief;
+    _notes.text = draft.notes;
+    _prices = BookProjectCatalog.pricesFor(vendor);
+    _price = _matchPrice(draft.packageKey, _prices);
     final shots = VendorPhotos.shots(vendor.vendorType, vendor.id);
-    _images = shots.take(3).toList();
+    if (draft.images.isEmpty) {
+      draft.images = shots.take(3).toList();
+    }
+    _loadPrices();
+  }
+
+  Future<void> _loadPrices() async {
+    try {
+      final payload = await ApiClient().getJson('/app/vendors/${vendor.id}');
+      final remote = (payload['packages'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => BookPriceOption.fromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.price > 0)
+          .toList();
+      if (!mounted || remote.isEmpty) {
+        return;
+      }
+      setState(() {
+        _prices = remote;
+        _price = _matchPrice(_price?.key ?? draft.packageKey, remote);
+      });
+    } catch (_) {}
   }
 
   @override
@@ -93,40 +103,57 @@ class _BookProjectPageState extends State<BookProjectPage> {
                     style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, height: 1.15),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Give your creator enough context to prepare for your session.',
-                    style: TextStyle(color: Color(0xFF8E8B84), fontSize: 14, height: 1.35),
+                  Text(
+                    'Fill the ${vendor.vendorTypeName.toLowerCase()} brief, choose a price, and pin the location on Google Maps.',
+                    style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 14, height: 1.35),
                   ),
                   const SizedBox(height: 18),
-                  _label('Project Name'),
+                  _label('Project Name *'),
                   _input(
                     controller: _name,
                     icon: Icons.calendar_today_outlined,
                     hint: 'E.g. Summer Menu Campaign',
                   ),
                   const SizedBox(height: 14),
-                  _label('Project Type'),
+                  _label('$_typeLabel *'),
                   _select(
                     icon: Icons.widgets_outlined,
-                    value: _type,
-                    hint: 'Select project type',
-                    onTap: () => _pick('Select project type', _types, _type, (value) => _type = value),
+                    value: draft.projectType.isEmpty ? null : draft.projectType,
+                    hint: 'Select $_typeLabel',
+                    onTap: () => _pick('Select $_typeLabel', _typeOptions, draft.projectType, (value) => draft.projectType = value),
                   ),
+                  for (final field in _extras) ...[
+                    const SizedBox(height: 14),
+                    _label('${field.label}${field.required ? ' *' : ''}'),
+                    _select(
+                      icon: Icons.tune_outlined,
+                      value: draft.details[field.key],
+                      hint: 'Select ${field.label.toLowerCase()}',
+                      onTap: () => _pick(field.label, field.options, draft.details[field.key], (value) => draft.details[field.key] = value),
+                    ),
+                  ],
                   const SizedBox(height: 14),
-                  _label('Location'),
+                  _label('Session price *'),
+                  _priceGrid(),
+                  const SizedBox(height: 14),
+                  _label('Location *'),
                   _select(
                     icon: Icons.location_on_outlined,
-                    value: _location,
-                    hint: 'Select location',
-                    onTap: () => _pick('Select location', CategoryFilters.cityOptions, _location, (value) => _location = value),
+                    value: draft.location.isEmpty ? null : draft.location,
+                    hint: 'Pin on Google Maps',
+                    onTap: _pickLocation,
                   ),
                   const SizedBox(height: 14),
-                  _label('Short Brief'),
+                  _label('Short Brief *'),
                   _area(
                     controller: _brief,
                     icon: Icons.description_outlined,
                     hint: 'Tell us about your project, goals, and what you have in mind...',
                   ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_error!, style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.w600)),
+                  ],
                   const SizedBox(height: 16),
                   _referencesHead(),
                   const SizedBox(height: 10),
@@ -151,22 +178,7 @@ class _BookProjectPageState extends State<BookProjectPage> {
                 height: 54,
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => BookReviewPage(
-                        vendor: vendor,
-                        home: widget.home,
-                        dateLabel: widget.dateLabel,
-                        time: widget.time,
-                        packageName: widget.packageName,
-                        packageDetails: widget.packageDetails,
-                        location: _location ?? '',
-                        brief: _brief.text,
-                        images: _images,
-                        projectName: _name.text,
-                      ),
-                    ),
-                  ),
+                  onPressed: _continue,
                   style: FilledButton.styleFrom(
                     backgroundColor: LensColors.primary,
                     foregroundColor: Colors.white,
@@ -261,7 +273,7 @@ class _BookProjectPageState extends State<BookProjectPage> {
                   ),
                 ],
               ),
-              if (widget.home.on('reviews')) ...[
+              if (draft.home.on('reviews')) ...[
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -423,8 +435,8 @@ class _BookProjectPageState extends State<BookProjectPage> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          for (var i = 0; i < _images.length; i++) ...[
-            _thumb(_images[i], () => setState(() => _images.removeAt(i))),
+          for (var i = 0; i < draft.images.length; i++) ...[
+            _thumb(draft.images[i], () => setState(() => draft.images.removeAt(i))),
             const SizedBox(width: 10),
           ],
           GestureDetector(
@@ -515,10 +527,117 @@ class _BookProjectPageState extends State<BookProjectPage> {
     );
   }
 
+  BookPriceOption? _matchPrice(String key, List<BookPriceOption> options) {
+    for (final option in options) {
+      if (option.key == key) {
+        return option;
+      }
+    }
+    return options.isEmpty ? null : options.first;
+  }
+
   void _addImage() {
-    final pool = VendorPhotos.shots(vendor.vendorType, vendor.id + _images.length + 1);
-    final next = pool.firstWhere((url) => !_images.contains(url), orElse: () => pool.first);
-    setState(() => _images.add(next));
+    final pool = VendorPhotos.shots(vendor.vendorType, vendor.id + draft.images.length + 1);
+    final next = pool.firstWhere((url) => !draft.images.contains(url), orElse: () => pool.first);
+    setState(() => draft.images.add(next));
+  }
+
+  Widget _priceGrid() {
+    if (_prices.isEmpty) {
+      return const Text('This vendor has no published prices yet.', style: TextStyle(color: Color(0xFFFF6B6B)));
+    }
+    return Column(
+      children: [
+        for (final option in _prices) ...[
+          GestureDetector(
+            onTap: () => setState(() => _price = option),
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF141416),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _price?.key == option.key ? LensColors.primary : const Color(0xFF2A2A2E)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(option.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  ),
+                  Text('EGP ${option.price.round()}', style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.of(context).push<PickedMapLocation>(
+      MaterialPageRoute(
+        builder: (_) => BookMapPickerPage(
+          initial: draft.latitude != null && draft.longitude != null
+              ? PickedMapLocation(label: draft.location, latitude: draft.latitude!, longitude: draft.longitude!)
+              : null,
+          fallbackLabel: _vendorLocation,
+          fallbackLatitude: vendor.mapLatitude,
+          fallbackLongitude: vendor.mapLongitude,
+        ),
+      ),
+    );
+    if (result == null) {
+      return;
+    }
+    setState(() {
+      draft.location = result.label;
+      draft.latitude = result.latitude;
+      draft.longitude = result.longitude;
+    });
+  }
+
+  void _continue() {
+    final missing = <String>[];
+    if (_name.text.trim().isEmpty) {
+      missing.add('project name');
+    }
+    if (draft.projectType.isEmpty) {
+      missing.add(_typeLabel.toLowerCase());
+    }
+    for (final field in _extras.where((item) => item.required)) {
+      if ((draft.details[field.key] ?? '').isEmpty) {
+        missing.add(field.label.toLowerCase());
+      }
+    }
+    if (_price == null || _price!.price <= 0) {
+      missing.add('session price');
+    }
+    if (draft.location.trim().isEmpty) {
+      missing.add('Google Maps location');
+    }
+    if (_brief.text.trim().isEmpty) {
+      missing.add('short brief');
+    }
+    if (missing.isNotEmpty) {
+      setState(() => _error = 'Please enter ${missing.join(', ')}.');
+      return;
+    }
+
+    draft.projectName = _name.text.trim();
+    draft.brief = _brief.text.trim();
+    draft.notes = _notes.text.trim();
+    draft.packageKey = _price!.key;
+    draft.packageName = _price!.label;
+    draft.sessionPrice = _price!.price;
+    if (_price!.durationHours != null) {
+      draft.packageDetails = '${_price!.durationHours} Hours';
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => BookReviewPage(draft: draft)),
+    );
   }
 
   Future<void> _pick(String title, List<String> options, String? selected, ValueChanged<String> onPick) async {

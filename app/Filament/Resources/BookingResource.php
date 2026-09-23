@@ -29,6 +29,7 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -120,7 +121,11 @@ class BookingResource extends Resource
                     ->helperText('Compared to the vendor home governorate. A travel fee is added when they differ.')
                     ->live()
                     ->afterStateUpdated(fn (Get $get, Set $set) => self::recalculateTravel($get, $set)),
-                TextInput::make('location_text')->label('Location details'),
+                TextInput::make('location_text')->label('Map location')
+                    ->helperText('Pinned from Google Maps on the mobile booking form.')
+                    ->columnSpanFull(),
+                TextInput::make('location_lat')->label('Latitude')->numeric(),
+                TextInput::make('location_lng')->label('Longitude')->numeric(),
             ])->columns(2),
             Section::make('Checkout quote')
                 ->description('Client pays session + travel (if outside the vendor governorate) + platform fee + tax. Travel is paid in full to the vendor; the 20% commission applies to the session only.')
@@ -144,6 +149,17 @@ class BookingResource extends Resource
                     TextInput::make('total_paid')->label('Client pays (held in escrow)')->numeric()->prefix(Finance::currency())->readOnly(),
                     TextInput::make('vendor_commission')->label('Platform commission (20%)')->numeric()->prefix(Finance::currency())->readOnly(),
                     TextInput::make('vendor_net')->label('Vendor net after completion')->numeric()->prefix(Finance::currency())->readOnly(),
+                    Select::make('payment_method')->label('Payment method')->options([
+                        'card' => 'Bank card',
+                        'wallet' => 'Mobile wallet',
+                        'paypal' => 'PayPal',
+                    ])->native(false),
+                    KeyValue::make('payment_details')
+                        ->label('Payment details')
+                        ->keyLabel('Field')
+                        ->valueLabel('Value')
+                        ->helperText('Sanitized client payment details from Secure Checkout. Full card numbers are never stored.')
+                        ->columnSpanFull(),
                     Select::make('escrow_status')->label('Escrow status')->options([
                         'none' => 'Disabled',
                         'held' => 'Held (100%)',
@@ -160,8 +176,15 @@ class BookingResource extends Resource
                     Textarea::make('notes')->label('Notes')->columnSpanFull(),
                 ])->columns(2),
             Section::make('Client project')
-                ->description('The client creates this project when they book: a brief plus reference files the vendor works from. Delivery files are uploaded by the vendor on the Delivery tab.')
+                ->description('The client fills these fields on Tell them about your project. They follow the vendor specialty and include the chosen price and map pin.')
                 ->schema([
+                    TextInput::make('project_name')->label('Project name'),
+                    TextInput::make('project_type')->label('Project type / specialty'),
+                    KeyValue::make('project_details')
+                        ->label('Specialty details')
+                        ->keyLabel('Field')
+                        ->valueLabel('Answer')
+                        ->columnSpanFull(),
                     Textarea::make('client_brief')->label('Project brief')->rows(4)->columnSpanFull()
                         ->helperText('What the client wants delivered — mood, shot list, usage, and deadlines.'),
                     FileUpload::make('client_project_files')
@@ -200,7 +223,16 @@ class BookingResource extends Resource
                         default => 'gray',
                     }),
                 TextColumn::make('scheduled_at')->label('Schedule')->dateTime('Y-m-d H:i')->sortable(),
-                TextColumn::make('client_brief')->label('Project')->limit(28)->toggleable(),
+                TextColumn::make('project_name')->label('Project')->limit(28)->toggleable(),
+                TextColumn::make('location_text')->label('Location')->limit(24)->toggleable(),
+                TextColumn::make('session_price')->label('Price')->money(Finance::currency())->toggleable(),
+                TextColumn::make('payment_method')->label('Pay')->formatStateUsing(fn (?string $state): string => match ($state) {
+                    'card' => 'Bank card',
+                    'wallet' => 'Mobile wallet',
+                    'paypal' => 'PayPal',
+                    default => $state ?: '—',
+                })->toggleable(),
+                TextColumn::make('client_brief')->label('Brief')->limit(28)->toggleable(),
                 TextColumn::make('deliverables_count')->counts('deliverables')->label('Delivered files')->toggleable(),
             ])
             ->filters([

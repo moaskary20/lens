@@ -18,9 +18,11 @@ class Booking extends Model
         'availability_id',
         'duration_hours', 'package_type', 'location_text', 'city_id', 'session_price',
         'travel_fee', 'client_fee',
-        'tax_amount', 'total_paid', 'discount_amount', 'coupon_id', 'vendor_commission', 'vendor_net', 'escrow_status',
+        'tax_amount', 'total_paid', 'discount_amount', 'coupon_id', 'payment_method', 'vendor_commission', 'vendor_net', 'escrow_status',
         'payout_status', 'checked_in_at', 'approved_at', 'cancelled_at', 'cancelled_by',
-        'cancellation_reason', 'revision_count', 'notes', 'client_brief', 'client_project_files',
+        'cancellation_reason', 'revision_count', 'notes', 'project_name', 'project_type',
+        'client_brief', 'project_details', 'client_project_files',
+        'location_lat', 'location_lng', 'payment_details',
     ];
 
     protected function casts(): array
@@ -38,7 +40,11 @@ class Booking extends Model
             'discount_amount' => 'decimal:2',
             'vendor_commission' => 'decimal:2',
             'vendor_net' => 'decimal:2',
+            'location_lat' => 'decimal:7',
+            'location_lng' => 'decimal:7',
+            'project_details' => 'array',
             'client_project_files' => 'array',
+            'payment_details' => 'array',
         ];
     }
 

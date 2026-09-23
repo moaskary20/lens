@@ -47,6 +47,18 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Lens uses your location to show nearby vendors on the map.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Lens needs your photos and videos to add previous projects to your vendor profile.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Lens needs the camera to add photos or videos to previous projects.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Lens needs the microphone when you record a project video.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>https</string>
+		<string>whatsapp</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

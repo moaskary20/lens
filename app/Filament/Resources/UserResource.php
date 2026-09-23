@@ -49,7 +49,10 @@ class UserResource extends Resource
             Section::make('Profile')->schema([
                 TextInput::make('name')->label('Name')->required()->maxLength(255),
                 TextInput::make('email')->label('Email')->email()->required()->unique(ignoreRecord: true),
-                TextInput::make('phone')->label('Phone')->tel()->unique(ignoreRecord: true),
+                TextInput::make('phone')->label('Phone')->tel()->unique(ignoreRecord: true)
+                    ->rule(\App\Support\Egypt::mobileRule())
+                    ->validationMessages(['regex' => \App\Support\Egypt::mobileMessage()])
+                    ->helperText('Egyptian mobile: 11 digits starting with 010, 011, 012, or 015.'),
                 TextInput::make('password')->label('Password')->password()->revealable()
                     ->required(fn (string $operation): bool => $operation === 'create')
                     ->dehydrated(fn (?string $state): bool => filled($state)),

@@ -68,7 +68,9 @@ class VendorRequestResource extends Resource
             ->columns([
                 TextColumn::make('reference')->label('Reference')->searchable(),
                 TextColumn::make('client.name')->label('Client')->searchable(),
+                TextColumn::make('project_name')->label('Project')->limit(24)->toggleable(),
                 TextColumn::make('package_type')->label('Package')->formatStateUsing(fn (?string $state): string => str_replace('_', ' ', $state ?? '—')),
+                TextColumn::make('location_text')->label('Location')->limit(22)->toggleable(),
                 TextColumn::make('scheduled_at')->label('When')->dateTime('Y-m-d H:i'),
                 TextColumn::make('city.name_en')->label('Governorate'),
                 TextColumn::make('session_price')->label('Your rate')->money(Finance::currency()),

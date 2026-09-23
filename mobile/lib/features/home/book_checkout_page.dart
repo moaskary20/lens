@@ -1,51 +1,55 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/home/book_confirmed_page.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
+import 'package:lens/features/home/book_draft.dart';
+import 'package:lens/features/home/book_payment_page.dart';
+import 'package:lens/features/home/book_project_catalog.dart';
 
 class BookCheckoutPage extends StatefulWidget {
-  const BookCheckoutPage({
-    super.key,
-    required this.vendor,
-    required this.home,
-    required this.projectName,
-    required this.dateLabel,
-    required this.time,
-    required this.duration,
-    required this.location,
-    required this.sessionPrice,
-  });
+  const BookCheckoutPage({super.key, required this.draft});
 
-  final VendorCard vendor;
-  final HomeData home;
-  final String projectName;
-  final String dateLabel;
-  final String time;
-  final String duration;
-  final String location;
-  final double sessionPrice;
+  final BookDraft draft;
 
   @override
   State<BookCheckoutPage> createState() => _BookCheckoutPageState();
 }
 
 class _BookCheckoutPageState extends State<BookCheckoutPage> {
-  String _method = 'card';
-  String? _promo;
+  final _promo = TextEditingController();
+  String? _promoError;
+  String? _payError;
+  bool _busy = false;
+  double _discount = 0;
+  double _quotedTotal = 0;
 
-  VendorCard get vendor => widget.vendor;
+  BookDraft get draft => widget.draft;
+  VendorCard get vendor => draft.vendor;
 
-  double get _session => widget.sessionPrice;
+  double get _session => draft.sessionPrice;
   double get _platform => _session * 0.10;
-  double get _tax => (_session + _platform) * 0.14;
-  double get _total => _session + _platform + _tax;
+  double get _tax => 0;
+  double get _total => _quotedTotal > 0 ? _quotedTotal : (_session + _platform + _tax - _discount);
 
-  String get _title => widget.projectName.trim().isEmpty ? 'Product Photoshoot' : widget.projectName.trim();
+  String get _title => draft.projectName.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _promo.text = draft.promoCode ?? '';
+  }
+
+  @override
+  void dispose() {
+    _promo.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,8 +80,12 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
                   _escrow(),
                   const SizedBox(height: 14),
                   _methods(),
-                  const SizedBox(height: 10),
-                  _promoRow(),
+                  const SizedBox(height: 14),
+                  _promoBox(),
+                  if (_payError != null) ...[
+                    const SizedBox(height: 10),
+                    Text(_payError!, style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.w600)),
+                  ],
                 ],
               ),
             ),
@@ -89,18 +97,7 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
                     height: 54,
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => BookConfirmedPage(
-                            vendor: vendor,
-                            home: widget.home,
-                            projectName: _title,
-                            dateLabel: widget.dateLabel,
-                            time: widget.time,
-                            location: widget.location,
-                          ),
-                        ),
-                      ),
+                      onPressed: _busy ? null : _confirm,
                       style: FilledButton.styleFrom(
                         backgroundColor: LensColors.primary,
                         foregroundColor: Colors.white,
@@ -191,7 +188,10 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(
+                  _title.isEmpty ? vendor.displayName : _title,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 2),
                 Row(
                   children: [
@@ -209,6 +209,13 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
                     ],
                   ],
                 ),
+                if (draft.projectType.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${BookProjectCatalog.typeLabel(vendor.vendorType)}  •  ${draft.projectType}',
+                    style: const TextStyle(color: Color(0xFFB0ABA3), fontSize: 12),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -216,7 +223,7 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '${widget.dateLabel}  •  ${widget.time} (${widget.duration})',
+                        '${draft.dateLabel}  •  ${draft.time} (${draft.durationLabel})',
                         style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 11.5),
                       ),
                     ),
@@ -228,10 +235,17 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
                     const Icon(Icons.location_on_outlined, color: Color(0xFF8E8B84), size: 14),
                     const SizedBox(width: 5),
                     Expanded(
-                      child: Text(widget.location, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
+                      child: Text(
+                        draft.location.isEmpty ? 'No map pin' : draft.location,
+                        style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
+                if (draft.packageName.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(draft.packageName.trim(), style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
+                ],
               ],
             ),
           ),
@@ -260,11 +274,17 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
         children: [
           const Text('Cost Breakdown', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
-          _costRow('Session Price', _egp(_session)),
+          _costRow(draft.packageName.trim().isEmpty ? 'Session Price' : draft.packageName.trim(), _egp(_session)),
           const SizedBox(height: 10),
           _costRow('Lens Platform Fee (10%)', _egp(_platform), info: 'A 10% platform fee covers booking protection, escrow, and support.'),
-          const SizedBox(height: 10),
-          _costRow('Taxes (14%)', _egp(_tax), info: '14% VAT is applied on the session price plus platform fee.'),
+          if (_tax > 0) ...[
+            const SizedBox(height: 10),
+            _costRow('Taxes', _egp(_tax)),
+          ],
+          if (_discount > 0) ...[
+            const SizedBox(height: 10),
+            _costRow('Promo discount', '- ${_egp(_discount)}'),
+          ],
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Divider(height: 1, thickness: 1, color: Color(0xFF2A2A2E)),
@@ -347,12 +367,7 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
             const Expanded(
               child: Text('Payment Method', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
             ),
-            GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'Add payment method')),
-              ),
-              child: const Text('+ Add New', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
-            ),
+            const Text('Held in Lens escrow', style: TextStyle(color: Color(0xFF8E8B84), fontWeight: FontWeight.w600, fontSize: 12)),
           ],
         ),
         const SizedBox(height: 10),
@@ -363,21 +378,29 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
               _methodTile(
                 id: 'card',
                 leading: const Icon(Icons.credit_card, color: Color(0xFFD0CBC3), size: 22),
-                title: '••••  4242',
-                subtitle: 'Visa  •  Expires 08/29',
+                title: 'Bank card',
+                subtitle: _methodSummary('card', 'Visa, Mastercard, or Meeza'),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(color: const Color(0xFF1A3A8A), borderRadius: BorderRadius.circular(6)),
-                  child: const Text('VISA', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+                  child: const Text('CARD', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
                 ),
               ),
               const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A2E)),
               _methodTile(
-                id: 'apple',
-                leading: const Text('', style: TextStyle(color: Colors.white, fontSize: 22, height: 1)),
-                title: 'Apple Pay',
-                subtitle: 'Pay securely with Apple Pay',
-                trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
+                id: 'wallet',
+                leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFD0CBC3), size: 22),
+                title: 'Mobile wallet',
+                subtitle: _methodSummary('wallet', 'Vodafone Cash, Orange Cash, e& cash, WE Pay'),
+                trailing: const Icon(Icons.phone_iphone_rounded, color: Color(0xFF8E8B84)),
+              ),
+              const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A2E)),
+              _methodTile(
+                id: 'paypal',
+                leading: const Icon(Icons.payments_outlined, color: Color(0xFFD0CBC3), size: 22),
+                title: 'PayPal',
+                subtitle: _methodSummary('paypal', 'Pay with your PayPal balance or linked card'),
+                trailing: const Text('PayPal', style: TextStyle(color: Color(0xFF003087), fontWeight: FontWeight.w800, fontSize: 12)),
               ),
             ],
           ),
@@ -393,9 +416,9 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
     required String subtitle,
     required Widget trailing,
   }) {
-    final selected = _method == id;
+    final selected = draft.paymentMethod == id;
     return InkWell(
-      onTap: () => setState(() => _method = id),
+      onTap: () => _openMethod(id),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
@@ -441,72 +464,184 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
     );
   }
 
-  Widget _promoRow() {
-    return GestureDetector(
-      onTap: _enterPromo,
-      child: _box(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        child: Row(
-          children: [
-            const Icon(Icons.sell_outlined, color: Color(0xFF8E8B84), size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _promo == null ? 'Promo Code (Optional)' : 'Promo: $_promo',
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+  Widget _promoBox() {
+    return _box(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Promo code', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          const Text('Add a Lens offer code before you pay.', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12.5)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _promo,
+                  textCapitalization: TextCapitalization.characters,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+                  decoration: InputDecoration(
+                    hintText: 'WELCOME200',
+                    hintStyle: const TextStyle(color: Color(0xFF6B6B70), letterSpacing: 0),
+                    prefixIcon: const Icon(Icons.sell_outlined, color: Color(0xFF8E8B84)),
+                    filled: true,
+                    fillColor: const Color(0xFF0D0D0F),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2E))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2E))),
+                  ),
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 48,
+                child: FilledButton(
+                  onPressed: _applyPromo,
+                  style: FilledButton.styleFrom(backgroundColor: LensColors.primary, foregroundColor: Colors.white, shape: const StadiumBorder()),
+                  child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+          if (_promoError != null) ...[
+            const SizedBox(height: 8),
+            Text(_promoError!, style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 12.5, fontWeight: FontWeight.w600)),
           ],
+          if (_discount > 0) ...[
+            const SizedBox(height: 8),
+            Text('Saved ${_egp(_discount)}', style: const TextStyle(color: Color(0xFF7DCE9A), fontWeight: FontWeight.w700)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _methodSummary(String id, String fallback) {
+    if (draft.payment?.method == id && (draft.payment?.summary.isNotEmpty ?? false)) {
+      return draft.payment!.summary;
+    }
+    return fallback;
+  }
+
+  Future<void> _openMethod(String id) async {
+    draft.paymentMethod = id;
+    setState(() => _payError = null);
+    final result = await Navigator.of(context).push<BookPaymentDetails>(
+      MaterialPageRoute(
+        builder: (_) => BookPaymentPage(
+          method: id,
+          home: draft.home,
+          existing: draft.payment?.method == id ? draft.payment : null,
+          amountLabel: _egp(_total),
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (result != null) {
+        draft.payment = result;
+        draft.paymentMethod = result.method;
+      }
+    });
+  }
+
+  Future<void> _confirm() async {
+    if (!draft.hasPaymentDetails) {
+      setState(() => _payError = 'Open ${_methodTitle(draft.paymentMethod)} and enter the payment details first.');
+      return;
+    }
+    final bookingId = await _persistBooking();
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BookConfirmedPage(
+          vendor: vendor,
+          home: draft.home,
+          projectName: _title,
+          dateLabel: draft.dateLabel,
+          time: draft.time,
+          location: draft.location,
+          bookingId: bookingId,
         ),
       ),
     );
   }
 
-  Future<void> _enterPromo() async {
-    final controller = TextEditingController(text: _promo);
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF141416),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Promo Code', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Enter code',
-                  hintStyle: const TextStyle(color: Color(0xFF6B6B70)),
-                  filled: true,
-                  fillColor: const Color(0xFF0D0D0F),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2E))),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(context, controller.text.trim()),
-                  style: FilledButton.styleFrom(backgroundColor: LensColors.primary, foregroundColor: Colors.white),
-                  child: const Text('Apply'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    controller.dispose();
-    if (result != null) {
-      setState(() => _promo = result.isEmpty ? null : result);
+  String _methodTitle(String id) => switch (id) {
+        'wallet' => 'Mobile wallet',
+        'paypal' => 'PayPal',
+        _ => 'Bank card',
+      };
+
+  Future<void> _applyPromo() async {
+    final code = _promo.text.trim();
+    draft.promoCode = code.isEmpty ? null : code;
+    if (code.isEmpty) {
+      setState(() {
+        _discount = 0;
+        _quotedTotal = 0;
+        _promoError = null;
+      });
+      return;
+    }
+    try {
+      final payload = await ApiClient().postJson('/app/bookings/quote', {
+        'vendor_id': vendor.id,
+        'session_price': _session,
+        'promo_code': code,
+        'location_text': draft.location,
+      });
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _discount = (payload['discount_amount'] as num?)?.toDouble() ?? 0;
+        _quotedTotal = (payload['total_paid'] as num?)?.toDouble() ?? 0;
+        _promoError = _discount > 0 ? null : 'Code accepted with no extra discount.';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _promoError = 'This promo code is not valid.');
+    }
+  }
+
+  Future<int?> _persistBooking() async {
+    draft.promoCode = _promo.text.trim().isEmpty ? null : _promo.text.trim();
+    if (!LensConfig.useNetwork || !SessionStore.instance.isClient) {
+      return null;
+    }
+    try {
+      final payload = await ApiClient().postJson('/app/bookings', {
+        'vendor_id': vendor.id,
+        'project_name': _title,
+        'project_type': draft.projectType,
+        'client_brief': draft.brief,
+        'location_text': draft.location,
+        'location_lat': draft.latitude,
+        'location_lng': draft.longitude,
+        'package_type': draft.packageKey,
+        'session_price': _session,
+        'scheduled_at': draft.scheduledAt?.toIso8601String(),
+        'duration_hours': draft.packageKey.contains('full') ? 12 : (draft.packageKey.contains('hour') ? 4 : 6),
+        'payment_method': draft.paymentMethod,
+        'payment_details': draft.payment?.toApi(),
+        'promo_code': draft.promoCode,
+        'project_details': draft.details,
+        'notes': draft.notes,
+      });
+      return payload['id'] is int ? payload['id'] as int : int.tryParse('${payload['id']}');
+    } catch (error) {
+      if (!mounted) {
+        return null;
+      }
+      setState(() => _payError = error.toString());
+      return null;
     }
   }
 

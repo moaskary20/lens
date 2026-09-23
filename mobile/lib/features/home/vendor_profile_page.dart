@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
+import 'package:lens/core/contact_launch.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/home/book_date_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
+import 'package:lens/features/home/vendor_chat_page.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
-void openVendorProfile(BuildContext context, VendorCard vendor, HomeData home) {
+void openVendorProfile(BuildContext context, VendorCard vendor, HomeData home, {bool booked = false}) {
   Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => VendorProfilePage(vendor: vendor, home: home)),
+    MaterialPageRoute<void>(builder: (_) => VendorProfilePage(vendor: vendor, home: home, booked: booked)),
   );
 }
 
 class VendorProfilePage extends StatefulWidget {
-  const VendorProfilePage({super.key, required this.vendor, required this.home});
+  const VendorProfilePage({super.key, required this.vendor, required this.home, this.booked = false});
 
   final VendorCard vendor;
   final HomeData home;
+  final bool booked;
 
   @override
   State<VendorProfilePage> createState() => _VendorProfilePageState();
@@ -42,8 +45,25 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   late List<String> _equipment;
   late List<String> _specialties;
   late List<_Package> _packages;
+  String _contactPhone = '';
+  String _whatsapp = '';
 
   VendorCard get vendor => widget.vendor;
+  bool get booked => widget.booked;
+
+  String get _phone {
+    if (_contactPhone.isNotEmpty) {
+      return _contactPhone.replaceAll(RegExp(r'\D'), '');
+    }
+    return '010${vendor.id.toString().padLeft(8, '0')}';
+  }
+
+  String get _whatsappNumber {
+    if (_whatsapp.isNotEmpty) {
+      return _whatsapp.replaceAll(RegExp(r'\D'), '');
+    }
+    return _phone;
+  }
 
   @override
   void initState() {
@@ -127,6 +147,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         if (packages.isNotEmpty) {
           _packages = packages;
         }
+        _contactPhone = payload['contact_phone']?.toString() ?? _contactPhone;
+        _whatsapp = payload['whatsapp']?.toString() ?? _whatsapp;
       });
     } catch (_) {
       // Keep the listing snapshot when the profile API is offline.
@@ -153,13 +175,16 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       body: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.only(bottom: 108),
+            padding: EdgeInsets.only(bottom: booked ? 118 : 108),
             cacheExtent: 1600,
             children: [
               _hero(),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _identity(location),
+                padding: EdgeInsets.fromLTRB(16, booked ? 0 : 16, 16, 0),
+                child: Transform.translate(
+                  offset: Offset(0, booked ? -28 : 0),
+                  child: _identity(location),
+                ),
               ),
               _stats(),
               _tabBar(),
@@ -174,38 +199,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x000D0D0F), Color(0xCC0D0D0F), Color(0xF20D0D0F)],
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 28, 16, 12),
-                  child: SizedBox(
-                    height: 54,
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => BookDatePage(vendor: vendor, home: widget.home)),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: LensColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: const StadiumBorder(),
-                      ),
-                      icon: const Icon(Icons.shopping_bag_outlined, size: 20),
-                      label: const Text('Book Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            child: booked ? _contactBar() : _bookNowBar(),
           ),
         ],
       ),
@@ -333,15 +327,15 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: const Color(0xFF2E7A4F)),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.circle, color: Color(0xFF3DDC84), size: 8),
-                        SizedBox(width: 6),
+                        const Icon(Icons.circle, color: Color(0xFF3DDC84), size: 8),
+                        const SizedBox(width: 6),
                         Text(
-                          'Available this weekend',
+                          booked ? 'Your vendor' : 'Available this weekend',
                           softWrap: false,
-                          style: TextStyle(color: Color(0xFF7DCEA0), fontSize: 11, fontWeight: FontWeight.w700),
+                          style: const TextStyle(color: Color(0xFF7DCEA0), fontSize: 11, fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
@@ -416,15 +410,17 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Widget _avatar() {
-    const size = 108.0;
+    final size = booked ? 96.0 : 108.0;
     final photo = vendor.profilePhotoUrl ?? VendorPhotos.portrait(vendor.vendorType, vendor.id);
+    final radius = booked ? size / 2 : 24.0;
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: LensColors.charcoal,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(radius),
+        border: booked ? Border.all(color: LensColors.charcoal, width: 3) : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: LensConfig.useNetwork
@@ -786,6 +782,154 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: SizedBox(width: 38, height: 38, child: Icon(icon, color: color, size: 20)),
+      ),
+    );
+  }
+
+  Widget _bookNowBar() {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x000D0D0F), Color(0xCC0D0D0F), Color(0xF20D0D0F)],
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 28, 16, 12),
+          child: SizedBox(
+            height: 54,
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => BookDatePage(vendor: vendor, home: widget.home)),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: LensColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: const StadiumBorder(),
+              ),
+              icon: const Icon(Icons.shopping_bag_outlined, size: 20),
+              label: const Text('Book Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _contactBar() {
+    return ColoredBox(
+      color: LensColors.charcoal,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: _contactButton(
+                  label: 'Call Now',
+                  icon: Icons.call_outlined,
+                  background: const Color(0xFF111111),
+                  foreground: Colors.white,
+                  border: Colors.white,
+                  onTap: _call,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _contactButton(
+                  label: 'WhatsApp',
+                  icon: Icons.chat,
+                  background: const Color(0xFF128C7E),
+                  foreground: Colors.white,
+                  border: const Color(0xFF128C7E),
+                  onTap: _whatsApp,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _contactButton(
+                  label: 'Chat in App',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  background: LensColors.primary,
+                  foreground: Colors.white,
+                  border: LensColors.primary,
+                  onTap: _chat,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _contactButton({
+    required String label,
+    required IconData icon,
+    required Color background,
+    required Color foreground,
+    required Color border,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      height: 50,
+      child: Material(
+        color: background,
+        shape: StadiumBorder(side: BorderSide(color: border, width: 1.6)),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: foreground, size: 17),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _call() async {
+    final opened = await ContactLaunch.open(ContactLaunch.tel(_phone));
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Call $_phone')));
+    }
+  }
+
+  Future<void> _whatsApp() async {
+    final opened = await ContactLaunch.open(ContactLaunch.whatsapp(_whatsappNumber));
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('WhatsApp $_whatsappNumber')));
+    }
+  }
+
+  void _chat() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VendorChatPage(
+          vendor: vendor,
+          location: vendor.location.isEmpty ? vendor.city : vendor.location,
+          status: booked ? 'Confirmed' : 'Pending',
+        ),
       ),
     );
   }

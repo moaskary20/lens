@@ -29,6 +29,21 @@ class DemoBootstrap {
         {'slug': 'ugc', 'label': 'UGC Creators'},
         {'slug': 'food_stylist', 'label': 'Food Stylists'},
       ],
+      'cities': const [
+        {'id': 1, 'name': 'Cairo'},
+        {'id': 2, 'name': 'Giza'},
+        {'id': 3, 'name': 'Alexandria'},
+      ],
+      'banks': const [
+        {'id': 'Banque Misr', 'label': 'Banque Misr'},
+        {'id': 'CIB', 'label': 'Commercial International Bank (CIB)'},
+      ],
+      'telecom_wallets': const [
+        {'id': 'vodafone', 'label': 'Vodafone Cash'},
+        {'id': 'orange', 'label': 'Orange Cash'},
+        {'id': 'etisalat', 'label': 'e& cash (Etisalat)'},
+        {'id': 'we', 'label': 'WE Pay'},
+      ],
       'popular': [
         {
           'slug': 'photographer',

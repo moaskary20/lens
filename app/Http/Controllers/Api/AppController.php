@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppScreen;
+use App\Models\City;
 use App\Models\Vendor;
 use App\Models\VendorType;
 use App\Services\VendorSearch;
 use App\Support\AppClient;
+use App\Support\Egypt;
 use App\Support\Feature;
 use App\Support\SearchEngine;
+use App\Support\VendorRegisterCatalog;
 use App\Support\SearchQuery;
 use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
@@ -58,6 +61,18 @@ class AppController extends Controller
             ])->values()->all(),
             'popular' => $this->popular($types),
             'filter_catalog' => SearchEngine::appFilters(),
+            'cities' => City::query()->where('is_active', true)->orderBy('name_en')->get(['id', 'name_en'])
+                ->map(fn (City $city): array => [
+                    'id' => $city->id,
+                    'name' => $city->name_en,
+                ])->values()->all(),
+            'banks' => collect(Egypt::banks())
+                ->map(fn (string $label, string $id): array => ['id' => $id, 'label' => $label])
+                ->values()->all(),
+            'telecom_wallets' => collect(Egypt::telecomWallets())
+                ->map(fn (string $label, string $id): array => ['id' => $id, 'label' => $label])
+                ->values()->all(),
+            'vendor_register' => VendorRegisterCatalog::types(),
             'screens' => AppScreen::query()
                 ->where('is_active', true)
                 ->orderBy('sort_order')
@@ -121,14 +136,17 @@ class AppController extends Controller
             };
         }
 
-        $packages = array_values(array_filter([
-            $vendor->hourly_price ? ['label' => 'Hourly', 'price' => (float) $vendor->hourly_price] : null,
-            $vendor->half_day_price ? ['label' => 'Half day', 'price' => (float) $vendor->half_day_price] : null,
-            $vendor->full_day_price ? ['label' => 'Full day', 'price' => (float) $vendor->full_day_price] : null,
-            $vendor->per_video_price ? ['label' => 'Per video', 'price' => (float) $vendor->per_video_price] : null,
-        ]));
+        $packages = $vendor->bookablePackages();
 
         $projects = (int) ($vendor->completed_sessions ?: max(24, (int) $vendor->rating_count));
+
+        $client = AppClient::user();
+        $contactUnlocked = $client && $vendor->bookings()
+            ->where('client_id', $client->id)
+            ->whereNotIn('status', ['cancelled', 'rejected', 'failed'])
+            ->exists();
+        $vendor->loadMissing('user');
+        $contactPhone = $vendor->contact_phone ?: $vendor->user?->phone;
 
         return response()->json(array_merge($payload, [
             'bio' => $vendor->bio,
@@ -151,6 +169,9 @@ class AppController extends Controller
             'packages' => $packages,
             'portfolio' => $portfolio,
             'portfolio_filters' => $filters,
+            'contact_unlocked' => $contactUnlocked,
+            'contact_phone' => $contactUnlocked ? $contactPhone : null,
+            'whatsapp' => $contactUnlocked ? ($vendor->whatsapp ?: $contactPhone) : null,
         ]));
     }
 

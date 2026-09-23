@@ -10,6 +10,10 @@ class HomeData {
     required this.unreadNotifications,
     this.favoriteIds = const [],
     this.filterCatalog = const [],
+    this.cities = const [],
+    this.banks = const [],
+    this.telecomWallets = const [],
+    this.vendorRegister = const [],
   });
 
   factory HomeData.fromJson(Map<String, dynamic> json) {
@@ -40,6 +44,10 @@ class HomeData {
           .whereType<Map>()
           .map((item) => FilterGroupItem.fromJson(Map<String, dynamic>.from(item)))
           .toList(),
+      cities: (json['cities'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
+      banks: (json['banks'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
+      telecomWallets: (json['telecom_wallets'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
+      vendorRegister: (json['vendor_register'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
     );
   }
 
@@ -53,8 +61,20 @@ class HomeData {
   final int unreadNotifications;
   final List<int> favoriteIds;
   final List<FilterGroupItem> filterCatalog;
+  final List<Map<String, dynamic>> cities;
+  final List<Map<String, dynamic>> banks;
+  final List<Map<String, dynamic>> telecomWallets;
+  final List<Map<String, dynamic>> vendorRegister;
 
   bool on(String key) => features[key] ?? false;
+
+  Map<String, dynamic> get registerCatalog => {
+        'vendor_types': vendorTypes.map((item) => {'slug': item.slug, 'label': item.label}).toList(),
+        'cities': cities,
+        'banks': banks,
+        'telecom_wallets': telecomWallets,
+        'vendor_register': vendorRegister,
+      };
 }
 
 class FilterGroupItem {

@@ -5,6 +5,7 @@ import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/features/home/book_draft.dart';
 import 'package:lens/features/home/book_project_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 
@@ -57,6 +58,20 @@ class _BookDatePageState extends State<BookDatePage> {
 
   String get _dateLabel {
     return '${_weekShort[_selected.weekday - 1]}, ${_monthShort[_selected.month - 1]} ${_selected.day}, ${_selected.year}';
+  }
+
+  DateTime get _scheduledAt {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$').firstMatch(_time);
+    var hour = int.tryParse(match?.group(1) ?? '') ?? 10;
+    final minute = int.tryParse(match?.group(2) ?? '') ?? 0;
+    final meridiem = match?.group(3);
+    if (meridiem == 'PM' && hour < 12) {
+      hour += 12;
+    }
+    if (meridiem == 'AM' && hour == 12) {
+      hour = 0;
+    }
+    return DateTime(_selected.year, _selected.month, _selected.day, hour, minute);
   }
 
   bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
@@ -125,12 +140,16 @@ class _BookDatePageState extends State<BookDatePage> {
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => BookProjectPage(
-                        vendor: vendor,
-                        home: widget.home,
-                        dateLabel: _dateLabel,
-                        time: _time,
-                        packageName: _package.name,
-                        packageDetails: _package.details,
+                        draft: BookDraft(
+                          vendor: vendor,
+                          home: widget.home,
+                          dateLabel: _dateLabel,
+                          time: _time,
+                          scheduledAt: _scheduledAt,
+                          packageName: _package.name,
+                          packageKey: _package.name == 'Full day' ? 'full_day' : (_package.name == 'Half day' ? 'half_day' : 'hourly'),
+                          packageDetails: _package.details,
+                        ),
                       ),
                     ),
                   ),

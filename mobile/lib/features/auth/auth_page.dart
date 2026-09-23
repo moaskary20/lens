@@ -14,8 +14,10 @@ class AuthPage extends StatelessWidget {
       backgroundColor: const Color(0xFF070707),
       body: LoginView(
         intendedRole: intendedRole,
-        onSuccess: () => Navigator.of(context).pushReplacement(
+        bootstrap: bootstrap,
+        onSuccess: () => Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute<void>(builder: (_) => AppShell(bootstrap: bootstrap)),
+          (route) => false,
         ),
       ),
     );

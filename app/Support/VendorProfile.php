@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\City;
+use App\Models\FilterGroup;
 use App\Models\PricingModelField;
 use App\Models\Vendor;
 use App\Models\VendorType;
@@ -14,7 +15,6 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -149,6 +149,124 @@ class VendorProfile
     }
 
     /**
+     * Filter groups shown on mobile filter screens that a vendor should answer.
+     *
+     * @return list<string>
+     */
+    public static function profileSkipSlugs(): array
+    {
+        return [
+            'project_type',
+            'location',
+            'availability',
+            'budget',
+            'rating',
+            'search_cities',
+            'studio_hourly',
+            'ugc_price',
+            'food_price',
+            'model_sizes',
+            'model_experience',
+            'ugc',
+            'food_stylist',
+        ];
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, FilterGroup>
+     */
+    public static function filterProfileGroups(?string $slug = null)
+    {
+        return FilterGroup::query()
+            ->where('is_active', true)
+            ->whereNotIn('slug', self::profileSkipSlugs())
+            ->when(
+                $slug,
+                fn ($query) => $query->whereJsonContains('vendor_type_slugs', $slug),
+                fn ($query) => $query->whereJsonLength('vendor_type_slugs', '>', 0),
+            )
+            ->with(['options' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])
+            ->orderBy('sort_order')
+            ->get()
+            ->filter(fn (FilterGroup $group): bool => $group->options->isNotEmpty())
+            ->values();
+    }
+
+    /**
+     * @return list<\Filament\Schemas\Components\Component>
+     */
+    public static function filterProfileFields(): array
+    {
+        $fields = [];
+
+        foreach (self::filterProfileGroups() as $group) {
+            $typeSlugs = array_values(array_filter($group->vendor_type_slugs ?? []));
+            if ($typeSlugs === []) {
+                continue;
+            }
+
+            $fields[] = CheckboxList::make('profile_filters.'.$group->slug)
+                ->label($group->name)
+                ->helperText($group->description ?: 'Same options clients use on the mobile filter screen.')
+                ->options($group->options->pluck('name_en', 'id'))
+                ->columns(2)
+                ->columnSpanFull()
+                ->visible(self::visibleFor(...$typeSlugs));
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $profileFilters
+     * @return list<int>
+     */
+    public static function flattenProfileFilters(array $profileFilters): array
+    {
+        return collect($profileFilters)
+            ->flatten()
+            ->filter(fn ($id): bool => is_numeric($id))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, list<int>>
+     */
+    public static function hydrateProfileFilters(?Vendor $vendor): array
+    {
+        if (! $vendor) {
+            return [];
+        }
+
+        $grouped = [];
+        foreach ($vendor->filterTags()->with('group')->get() as $tag) {
+            $slug = $tag->group?->slug ?: $tag->group_key;
+            if (! $slug) {
+                continue;
+            }
+            $grouped[$slug][] = $tag->id;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * @param  array<string, mixed>  $profileFilters
+     */
+    public static function syncProfileFilters(Vendor $vendor, array $profileFilters, array $extraIds = []): void
+    {
+        $ids = array_values(array_unique(array_merge(
+            self::flattenProfileFilters($profileFilters),
+            array_map('intval', $extraIds),
+        )));
+
+        $vendor->filterTags()->sync($ids);
+    }
+
+    /**
      * @return list<\Filament\Schemas\Components\Component>
      */
     public static function typeSections(): array
@@ -156,16 +274,18 @@ class VendorProfile
         return [
             Placeholder::make('pick_vendor_type')
                 ->hiddenLabel()
-                ->content('Choose a vendor type on the Identity tab. Matching portfolio, gear, and specialty fields will appear here.')
+                ->content('Choose a vendor type on the Identity tab. Matching filter-screen fields will appear here.')
                 ->visible(fn (Get $get, ?Vendor $record = null): bool => self::slug($get, $record) === null),
 
-            Section::make('Photographer profile')
-                ->description('Photo portfolio grid, camera / lens / lighting tags, and primary specialties.')
+            Section::make('Filter profile')
+                ->description('The same options clients use on the mobile filter screens. These tags decide how the vendor appears in search.')
+                ->schema(self::filterProfileFields())
+                ->visible(fn (Get $get, ?Vendor $record = null): bool => self::slug($get, $record) !== null),
+
+            Section::make('Photographer extras')
+                ->description('Free-text notes that sit next to the filter tags.')
                 ->visible(self::visibleFor('photographer'))
                 ->schema([
-                    TagsInput::make('extras.cameras')->label('Cameras')->placeholder('Canon R5, Sony A7 IV'),
-                    TagsInput::make('extras.lenses')->label('Lenses')->placeholder('85mm f/1.2, 24-70mm'),
-                    TagsInput::make('extras.lighting')->label('Lighting / strobes')->placeholder('Godox AD600, Aputure 600d'),
                     CheckboxList::make('specialties')->label('Primary specialties')
                         ->options(self::specialtyOptions())
                         ->columns(2)
@@ -174,14 +294,11 @@ class VendorProfile
                         ->hiddenLabel()
                         ->content('Add a photo portfolio grid under Previous projects (images of completed shoots).')
                         ->columnSpanFull(),
-                ])->columns(2),
+                ]),
 
-            Section::make('Videographer profile')
-                ->description('Reel highlights, camera kit, stabilization, turnaround, and delivery formats.')
+            Section::make('Videographer extras')
                 ->visible(self::visibleFor('videographer'))
                 ->schema([
-                    TagsInput::make('extras.camera_kit')->label('Camera kit')->placeholder('FX6, RED Komodo'),
-                    TagsInput::make('extras.stabilization')->label('Stabilization gear')->placeholder('DJI RS 4, shoulder rig'),
                     CheckboxList::make('delivery_formats')->label('Supported delivery formats')
                         ->options(self::deliveryFormatOptions())
                         ->columns(2)
@@ -190,76 +307,52 @@ class VendorProfile
                         ->hiddenLabel()
                         ->content('Add video reel highlights under Previous projects (upload clips or paste a reel URL).')
                         ->columnSpanFull(),
-                ])->columns(2),
+                ]),
 
-            Section::make('Mobile Reels Creator profile')
-                ->description('Phones used, social sample links, session length, and quick social-edit pricing.')
+            Section::make('Mobile Reels extras')
                 ->visible(self::visibleFor('reels'))
                 ->schema([
-                    TagsInput::make('extras.devices')->label('Mobile devices used')->placeholder('iPhone 15 Pro, iPhone 16 Pro'),
                     TextInput::make('extras.tiktok_url')->label('TikTok sample link')->url()->columnSpanFull(),
                     TextInput::make('extras.instagram_url')->label('Instagram / Reels sample link')->url()->columnSpanFull(),
                     TextInput::make('extras.standard_session_hours')->label('Standard session length (hours)')->numeric()->minValue(0.5)->step(0.5),
-                    TextInput::make('extras.social_edit_price')->label('Quick-turnaround social edit price')->numeric()->prefix(Finance::currency()),
                     Placeholder::make('reels_projects_hint')
                         ->hiddenLabel()
                         ->content('You can also attach more TikTok / Instagram links as Previous projects of type Link.')
                         ->columnSpanFull(),
-                ])->columns(2),
+                ]),
 
-            Section::make('Studio profile')
-                ->description('Studio gallery, room inventory, props, and hourly booking calendar.')
+            Section::make('Studio extras')
                 ->visible(self::visibleFor('studio'))
                 ->schema([
-                    CheckboxList::make('extras.rooms')->label('Room / space inventory')
-                        ->options(self::studioRooms())
-                        ->columns(2)
-                        ->columnSpanFull(),
-                    TagsInput::make('extras.props')->label('Available props')->placeholder('Dining table, vintage chairs')->columnSpanFull(),
                     Placeholder::make('studio_calendar_hint')
                         ->hiddenLabel()
                         ->content('Add the studio gallery under Previous projects. After saving, book hourly slots from the Hourly slot booking calendar tab.')
                         ->columnSpanFull(),
                 ]),
 
-            Section::make('Model profile')
-                ->description('Polished photo portfolio, measurements, experience tags, and availability.')
+            Section::make('Model extras')
                 ->visible(self::visibleFor('model'))
                 ->schema([
-                    TextInput::make('extras.height_cm')->label('Height (cm)')->numeric(),
-                    TextInput::make('extras.clothing_size')->label('Clothing size')->placeholder('S / M / 38'),
-                    TextInput::make('extras.shoe_size')->label('Shoe size'),
                     TextInput::make('extras.hair_color')->label('Hair color'),
                     TextInput::make('extras.eye_color')->label('Eye color'),
-                    CheckboxList::make('extras.experience')->label('Experience tags')
-                        ->options(self::modelExperience())
-                        ->columns(2)
-                        ->columnSpanFull(),
                     Placeholder::make('model_projects_hint')
                         ->hiddenLabel()
                         ->content('Upload a polished photo portfolio under Previous projects. After saving, set open dates on the Availability calendar tab.')
                         ->columnSpanFull(),
                 ])->columns(2),
 
-            Section::make('UGC Creator profile')
-                ->description('Short-form UGC video samples for brands.')
+            Section::make('UGC extras')
                 ->visible(self::visibleFor('ugc'))
                 ->schema([
-                    TagsInput::make('extras.platforms')->label('Platforms')->placeholder('TikTok, Instagram, Snapchat'),
                     Placeholder::make('ugc_projects_hint')
                         ->hiddenLabel()
                         ->content('Add short-form UGC video samples under Previous projects (vertical video files or social links).')
                         ->columnSpanFull(),
                 ]),
 
-            Section::make('Food Stylist profile')
-                ->description('Food styling & staging portfolio plus add-on services.')
+            Section::make('Food Stylist extras')
                 ->visible(self::visibleFor('food_stylist'))
                 ->schema([
-                    CheckboxList::make('extras.food_addons')->label('Add-on services')
-                        ->options(self::foodAddons())
-                        ->columns(2)
-                        ->columnSpanFull(),
                     Textarea::make('extras.addon_notes')->label('Add-on notes')->rows(3)->columnSpanFull(),
                     Placeholder::make('food_projects_hint')
                         ->hiddenLabel()
@@ -397,9 +490,14 @@ class VendorProfile
     public static function contactFields(): array
     {
         return [
-            TextInput::make('contact_phone')->label('Phone')->tel(),
+            TextInput::make('contact_phone')->label('Phone')->tel()
+                ->rule(Egypt::mobileRule())
+                ->validationMessages(['regex' => Egypt::mobileMessage()])
+                ->helperText(Egypt::mobileMessage()),
             TextInput::make('contact_email')->label('Email')->email(),
-            TextInput::make('whatsapp')->label('WhatsApp')->tel(),
+            TextInput::make('whatsapp')->label('WhatsApp')->tel()
+                ->rule(Egypt::mobileRule())
+                ->validationMessages(['regex' => Egypt::mobileMessage()]),
             TextInput::make('instagram')->label('Instagram')->placeholder('@studio'),
         ];
     }
@@ -475,9 +573,9 @@ class VendorProfile
                         ->tel()
                         ->placeholder('010xxxxxxxx')
                         ->helperText('Egyptian mobile number linked to this wallet.')
-                        ->rule('regex:/^01[0125][0-9]{8}$/')
+                        ->rule(Egypt::mobileRule())
                         ->validationMessages([
-                            'regex' => 'Use an Egyptian mobile number such as 010xxxxxxxx.',
+                            'regex' => Egypt::mobileMessage(),
                         ])
                         ->required(fn (Get $get): bool => $get('payout_method') === 'wallet')
                         ->columnSpanFull(),

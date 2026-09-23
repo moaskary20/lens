@@ -53,7 +53,7 @@ class VendorTypeResource extends Resource
                     ->required()
                     ->searchable()
                     ->preload()
-                    ->helperText('Admin creates and edits models under Marketplace → Pricing models. The vendor only fills the amounts.'),
+                    ->helperText('Create a pricing model under Marketplace → Pricing models and choose this vendor type. Vendors then fill those amounts.'),
                 Toggle::make('escrow_on_checkin')->label('Release on check-in / arrival (studios & models)')
                     ->helperText('On: funds release when the booking is checked in at the location (20% commission deducted then). Off: photographers and videographers — 100% stays in escrow until deliverables are uploaded and the client taps Approve. Revisions stay on hold.'),
                 Toggle::make('is_active')->label('Enabled')->default(true),

@@ -31,6 +31,7 @@ class EditMyMessage extends EditRecord
                         'conversation_id' => $conversation->id,
                         'sender_id' => auth()->id(),
                         'body' => $data['body'],
+                        'type' => 'text',
                     ]);
                     $conversation->update(['last_message_at' => now()]);
 

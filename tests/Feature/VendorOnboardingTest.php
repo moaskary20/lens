@@ -29,9 +29,9 @@ class VendorOnboardingTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/vendors/'.$vendor->id.'/edit')
             ->assertOk()
-            ->assertSee('Cameras')
-            ->assertSee('Lenses')
-            ->assertSee('Lighting / strobes')
+            ->assertSee('Camera type')
+            ->assertSee('Lenses available')
+            ->assertSee('Lighting gear')
             ->assertSee('Primary specialties')
             ->assertSee('Previous projects')
             ->assertSee('Yasmin Hall wedding')
@@ -47,8 +47,8 @@ class VendorOnboardingTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/vendors/'.$vendor->id.'/edit')
             ->assertOk()
-            ->assertSee('Room / space inventory')
-            ->assertSee('Available props')
+            ->assertSee('Studio Type')
+            ->assertSee('Features & Equipment')
             ->assertSee('Hourly slot booking calendar')
             ->assertSee('Studio gallery')
             ->assertSee('Price per hour per location');
@@ -60,11 +60,11 @@ class VendorOnboardingTest extends TestCase
         $cityId = Vendor::query()->where('display_name', 'Fahad Studio Light')->value('city_id');
 
         $cases = [
-            'videographer' => ['Camera kit', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
-            'reels' => ['Mobile devices used', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
-            'model' => ['Height (cm)', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
-            'ugc' => ['Short-form UGC samples', 'Price per video'],
-            'food_stylist' => ['Add-on services', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'videographer' => ['Video quality & formats', 'Video gear', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'reels' => ['Mobile reel creators', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'model' => ['Gender', 'Category', 'Height (cm)', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'ugc' => ['Category / Niche', 'Short-form UGC samples', 'Price per video'],
+            'food_stylist' => ['Category / Expertise', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
         ];
 
         foreach ($cases as $slug => $needles) {
@@ -139,6 +139,10 @@ class VendorOnboardingTest extends TestCase
         $this->assertContains('wedding', array_keys(VendorProfile::specialtyOptions()));
         $this->assertArrayHasKey('cyclorama', VendorProfile::studioRooms());
         $this->assertArrayHasKey('recipe_development', VendorProfile::foodAddons());
+        $this->assertTrue(VendorProfile::filterProfileGroups('photographer')->contains('slug', 'camera'));
+        $this->assertTrue(VendorProfile::filterProfileGroups('studio')->contains('slug', 'studio_type'));
+        $this->assertFalse(VendorProfile::filterProfileGroups('photographer')->contains('slug', 'studio_type'));
+        $this->assertFalse(VendorProfile::filterProfileGroups('studio')->contains('slug', 'studio_hourly'));
 
         $photographer = VendorType::query()->where('slug', 'photographer')->firstOrFail();
         $this->assertSame('photographer', VendorProfile::slugFromId($photographer->id));

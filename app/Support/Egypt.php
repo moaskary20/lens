@@ -123,4 +123,19 @@ class Egypt
             'we' => 'WE Pay',
         ];
     }
+
+    public static function mobilePattern(): string
+    {
+        return '/^01[0125][0-9]{8}$/';
+    }
+
+    public static function mobileRule(): string
+    {
+        return 'regex:'.self::mobilePattern();
+    }
+
+    public static function mobileMessage(): string
+    {
+        return 'Use an Egyptian mobile number of 11 digits starting with 010, 011, 012, or 015.';
+    }
 }

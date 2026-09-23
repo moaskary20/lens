@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\AppController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BookingController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ClientInboxController;
 use App\Http\Controllers\Api\SearchController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +16,12 @@ Route::post('app/auth/login', [AuthController::class, 'login']);
 Route::post('app/auth/register', [AuthController::class, 'register']);
 Route::get('app/auth/me', [AuthController::class, 'me']);
 Route::get('app/bookings', [AuthController::class, 'bookings']);
+Route::post('app/bookings/quote', [BookingController::class, 'quote']);
+Route::post('app/bookings', [BookingController::class, 'store']);
+
+Route::post('app/conversations', [ChatController::class, 'open']);
+Route::get('app/conversations/{conversation}', [ChatController::class, 'show']);
+Route::post('app/conversations/{conversation}/messages', [ChatController::class, 'store']);
 
 Route::get('app/favorites', [ClientInboxController::class, 'favorites']);
 Route::post('app/favorites/{vendor}', [ClientInboxController::class, 'save']);

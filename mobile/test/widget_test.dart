@@ -10,8 +10,14 @@ import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/filter_page.dart';
 import 'package:lens/features/home/book_checkout_page.dart';
 import 'package:lens/features/home/book_confirmed_page.dart';
+import 'package:lens/features/home/book_date_page.dart';
 import 'package:lens/features/home/book_project_page.dart';
 import 'package:lens/features/home/book_review_page.dart';
+import 'package:lens/features/bookings/bookings_page.dart';
+import 'package:lens/features/home/vendor_chat_page.dart';
+import 'package:lens/features/home/vendor_profile_page.dart';
+import 'package:lens/features/auth/user_register_page.dart';
+import 'package:lens/features/auth/vendor_register_page.dart';
 import 'package:lens/features/onboarding/onboarding_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
 
@@ -155,16 +161,87 @@ void main() {
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     expect(find.text('Tell them about your project'), findsOneWidget);
+    expect(find.text('Shoot type *'), findsOneWidget);
+    final projectScroll = find.descendant(of: find.byType(BookProjectPage), matching: find.byType(Scrollable)).first;
+    await tester.enterText(find.widgetWithText(TextField, 'E.g. Summer Menu Campaign'), 'Summer Menu Campaign');
+    await tester.tap(find.text('Select Shoot type'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wedding'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Select visual style'), 240, scrollable: projectScroll);
+    await tester.tap(find.text('Select visual style'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Natural light'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Select deliverables'), 240, scrollable: projectScroll);
+    await tester.tap(find.text('Select deliverables'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('25 edited photos'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Half-day price (6 hours)'), 240, scrollable: projectScroll);
+    await tester.tap(find.text('Half-day price (6 hours)'));
+    await tester.pump();
+    await tester.scrollUntilVisible(find.text('Pin on Google Maps'), 240, scrollable: projectScroll);
+    await tester.tap(find.text('Pin on Google Maps'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pin on Google Maps'), findsWidgets);
+    await tester.tap(find.text('Zamalek, Cairo'));
+    await tester.pump();
+    await tester.tap(find.text('Use this location'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextField, 'Tell us about your project, goals, and what you have in mind...'),
+      240,
+      scrollable: find.descendant(of: find.byType(BookProjectPage), matching: find.byType(Scrollable)).first,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Tell us about your project, goals, and what you have in mind...'),
+      'Lifestyle plates and close-ups of the new summer menu.',
+    );
     expect(find.text('Review Booking'), findsOneWidget);
     await tester.ensureVisible(find.text('Review Booking'));
     await tester.tap(find.text('Review Booking'));
     await tester.pumpAndSettle();
     expect(find.text('Review Your Booking'), findsOneWidget);
+    final reviewScroll = find.descendant(of: find.byType(BookReviewPage), matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(find.text('Zamalek, Cairo'), 240, scrollable: reviewScroll);
+    expect(find.text('Zamalek, Cairo'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Summer Menu Campaign'), 240, scrollable: reviewScroll);
+    expect(find.text('Summer Menu Campaign'), findsOneWidget);
+    expect(find.text('Wedding'), findsOneWidget);
+    expect(find.text('Natural light'), findsOneWidget);
+    expect(find.text('25 edited photos'), findsOneWidget);
+    expect(find.text('Half-day price (6 hours)'), findsWidgets);
+    await tester.scrollUntilVisible(find.textContaining('Lifestyle plates'), 240, scrollable: reviewScroll);
+    expect(find.textContaining('Lifestyle plates'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Lens platform fee (10%)'), 240, scrollable: reviewScroll);
+    expect(find.text('Lens platform fee (10%)'), findsOneWidget);
     expect(find.text('Continue to Payment'), findsOneWidget);
     await tester.ensureVisible(find.text('Continue to Payment'));
     await tester.tap(find.text('Continue to Payment'));
     await tester.pumpAndSettle();
     expect(find.text('Secure Checkout'), findsOneWidget);
+    expect(find.text('Summer Menu Campaign'), findsOneWidget);
+    expect(find.textContaining('Zamalek'), findsWidgets);
+    final checkoutScroll = find.descendant(of: find.byType(BookCheckoutPage), matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(find.text('Bank card'), 280, scrollable: checkoutScroll);
+    expect(find.text('Bank card'), findsOneWidget);
+    expect(find.text('Mobile wallet'), findsOneWidget);
+    expect(find.text('PayPal'), findsWidgets);
+    await tester.tap(find.text('Bank card'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cardholder name'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('card-holder')), 'Sarah Bennett');
+    await tester.enterText(find.byKey(const Key('card-number')), '4242424242424242');
+    await tester.enterText(find.byKey(const Key('card-expiry')), '1228');
+    await tester.enterText(find.byKey(const Key('card-cvv')), '123');
+    await tester.ensureVisible(find.text('Save Bank card'));
+    await tester.tap(find.text('Save Bank card'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BookCheckoutPage), findsOneWidget);
+    expect(find.textContaining('Visa'), findsWidgets);
+    await tester.scrollUntilVisible(find.text('Promo code'), 240, scrollable: find.descendant(of: find.byType(BookCheckoutPage), matching: find.byType(Scrollable)).first);
+    expect(find.text('Promo code'), findsOneWidget);
     expect(find.text('Confirm & Pay'), findsOneWidget);
     await tester.ensureVisible(find.text('Confirm & Pay'));
     await tester.tap(find.text('Confirm & Pay'));
@@ -172,23 +249,32 @@ void main() {
     expect(find.text("You're booked."), findsOneWidget);
     expect(find.text('View Booking'), findsOneWidget);
     expect(find.text('Message Creator'), findsOneWidget);
-    Navigator.of(tester.element(find.byType(BookConfirmedPage))).pop();
+    await tester.tap(find.text('Message Creator'));
     await tester.pumpAndSettle();
-    expect(find.text('Secure Checkout'), findsOneWidget);
-    await tester.tap(find.descendant(of: find.byType(BookCheckoutPage), matching: find.byTooltip('Back')));
+    expect(find.byType(VendorChatPage), findsOneWidget);
+    expect(find.text('Type a message...'), findsOneWidget);
+    Navigator.of(tester.element(find.byType(VendorChatPage))).pop();
     await tester.pumpAndSettle();
-    expect(find.text('Review Your Booking'), findsOneWidget);
-    await tester.tap(find.descendant(of: find.byType(BookReviewPage), matching: find.byTooltip('Back')));
+    expect(find.text("You're booked."), findsOneWidget);
+    await tester.tap(find.text('View Booking'));
     await tester.pumpAndSettle();
-    expect(find.text('Tell them about your project'), findsOneWidget);
-    await tester.tap(find.descendant(of: find.byType(BookProjectPage), matching: find.byTooltip('Back')));
+    expect(find.byType(BookingsPage), findsOneWidget);
+    expect(find.text('My Bookings'), findsOneWidget);
+    expect(find.text("You're booked."), findsNothing);
+    expect(find.byType(VendorChatPage), findsNothing);
+    await tester.tap(find.descendant(of: find.byType(BookingsPage), matching: find.byIcon(Icons.chevron_left_rounded)));
     await tester.pumpAndSettle();
-    expect(find.text('Choose Your Date'), findsOneWidget);
-    await tester.tap(find.byTooltip('Back'));
+    await tester.tap(find.text('Photographers'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fahad Studio Light'));
     await tester.pumpAndSettle();
     expect(find.text('Watch Showreel'), findsOneWidget);
     expect(find.text('Portfolio'), findsOneWidget);
     expect(find.text('Available this weekend'), findsOneWidget);
+    expect(find.text('Book Now'), findsOneWidget);
+    expect(find.text('Call Now'), findsNothing);
+    expect(find.text('WhatsApp'), findsNothing);
+    expect(find.text('Chat in App'), findsNothing);
     await tester.tap(find.byIcon(Icons.chevron_left_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sort'));
@@ -290,20 +376,148 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Welcome'), findsOneWidget);
-    expect(find.text('Sign In'), findsOneWidget);
-    expect(find.text('Create an Account'), findsOneWidget);
-    expect(find.image(const AssetImage('lib/assits/login.png')), findsOneWidget);
-    await tester.ensureVisible(find.text('Create an Account'));
-    await tester.tap(find.text('Create an Account'));
+    expect(find.text('Identity'), findsOneWidget);
+    expect(find.text('Vendor type *'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('5'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.chevron_left_rounded));
     await tester.pumpAndSettle();
-    expect(find.text('Join as User'), findsOneWidget);
-    expect(find.text('Join as Vendor'), findsOneWidget);
-    await tester.tap(find.text('Join as Vendor'));
+    await tester.tap(find.text('Join as User'));
     await tester.pump();
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
-    expect(find.text('Join as vendor'), findsOneWidget);
+    expect(find.text('Create your account'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('vendor register continues through numbered admin steps', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: VendorRegisterPage(bootstrap: _bootstrap()),
+    ));
+
+    expect(find.text('Identity'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('5'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Full name'), 'Yasmin Lens');
+    await tester.enterText(find.widgetWithText(TextField, 'Email'), 'yasmin@lens.app');
+    await tester.enterText(find.widgetWithText(TextField, 'Phone 010 / 011 / 012 / 015'), '01055550011');
+    await tester.enterText(find.widgetWithText(TextField, 'Password'), 'password');
+    await tester.ensureVisible(find.text('Photographers'));
+    await tester.tap(find.text('Photographers'));
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Photographer profile'), findsOneWidget);
+    expect(find.text('Camera type'), findsOneWidget);
+    expect(find.text('Lenses available'), findsOneWidget);
+    expect(find.text('Primary specialties'), findsOneWidget);
+    expect(find.text('Wedding'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Previous projects'), findsOneWidget);
+    expect(find.text('Add previous project'), findsOneWidget);
+    await tester.tap(find.text('Add previous project'));
+    await tester.pump();
+    expect(find.text('Add photos / gallery'), findsOneWidget);
+    await tester.tap(find.text('Video'));
+    await tester.pump();
+    expect(find.text('Add videos'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pricing'), findsOneWidget);
+    expect(find.text('Pricing model'), findsWidgets);
+    expect(find.text('Half-day price (6 hours)'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'EGP Half-day price (6 hours)'), '1800');
+    await tester.enterText(find.widgetWithText(TextField, 'EGP Full-day price (12 hours)'), '3200');
+    await tester.enterText(find.widgetWithText(TextField, 'Post-production turnaround (hours)'), '48');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bank & payouts'), findsOneWidget);
+    expect(find.text('Bank account'), findsOneWidget);
+    expect(find.text('Mobile wallet'), findsOneWidget);
+    expect(find.text('PayPal'), findsOneWidget);
+    await tester.tap(find.text('Mobile wallet'));
+    await tester.pump();
+    await tester.enterText(find.widgetWithText(TextField, 'Wallet phone 010 / 011 / 012 / 015'), '01055550011');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(SessionStore.instance.isVendor, isTrue);
+  });
+
+  testWidgets('vendor type loads the matching type profile', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: VendorRegisterPage(bootstrap: _bootstrap()),
+    ));
+
+    await tester.enterText(find.widgetWithText(TextField, 'Full name'), 'Noor Studio');
+    await tester.enterText(find.widgetWithText(TextField, 'Email'), 'noor@lens.app');
+    await tester.enterText(find.widgetWithText(TextField, 'Phone 010 / 011 / 012 / 015'), '01512345678');
+    await tester.enterText(find.widgetWithText(TextField, 'Password'), 'password');
+    await tester.ensureVisible(find.text('Studios'));
+    await tester.tap(find.text('Studios'));
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Studio profile'), findsOneWidget);
+    expect(find.text('Studio Type'), findsOneWidget);
+    expect(find.text('Features & Equipment'), findsOneWidget);
+    expect(find.text('Camera type'), findsNothing);
+  });
+
+  testWidgets('user register continues through numbered admin steps', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: UserRegisterPage(bootstrap: _bootstrap()),
+    ));
+
+    expect(find.text('Create your account'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Full name'), 'Mona Client');
+    await tester.enterText(find.widgetWithText(TextField, 'Email'), 'mona@lens.app');
+    await tester.enterText(find.widgetWithText(TextField, 'Password'), 'password');
+    await tester.enterText(find.widgetWithText(TextField, 'Confirm password'), 'password');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your profile'), findsOneWidget);
+    expect(find.text('Governorate'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Phone 010 / 011 / 012 / 015'), '01234567890');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(SessionStore.instance.isClient, isTrue);
+  });
+
+  testWidgets('user register requires an egyptian mobile number', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: UserRegisterPage(bootstrap: _bootstrap()),
+    ));
+
+    await tester.enterText(find.widgetWithText(TextField, 'Full name'), 'Mona Client');
+    await tester.enterText(find.widgetWithText(TextField, 'Email'), 'mona2@lens.app');
+    await tester.enterText(find.widgetWithText(TextField, 'Password'), 'password');
+    await tester.enterText(find.widgetWithText(TextField, 'Confirm password'), 'password');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Phone 010 / 011 / 012 / 015'), '01912345678');
+    await tester.tap(find.text('Continue'));
+    await tester.pump();
+    expect(find.textContaining('Egyptian mobile number'), findsOneWidget);
+    expect(SessionStore.instance.isGuest, isTrue);
   });
 
   testWidgets('models filter shows the admin catalog', (WidgetTester tester) async {
@@ -484,6 +698,16 @@ Map<String, dynamic> _bootstrap() {
       {'slug': 'photographer', 'label': 'Photographers'},
       {'slug': 'videographer', 'label': 'Videographers'},
       {'slug': 'studio', 'label': 'Studios'},
+    ],
+    'cities': [
+      {'id': 1, 'name': 'Cairo'},
+      {'id': 2, 'name': 'Giza'},
+    ],
+    'banks': [
+      {'id': 'Banque Misr', 'label': 'Banque Misr'},
+    ],
+    'telecom_wallets': [
+      {'id': 'vodafone', 'label': 'Vodafone Cash'},
     ],
     'popular': [
       {

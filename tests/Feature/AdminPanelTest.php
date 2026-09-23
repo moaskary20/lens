@@ -117,6 +117,9 @@ class AdminPanelTest extends TestCase
         $this->actingAs($admin)->get('/admin/bookings/'.$booking->id.'/edit')
             ->assertOk()
             ->assertSee('Client project', false)
+            ->assertSee('Project name', false)
+            ->assertSee('Map location', false)
+            ->assertSee('Payment method', false)
             ->assertSee('Vendor delivery files', false);
     }
 }

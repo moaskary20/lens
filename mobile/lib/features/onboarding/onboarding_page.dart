@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/theme/lens_colors.dart';
-import 'package:lens/features/auth/auth_page.dart';
+import 'package:lens/features/auth/user_register_page.dart';
+import 'package:lens/features/auth/vendor_register_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
 
 class OnboardingPage extends StatefulWidget {
@@ -38,13 +39,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
+  void _openHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => AppShell(bootstrap: widget.bootstrap)),
+      (route) => false,
+    );
+  }
+
   void _continueAccount() {
-    Navigator.of(context).pushReplacement(
+    final onSuccess = _openHome;
+    Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => AuthPage(
-          bootstrap: widget.bootstrap,
-          intendedRole: _role == 'vendor' ? 'vendor' : 'client',
-        ),
+        builder: (_) => _role == 'vendor'
+            ? VendorRegisterPage(bootstrap: widget.bootstrap, onSuccess: onSuccess)
+            : UserRegisterPage(bootstrap: widget.bootstrap, onSuccess: onSuccess),
       ),
     );
   }
