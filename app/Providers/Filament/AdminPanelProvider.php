@@ -5,7 +5,6 @@ namespace App\Providers\Filament;
 use App\Filament\Auth\AdminLogin;
 use App\Filament\Widgets\LatestBookings;
 use App\Filament\Widgets\LensStatsOverview;
-use App\Filament\Widgets\MarketplaceLoop;
 use App\Filament\Widgets\PendingVerifications;
 use App\Filament\Widgets\QualityStatsOverview;
 use App\Support\LensBrand;
@@ -64,7 +63,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                MarketplaceLoop::class,
                 LensStatsOverview::class,
                 LatestBookings::class,
                 PendingVerifications::class,

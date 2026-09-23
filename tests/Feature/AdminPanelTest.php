@@ -44,10 +44,9 @@ class AdminPanelTest extends TestCase
             ->assertOk()
             ->assertDontSee('Client filter map', false)
             ->assertDontSee('Filter options', false)
-            ->assertSee('Marketplace loop', false)
+            ->assertDontSee('Marketplace loop', false)
             ->assertDontSee('Previous work', false)
             ->assertDontSee('Availability calendar', false)
-            ->assertSee('Client books a vendor', false)
             ->assertSee('Operations', false)
             ->assertSee('class="fi dark"', false)
             ->assertDontSee('fi-theme-switcher', false);
