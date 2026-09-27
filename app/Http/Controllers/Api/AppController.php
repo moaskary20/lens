@@ -40,6 +40,8 @@ class AppController extends Controller
             'search_placeholder' => 'Search photographers, studios, models...',
             'ai_prompt' => $search['ai_prompt'] ?? 'What will you create today?',
             'ai_helper' => 'Describe your idea and let AI find the right creatives for you.',
+            'voice_input_enabled' => (bool) ($search['voice_input_enabled'] ?? true),
+            'moodboard_mode' => $search['moodboard_mode'] ?? 'after_payment',
             'unread_notifications' => Feature::enabled('notifications') ? (int) ($client?->unreadNotifications()->count() ?? 0) : 0,
             'favorite_ids' => Feature::enabled('favorites') && $client
                 ? $client->favorites()->pluck('vendor_id')->map(fn ($id) => (int) $id)->values()->all()

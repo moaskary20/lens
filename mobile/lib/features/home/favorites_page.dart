@@ -5,6 +5,7 @@ import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
+import 'package:lens/features/shell/app_shell.dart';
 
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key, required this.home});
@@ -26,6 +27,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF070707),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: AppShell.navFab(context),
+      bottomNavigationBar: AppShell.navBar(context, index: 0),
       body: SafeArea(
         child: Column(
           children: [

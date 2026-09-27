@@ -661,6 +661,7 @@ class LensSeeder extends Seeder
                 'duration_hours' => 6,
                 'package_type' => 'half_day',
                 'location_text' => 'Yasmin Hall, Cairo',
+                'project_name' => 'Yasmin Hall wedding',
                 'client_brief' => 'Wedding recap at Yasmin Hall. Soft light, couple portraits, and 50 edited photos delivered on Lens.',
                 'session_price' => 1800,
                 'client_fee' => 180,
@@ -689,6 +690,7 @@ class LensSeeder extends Seeder
                 'duration_hours' => 6,
                 'package_type' => 'half_day',
                 'location_text' => 'Zamalek rooftop, Cairo',
+                'project_name' => 'Zamalek rooftop session',
                 'session_price' => 1800,
                 'client_fee' => 180,
                 'total_paid' => 1980,
@@ -715,6 +717,7 @@ class LensSeeder extends Seeder
                 'vendor_net' => 800,
                 'escrow_status' => 'held',
                 'location_text' => 'Alexandria',
+                'project_name' => 'Alexandria studio day',
             ],
         );
 

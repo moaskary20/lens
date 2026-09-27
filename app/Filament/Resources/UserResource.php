@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
+use App\Support\ClientPreferences;
 use App\Support\Roles;
 use Illuminate\Database\Eloquent\Model;
 use BackedEnum;
@@ -18,6 +19,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -56,7 +59,7 @@ class UserResource extends Resource
                 TextInput::make('password')->label('Password')->password()->revealable()
                     ->required(fn (string $operation): bool => $operation === 'create')
                     ->dehydrated(fn (?string $state): bool => filled($state)),
-                Select::make('role')->label('Role')->required()
+                Select::make('role')->label('Role')->required()->live()
                     ->options(fn (): array => (auth()->user()?->isAdmin() ?? false)
                         ? [
                             'admin' => 'Platform admin',
@@ -72,11 +75,88 @@ class UserResource extends Resource
                     ->helperText('Clients browse and book. Vendors onboard under a type. Supervisors handle verification and disputes. Admins own settings.')
                     ->native(false),
                 Select::make('city_id')->label('Governorate')->relationship('city', 'name_en')->searchable()->preload(),
-                Select::make('locale')->label('Language')->options(['en' => 'English', 'ar' => 'Arabic'])->default('en'),
+                Select::make('locale')->label('Language')->options(ClientPreferences::languages())->default('en')->live()
+                    ->afterStateUpdated(fn (Set $set, ?string $state) => $set('app_settings.language', $state)),
                 Toggle::make('is_active')->label('Active account')->default(true),
                 FileUpload::make('avatar')->label('Avatar')->image()->directory('avatars')->avatar(),
             ])->columns(2),
+            Section::make('App settings')
+                ->description('Client preferences applied in the mobile app after the next refresh.')
+                ->visible(fn (Get $get): bool => $get('role') === Roles::CLIENT)
+                ->schema([
+                    Section::make('Alerts')->schema([
+                        self::preferenceSelect('push_notifications'),
+                        self::preferenceSelect('chat_alerts'),
+                        self::preferenceSelect('message_preview'),
+                        self::preferenceSelect('booking_reminders'),
+                        self::preferenceSelect('review_prompts'),
+                        self::preferenceSelect('email_offers'),
+                        self::preferenceSelect('vibration'),
+                    ])->columns(2),
+                    Section::make('Privacy')->schema([
+                        self::preferenceSelect('read_receipts'),
+                        self::preferenceSelect('hide_activity'),
+                    ])->columns(2),
+                    Section::make('Display & feel')->schema([
+                        self::preferenceSelect('haptic_feedback'),
+                        self::preferenceSelect('reduce_motion'),
+                        self::preferenceSelect('language'),
+                    ])->columns(2),
+                ]),
         ]);
+    }
+
+    public static function preferenceSelect(string $key): Select
+    {
+        $meta = ClientPreferences::FIELDS[$key];
+        $defaults = ClientPreferences::forForm([], 'en');
+
+        $field = Select::make('app_settings.'.$key)
+            ->label($meta['label'])
+            ->helperText($meta['helper'])
+            ->native(false)
+            ->required();
+
+        if ($key === 'language') {
+            return $field
+                ->options(ClientPreferences::languages())
+                ->default('en')
+                ->live()
+                ->afterStateUpdated(fn (Set $set, ?string $state) => $set('locale', $state));
+        }
+
+        return $field
+            ->options(ClientPreferences::onOff())
+            ->default($defaults[$key] ?? '1');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function hydratePreferences(array $data): array
+    {
+        $data['app_settings'] = ClientPreferences::forForm($data['app_settings'] ?? [], $data['locale'] ?? 'en');
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function normalizePreferenceData(array $data): array
+    {
+        if (($data['role'] ?? null) !== Roles::CLIENT) {
+            unset($data['app_settings']);
+
+            return $data;
+        }
+
+        $data['app_settings'] = ClientPreferences::fromForm($data['app_settings'] ?? [], $data['locale'] ?? 'en');
+        $data['locale'] = $data['app_settings']['language'] ?? $data['locale'] ?? 'en';
+
+        return $data;
     }
 
     public static function table(Table $table): Table
@@ -149,6 +229,8 @@ class UserResource extends Resource
         return [
             RelationManagers\BookingsRelationManager::class,
             RelationManagers\FavoritesRelationManager::class,
+            RelationManagers\PaymentMethodsRelationManager::class,
+            RelationManagers\AddressesRelationManager::class,
         ];
     }
 

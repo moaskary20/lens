@@ -15,6 +15,7 @@ import 'package:lens/features/home/book_project_page.dart';
 import 'package:lens/features/home/book_review_page.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
+import 'package:lens/features/home/category_list_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
 import 'package:lens/features/auth/user_register_page.dart';
 import 'package:lens/features/auth/vendor_register_page.dart';
@@ -74,6 +75,166 @@ void main() {
     expect(find.text('Find. Book. Create.'), findsOneWidget);
   });
 
+  testWidgets('home view all opens the matching category', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.ensureVisible(find.byKey(const Key('view-all-photographer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('view-all-photographer')));
+    await tester.pumpAndSettle();
+    expect(find.text('Photographers'), findsWidgets);
+    expect(find.text('F. L.'), findsWidgets);
+    expect(find.text('Fahad Studio Light'), findsNothing);
+    expect(find.text('Sort'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.chevron_left_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('view-all-studio')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('view-all-studio')));
+    await tester.pumpAndSettle();
+    expect(find.text('Studios'), findsWidgets);
+    expect(find.text('N. S.'), findsWidgets);
+    expect(find.text('Nile Loft Studio'), findsNothing);
+    expect(find.text('Sort'), findsOneWidget);
+  });
+
+  testWidgets('client bookings show project under vendor and contact menu', (WidgetTester tester) async {
+    await SessionStore.instance.login(email: 'client@lens.app', password: 'password');
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.tap(find.text('Bookings'));
+    await tester.pumpAndSettle();
+    expect(find.text('My Bookings'), findsOneWidget);
+    expect(find.text('Lana Mostafa'), findsOneWidget);
+    expect(find.text('Yasmin Hall wedding'), findsOneWidget);
+    await tester.tap(find.text('Yasmin Hall wedding'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available after approval'), findsOneWidget);
+    expect(find.text('Pasta_Shot_01.jpg'), findsOneWidget);
+    expect(find.text('Refuse'), findsOneWidget);
+    expect(find.text('Approve Delivery'), findsOneWidget);
+    expect(find.text('Request Edit'), findsOneWidget);
+    expect(find.text('1 / 24'), findsOneWidget);
+    await tester.tap(find.text('Approve Delivery'));
+    await tester.pumpAndSettle();
+    expect(find.text('Approve this delivery?'), findsOneWidget);
+    expect(find.text('Approve & Release Funds'), findsOneWidget);
+    expect(find.text('Keep Reviewing'), findsOneWidget);
+    expect(find.textContaining('EGP 1,980'), findsOneWidget);
+    await tester.ensureVisible(find.text('Keep Reviewing'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep Reviewing'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Refuse'));
+    await tester.pumpAndSettle();
+    expect(find.text('Are you sure you want to refuse this project?'), findsOneWidget);
+    expect(find.textContaining('You can\'t undo this action'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Request Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Request an Edit'), findsOneWidget);
+    expect(find.text('What would you like to change?'), findsOneWidget);
+    expect(find.text('Send Revision Request'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Booking actions').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Deliverables'), findsOneWidget);
+    expect(find.text('Request edit'), findsOneWidget);
+    expect(find.text('Approved delivery'), findsOneWidget);
+    await tester.tap(find.text('Deliverables'));
+    await tester.pumpAndSettle();
+    expect(find.text('Approve Delivery'), findsOneWidget);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lana Mostafa'));
+    await tester.pumpAndSettle();
+    expect(find.byType(VendorProfilePage), findsOneWidget);
+    expect(find.text('Call Now'), findsOneWidget);
+    expect(find.text('WhatsApp'), findsOneWidget);
+    expect(find.text('Chat in App'), findsOneWidget);
+  });
+
+  testWidgets('guest vendor profile masks the name and asks to log in', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.tap(find.text('Photographers'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byType(CategoryListPage), matching: find.text('F. L.')));
+    await tester.pumpAndSettle();
+    expect(find.byType(VendorProfilePage), findsOneWidget);
+    expect(find.descendant(of: find.byType(VendorProfilePage), matching: find.text('Fahad Studio Light')), findsNothing);
+    expect(find.descendant(of: find.byType(VendorProfilePage), matching: find.text('F. L.')), findsOneWidget);
+    expect(find.text('Book Now'), findsNothing);
+    expect(find.text('Log In'), findsOneWidget);
+    await tester.ensureVisible(find.text('Log In'));
+    await tester.tap(find.text('Log In'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Email'), findsOneWidget);
+  });
+
+  testWidgets('home categories view all opens every department', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.tap(find.byKey(const Key('view-all-categories')));
+    await tester.pumpAndSettle();
+    expect(find.text('All Categories'), findsOneWidget);
+    expect(find.text('Explore every department'), findsOneWidget);
+    expect(find.text('Photographers'), findsWidgets);
+    await tester.scrollUntilVisible(find.text('Videographers'), 280);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Videographers'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sort'), findsOneWidget);
+    expect(find.text('Videographers'), findsWidgets);
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+    expect(find.text('What are you looking to create?'), findsOneWidget);
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Find. Book. Create.'), findsOneWidget);
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('My Bookings'), findsOneWidget);
+  });
+
+  testWidgets('home ai search opens the assistant and asks location', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.tap(find.text('AI Search'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI Search'), findsWidgets);
+    expect(find.text('What will you create today?'), findsWidgets);
+    expect(find.text('Location'), findsOneWidget);
+    expect(find.text('Date'), findsOneWidget);
+    expect(find.text('Budget'), findsOneWidget);
+    expect(find.text('Chat'), findsOneWidget);
+    expect(find.text('Voice'), findsOneWidget);
+    await tester.tap(find.text('Wedding photographer next month, mid budget'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('governorate'), findsOneWidget);
+  });
+
   testWidgets('home follows enabled admin features', (WidgetTester tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: LensTheme.dark(),
@@ -86,7 +247,8 @@ void main() {
     expect(find.text('Photographers'), findsOneWidget);
     expect(find.text('AI Videos & Motion'), findsNothing);
     expect(find.text('VO (Voice Over)'), findsNothing);
-    expect(find.text('Fahad Studio Light', skipOffstage: false), findsOneWidget);
+    expect(find.text('F. L.', skipOffstage: false), findsOneWidget);
+    expect(find.text('Fahad Studio Light', skipOffstage: false), findsNothing);
     expect(find.text('Featured Studios', skipOffstage: false), findsOneWidget);
     expect(find.byIcon(Icons.favorite_border_rounded), findsWidgets);
     expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
@@ -118,6 +280,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('My Bookings'), findsOneWidget);
     expect(find.text('Lana Mostafa'), findsOneWidget);
+    expect(find.text('Yasmin Hall wedding'), findsOneWidget);
     expect(find.text('Cancel Booking'), findsWidgets);
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
@@ -335,13 +498,29 @@ void main() {
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
     expect(find.text('Guest'), findsOneWidget);
+    expect(find.text('Not signed in'), findsOneWidget);
     expect(find.text('Sign in to manage bookings'), findsOneWidget);
     expect(find.text('Sign in'), findsWidgets);
     expect(find.text('Upcoming'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('Arabic'), findsOneWidget);
     expect(find.text('My Bookings'), findsOneWidget);
     expect(find.text('Saved Creators'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Log Out'), 240);
-    expect(find.text('Log Out'), findsOneWidget);
+    expect(find.text('Payment Methods'), findsOneWidget);
+    expect(find.text('Addresses'), findsOneWidget);
+    await tester.tap(find.text('Payment Methods'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.text('Payment Methods'), findsNothing);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Register'), 240);
+    expect(find.text('Messages'), findsOneWidget);
+    expect(find.text('App Settings'), findsWidgets);
+    expect(find.text('Log Out'), findsNothing);
+    expect(find.text('Log In'), findsOneWidget);
+    expect(find.text('Register'), findsOneWidget);
   });
 
   testWidgets('bookings tab shows incoming list after vendor sign in', (WidgetTester tester) async {

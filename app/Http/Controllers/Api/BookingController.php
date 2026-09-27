@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\City;
 use App\Models\Coupon;
 use App\Models\Vendor;
+use App\Services\DeliveryService;
 use App\Services\PromoService;
 use App\Support\AppClient;
 use App\Support\Finance;
@@ -28,7 +29,7 @@ class BookingController extends Controller
         ]);
 
         $user = AppClient::requireUser();
-        abort_unless($user->isClient(), 403, 'Only clients can quote a booking.');
+        abort_unless($user->canUseClientApp(), 403, 'Only clients can quote a booking.');
 
         $vendor = Vendor::query()->with(['city', 'vendorType', 'travelRates'])->findOrFail($data['vendor_id']);
         $city = $this->cityFromLocation((string) ($data['location_text'] ?? '')) ?? $vendor->city;
@@ -77,7 +78,7 @@ class BookingController extends Controller
         ]);
 
         $user = AppClient::requireUser();
-        abort_unless($user->isClient(), 403, 'Only clients can create a booking.');
+        abort_unless($user->canUseClientApp(), 403, 'Only clients can create a booking.');
 
         $vendor = Vendor::query()->with(['city', 'vendorType', 'travelRates'])->findOrFail($data['vendor_id']);
         $city = $this->cityFromLocation($data['location_text']) ?? $vendor->city;
@@ -126,6 +127,96 @@ class BookingController extends Controller
             'payment_method' => $booking->payment_method,
             'location_text' => $booking->location_text,
         ], 201);
+    }
+
+    public function deliverables(Booking $booking): JsonResponse
+    {
+        $booking = $this->ownedBooking($booking)->load(['deliverables', 'vendor.vendorType']);
+        $state = app(DeliveryService::class)->previewState($booking);
+        $vendor = $booking->vendor;
+
+        return response()->json([
+            'project_name' => $booking->project_name ?: 'Session files',
+            'vendor_name' => $vendor?->display_name,
+            'vendor_type' => $vendor?->vendorType?->name_en,
+            'vendor_photo' => $vendor?->profile_photo ? asset('storage/'.$vendor->profile_photo) : null,
+            'date_label' => $booking->scheduled_at?->format('F j, Y'),
+            'total' => (float) ($booking->total_paid ?: $booking->session_price ?: 0),
+            'status' => $booking->status,
+            'preview' => $state,
+            'deliverables' => $booking->deliverables->map(fn ($file): array => [
+                'id' => $file->id,
+                'name' => $file->original_name ?: basename((string) $file->path),
+                'version' => $file->version,
+                'watermarked' => (bool) $file->is_watermarked,
+                'unlocked' => (bool) $file->is_unlocked || (bool) $state['downloads_unlocked'],
+                'url' => $file->path ? asset('storage/'.$file->path) : null,
+            ])->values()->all(),
+        ]);
+    }
+
+    public function requestEdit(Request $request, Booking $booking): JsonResponse
+    {
+        $booking = $this->ownedBooking($booking);
+        $data = $request->validate([
+            'note' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $updated = app(DeliveryService::class)->requestRevision($booking, $data['note'], $booking->client_id);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'status' => $updated->status,
+            'revision_count' => $updated->revision_count,
+            'message' => 'Edit requested. The creator will upload a new version.',
+        ]);
+    }
+
+    public function approve(Booking $booking): JsonResponse
+    {
+        $booking = $this->ownedBooking($booking);
+
+        try {
+            $updated = app(DeliveryService::class)->approve($booking);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'status' => $updated->status,
+            'message' => 'Delivery approved. Files are unlocked.',
+        ]);
+    }
+
+    public function refuse(Request $request, Booking $booking): JsonResponse
+    {
+        $booking = $this->ownedBooking($booking);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $dispute = app(DeliveryService::class)->rejectAndDispute($booking, $booking->client_id, $data['reason']);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'status' => $booking->fresh()->status,
+            'dispute_id' => $dispute->id,
+            'message' => 'Delivery refused. Admin will review the complaint.',
+        ]);
+    }
+
+    protected function ownedBooking(Booking $booking): Booking
+    {
+        $user = AppClient::requireUser();
+        abort_unless($user->canUseClientApp() && (int) $booking->client_id === (int) $user->id, 403, 'This booking is not yours.');
+
+        return $booking;
     }
 
     protected function nextReference(): string

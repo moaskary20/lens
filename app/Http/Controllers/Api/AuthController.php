@@ -34,12 +34,6 @@ class AuthController extends Controller
             ]);
         }
 
-        if (! in_array($user->role, ['client', 'vendor'], true)) {
-            throw ValidationException::withMessages([
-                'email' => 'Staff accounts sign in on the web console.',
-            ]);
-        }
-
         return response()->json($this->presentUser($user->load('vendor.vendorType')));
     }
 
@@ -181,12 +175,12 @@ class AuthController extends Controller
     {
         $user = AppClient::requireUser()->load('vendor');
 
-        $query = Booking::query()->with(['vendor.vendorType', 'vendor.city', 'client', 'category']);
+        $query = Booking::query()->with(['vendor.vendorType', 'vendor.city', 'vendor.badges', 'client', 'category']);
         if ($user->isVendor() && $user->vendor) {
             $query->where('vendor_id', $user->vendor->id);
             $view = 'vendor';
         } else {
-            abort_unless($user->isClient(), 403, 'Only clients and vendors can open bookings.');
+            abort_unless($user->canUseClientApp(), 403, 'Only clients and vendors can open bookings.');
             $query->where('client_id', $user->id);
             $view = 'client';
         }
@@ -277,11 +271,20 @@ class AuthController extends Controller
     {
         $role = $user->isVendor() ? 'vendor' : 'client';
 
+        $user->loadMissing('city');
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'phone' => $user->phone,
             'role' => $role,
+            'avatar' => $user->avatarUrl(),
+            'locale' => $user->locale ?: 'en',
+            'city_id' => $user->city_id,
+            'city' => $user->city?->name_en,
+            'is_active' => (bool) $user->is_active,
+            'joined_at' => $user->created_at?->toDateString(),
             'vendor_id' => $user->vendor?->id,
             'vendor_name' => $user->vendor?->display_name,
             'verification_status' => $user->vendor?->verification_status,
@@ -332,6 +335,28 @@ class AuthController extends Controller
             'photo' => $photo,
             'vendor_type' => $vendor?->vendorType?->name_en,
             'role' => $vendor?->vendorType?->name_en,
+            'project_name' => $booking->project_name ?: ($booking->category?->name_en ? $booking->category->name_en.' session' : 'Creative session'),
+            'phone' => preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: '')) ?: null,
+            'whatsapp' => preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendor?->contact_phone ?: '')) ?: null,
+            'vendor_id' => $vendor?->id,
+            'vendor' => $view === 'client' ? [
+                'id' => $vendor?->id,
+                'display_name' => $vendor?->display_name,
+                'vendor_type_name' => $vendor?->vendorType?->name_en,
+                'vendor_type' => $vendor?->vendorType?->slug,
+                'city' => $vendor?->city?->name_en,
+                'location' => $vendor?->address ?: $vendor?->city?->name_en,
+                'rating_avg' => (float) ($vendor?->rating_avg ?: 0),
+                'rating_count' => (int) ($vendor?->rating_count ?: 0),
+                'badges' => $vendor?->badges?->pluck('slug')->values()->all() ?? [],
+                'cover_url' => $vendor?->cover_image,
+                'profile_photo_url' => $vendor?->profile_photo ?: $photo,
+                'initials' => mb_strtoupper(mb_substr((string) ($vendor?->display_name ?: 'C'), 0, 1)),
+                'tags' => [],
+                'verified' => $vendor?->verification_status === 'verified',
+                'latitude' => $vendor?->latitude,
+                'longitude' => $vendor?->longitude,
+            ] : null,
         ];
     }
 

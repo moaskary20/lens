@@ -3,12 +3,12 @@ import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/features/home/ai_search_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/inbox.dart';
 import 'package:lens/features/home/map_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key, required this.data, this.autofocus = false});
@@ -248,9 +248,7 @@ class _SearchPageState extends State<SearchPage> {
               color: LensColors.primary,
               borderRadius: BorderRadius.circular(14),
               child: InkWell(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'AI Search')),
-                ),
+                onTap: () => openAiSearch(context, widget.data),
                 borderRadius: BorderRadius.circular(14),
                 child: const SizedBox(
                   width: 50,
@@ -267,7 +265,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Widget _chips() {
     return SizedBox(
-      height: 86,
+      height: 88,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -279,8 +277,7 @@ class _SearchPageState extends State<SearchPage> {
           return GestureDetector(
             onTap: () => setState(() => _typeSlug = type.slug),
             child: Container(
-              width: 78,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               decoration: BoxDecoration(
                 color: const Color(0xFF141210),
                 borderRadius: BorderRadius.circular(16),
@@ -294,9 +291,9 @@ class _SearchPageState extends State<SearchPage> {
                   Text(
                     type.slug == 'ugc' ? 'UGC' : type.label,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.1),
                   ),
                 ],
               ),

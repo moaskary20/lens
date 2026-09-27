@@ -29,6 +29,7 @@ class User extends Authenticatable implements FilamentUser
         'is_active',
         'locale',
         'city_id',
+        'app_settings',
     ];
 
     protected $hidden = [
@@ -42,6 +43,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'app_settings' => 'array',
         ];
     }
 
@@ -76,6 +78,11 @@ class User extends Authenticatable implements FilamentUser
     public function isClient(): bool
     {
         return $this->role === Roles::CLIENT;
+    }
+
+    public function canUseClientApp(): bool
+    {
+        return $this->isClient() || $this->isStaff();
     }
 
     public function isVendor(): bool
@@ -143,9 +150,32 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Favorite::class);
     }
 
+    public function paymentMethods(): HasMany
+    {
+        return $this->hasMany(UserPaymentMethod::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(UserAddress::class);
+    }
+
     public function favoriteVendors(): BelongsToMany
     {
         return $this->belongsToMany(Vendor::class, 'favorites')->withTimestamps();
+    }
+
+    public function avatarUrl(): ?string
+    {
+        if (! filled($this->avatar)) {
+            return null;
+        }
+
+        if (str_starts_with((string) $this->avatar, 'http://') || str_starts_with((string) $this->avatar, 'https://')) {
+            return $this->avatar;
+        }
+
+        return asset('storage/'.$this->avatar);
     }
 
     protected static function booted(): void

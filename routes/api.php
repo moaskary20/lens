@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AppController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingController;
@@ -16,8 +17,23 @@ Route::post('app/auth/login', [AuthController::class, 'login']);
 Route::post('app/auth/register', [AuthController::class, 'register']);
 Route::get('app/auth/me', [AuthController::class, 'me']);
 Route::get('app/bookings', [AuthController::class, 'bookings']);
+Route::get('app/account/payment-methods', [AccountController::class, 'paymentMethods']);
+Route::post('app/account/payment-methods', [AccountController::class, 'storePaymentMethod']);
+Route::delete('app/account/payment-methods/{paymentMethod}', [AccountController::class, 'destroyPaymentMethod']);
+Route::get('app/account/addresses', [AccountController::class, 'addresses']);
+Route::post('app/account/addresses', [AccountController::class, 'storeAddress']);
+Route::delete('app/account/addresses/{address}', [AccountController::class, 'destroyAddress']);
+Route::get('app/account/settings', [AccountController::class, 'settings']);
+Route::post('app/account/settings', [AccountController::class, 'updateSettings']);
+Route::get('app/account/profile', [AccountController::class, 'profile']);
+Route::post('app/account/profile', [AccountController::class, 'updateProfile']);
+Route::get('app/account/projects', [AccountController::class, 'projects']);
 Route::post('app/bookings/quote', [BookingController::class, 'quote']);
 Route::post('app/bookings', [BookingController::class, 'store']);
+Route::get('app/bookings/{booking}/deliverables', [BookingController::class, 'deliverables']);
+Route::post('app/bookings/{booking}/request-edit', [BookingController::class, 'requestEdit']);
+Route::post('app/bookings/{booking}/approve', [BookingController::class, 'approve']);
+Route::post('app/bookings/{booking}/refuse', [BookingController::class, 'refuse']);
 
 Route::post('app/conversations', [ChatController::class, 'open']);
 Route::get('app/conversations/{conversation}', [ChatController::class, 'show']);

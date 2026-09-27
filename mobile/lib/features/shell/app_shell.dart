@@ -20,9 +20,40 @@ class AppShell extends StatefulWidget {
   final Map<String, dynamic> bootstrap;
 
   static void Function({bool guestPreview})? openBookingsTab;
+  static void Function(int index)? selectTab;
+  static HomeData? currentHome;
+
+  static bool get bookingsOn => currentHome?.on('bookings') ?? true;
+  static int get searchIndex => bookingsOn ? 2 : 1;
+  static int get profileIndex => bookingsOn ? 3 : 2;
 
   static void showBookings({bool guestPreview = false}) {
     openBookingsTab?.call(guestPreview: guestPreview);
+  }
+
+  static void openTab(BuildContext context, int index) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.popUntil((route) => route.isFirst);
+    }
+    selectTab?.call(index);
+  }
+
+  static void openCreate(BuildContext context) {
+    openTab(context, searchIndex);
+  }
+
+  static Widget navBar(BuildContext context, {required int index, bool withFab = true}) {
+    return LensNavBar.bar(
+      bookingsOn: bookingsOn,
+      index: index,
+      withFab: withFab,
+      onSelect: (value) => openTab(context, value),
+    );
+  }
+
+  static Widget navFab(BuildContext context) {
+    return LensNavBar.fab(onPressed: () => openCreate(context));
   }
 
   @override
@@ -45,12 +76,27 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
     FavoritesStore.instance.hydrate(home);
     NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
     AppShell.openBookingsTab = ({bool guestPreview = false}) => openBookings(guestPreview: guestPreview);
+    AppShell.selectTab = (index) => setState(() {
+      _index = index;
+      if (index != 1) {
+        _guestBookings = false;
+      }
+      if (index != (HomeData.fromJson(widget.bootstrap).on('bookings') ? 2 : 1)) {
+        _focusSearch = false;
+      }
+    });
   }
 
   @override
   void dispose() {
     if (AppShell.openBookingsTab != null) {
       AppShell.openBookingsTab = null;
+    }
+    if (AppShell.selectTab != null) {
+      AppShell.selectTab = null;
+    }
+    if (AppShell.currentHome != null) {
+      AppShell.currentHome = null;
     }
     _menu.dispose();
     super.dispose();
@@ -63,6 +109,7 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
   @override
   Widget build(BuildContext context) {
     final home = HomeData.fromJson(widget.bootstrap);
+    AppShell.currentHome = home;
     final bookingsOn = home.on('bookings');
     final searchIndex = bookingsOn ? 2 : 1;
     final pages = [
@@ -171,9 +218,7 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
         backgroundColor: LensColors.charcoal,
         body: pages[visibleIndex],
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        floatingActionButton: LensNavBar.fab(
-          onPressed: () => _open(context, bookingsOn ? 'New booking' : 'Create'),
-        ),
+        floatingActionButton: AppShell.navFab(context),
         bottomNavigationBar: LensNavBar.bar(
           bookingsOn: bookingsOn,
           index: visibleIndex,

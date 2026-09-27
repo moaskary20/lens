@@ -9,8 +9,7 @@ import 'package:lens/features/home/filter_page.dart';
 import 'package:lens/features/home/inbox.dart';
 import 'package:lens/features/home/sort_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
-import 'package:lens/features/shell/lens_nav_bar.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
+import 'package:lens/features/shell/app_shell.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({
@@ -137,33 +136,13 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bookingsOn = widget.home.on('bookings');
     final items = _visible;
 
     return Scaffold(
       backgroundColor: const Color(0xFF070707),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: LensNavBar.fab(
-        onPressed: () => _open(context, bookingsOn ? 'New booking' : 'Create'),
-      ),
-      bottomNavigationBar: LensNavBar.bar(
-        bookingsOn: bookingsOn,
-        index: bookingsOn ? 2 : 1,
-        onSelect: (index) {
-          if (index == 0) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-            return;
-          }
-          if (bookingsOn && index == 1) {
-            _open(context, 'Bookings');
-            return;
-          }
-          if (index == (bookingsOn ? 2 : 1)) {
-            return;
-          }
-          _open(context, 'Profile');
-        },
-      ),
+      floatingActionButton: AppShell.navFab(context),
+      bottomNavigationBar: AppShell.navBar(context, index: AppShell.searchIndex),
       body: SafeArea(
         child: Column(
           children: [
@@ -203,7 +182,7 @@ class _MapPageState extends State<MapPage> {
             ),
           ),
           IconButton(
-            onPressed: () => _open(context, 'Search'),
+            onPressed: () => AppShell.openTab(context, AppShell.searchIndex),
             icon: const Icon(Icons.search, color: LensColors.cream),
           ),
           if (widget.home.on('notifications'))
@@ -518,9 +497,6 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  void _open(BuildContext context, String title) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: title)));
-  }
 }
 
 class _MapPin extends StatelessWidget {

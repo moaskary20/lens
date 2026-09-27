@@ -24,6 +24,7 @@ class LensNavBar {
     required bool bookingsOn,
     required int index,
     required ValueChanged<int> onSelect,
+    bool withFab = true,
   }) {
     return BottomAppBar(
       color: const Color(0xFF111114),
@@ -31,8 +32,8 @@ class LensNavBar {
       elevation: 0,
       padding: EdgeInsets.zero,
       height: 72,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 7,
+      shape: withFab ? const CircularNotchedRectangle() : null,
+      notchMargin: withFab ? 7 : 0,
       child: SizedBox(
         height: 72,
         child: Row(
@@ -52,7 +53,7 @@ class LensNavBar {
                 selected: index == 1,
                 onTap: () => onSelect(1),
               ),
-            const SizedBox(width: 72),
+            if (withFab) const SizedBox(width: 72),
             _item(
               selectedIcon: Icons.search_rounded,
               icon: Icons.search_rounded,

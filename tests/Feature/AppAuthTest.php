@@ -197,11 +197,18 @@ class AppAuthTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('phone');
     }
 
-    public function test_staff_cannot_sign_in_on_the_app(): void
+    public function test_staff_can_sign_in_on_the_app_as_a_client(): void
     {
         $this->postJson('/api/app/auth/login', [
             'email' => 'admin@lens.app',
             'password' => 'password',
-        ])->assertStatus(422);
+        ])->assertOk()
+            ->assertJsonPath('email', 'admin@lens.app')
+            ->assertJsonPath('role', 'client');
+
+        $this->withHeaders(['X-Lens-Client' => 'admin@lens.app'])
+            ->getJson('/api/app/bookings')
+            ->assertOk()
+            ->assertJsonPath('role', 'client');
     }
 }

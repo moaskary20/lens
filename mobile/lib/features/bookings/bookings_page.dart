@@ -6,8 +6,12 @@ import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/auth/login_view.dart';
+import 'package:lens/features/bookings/approve_delivery_sheet.dart';
+import 'package:lens/features/bookings/deliverables_page.dart';
+import 'package:lens/features/bookings/request_edit_page.dart';
 import 'package:lens/features/home/inbox.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
+import 'package:lens/features/home/vendor_profile_page.dart';
+import 'package:lens/features/profile/app_settings_page.dart';
 
 class BookingsPage extends StatefulWidget {
   const BookingsPage({super.key, required this.home, this.onBack, this.asRoute = false});
@@ -197,7 +201,7 @@ class _ClientBookings extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'App Settings'))),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AppSettingsPage(home: home))),
                   icon: const Icon(Icons.settings_outlined, color: LensColors.cream),
                 ),
                 if (home.on('notifications'))
@@ -327,15 +331,18 @@ class _ClientBookings extends StatelessWidget {
   Widget _card(_BookingItem item) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: _ClientCard(item: item),
+      child: _ClientCard(item: item, home: home),
     );
   }
 }
 
 class _ClientCard extends StatelessWidget {
-  const _ClientCard({required this.item});
+  const _ClientCard({required this.item, required this.home});
 
   final _BookingItem item;
+  final HomeData home;
+
+  VendorCard get vendor => item.vendor ?? item.fallbackVendor;
 
   @override
   Widget build(BuildContext context) {
@@ -346,68 +353,89 @@ class _ClientCard extends StatelessWidget {
         color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(22),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _VendorPhoto(url: item.photo),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(onTap: () => _openVendor(context), child: _VendorPhoto(url: item.photo ?? vendor.profilePhotoUrl ?? vendor.coverUrl)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.counterpart,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _openVendor(context),
+                            child: Text(
+                              item.counterpart,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                            ),
                           ),
-                          if (item.role.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(item.role, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(color: colors.$1),
+                          ),
+                          child: Text(item.badge, style: TextStyle(color: colors.$1, fontSize: 11, fontWeight: FontWeight.w700)),
+                        ),
+                        const SizedBox(width: 2),
+                        PopupMenuButton<String>(
+                          tooltip: 'Booking actions',
+                          padding: EdgeInsets.zero,
+                          color: const Color(0xFF1A1A1A),
+                          icon: const Icon(Icons.more_horiz, color: Color(0xFF8E8B84), size: 20),
+                          onSelected: (value) => _menu(context, value),
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(value: 'deliverables', child: Text('Deliverables', style: TextStyle(color: Colors.white))),
+                            PopupMenuItem(value: 'request_edit', child: Text('Request edit', style: TextStyle(color: Colors.white))),
+                            PopupMenuItem(value: 'approve', child: Text('Approved delivery', style: TextStyle(color: Colors.white))),
+                            PopupMenuItem(value: 'refuse', child: Text('Refuse', style: TextStyle(color: Colors.white))),
                           ],
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: colors.$1),
-                      ),
-                      child: Text(item.badge, style: TextStyle(color: colors.$1, fontSize: 11, fontWeight: FontWeight.w700)),
-                    ),
-                    const SizedBox(width: 6),
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Icon(Icons.more_horiz, color: Color(0xFF8E8B84), size: 20),
+                    if (item.role.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(item.role, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13)),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _meta(Icons.calendar_today_outlined, item.dateLabel),
+                              _meta(Icons.access_time_rounded, item.timeLabel),
+                              _meta(Icons.location_on_outlined, item.location),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _action(item),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _meta(Icons.calendar_today_outlined, item.dateLabel),
-                          _meta(Icons.access_time_rounded, item.timeLabel),
-                          _meta(Icons.location_on_outlined, item.location),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _action(item),
-                  ],
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => _openProject(context),
+            child: Text(
+              item.displayProject,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: LensColors.primary, fontSize: 14, fontWeight: FontWeight.w700, height: 1.25),
             ),
           ),
         ],
@@ -446,6 +474,143 @@ class _ClientCard extends StatelessWidget {
         shape: const StadiumBorder(),
       ),
     );
+  }
+
+  void _openVendor(BuildContext context) {
+    openVendorProfile(context, vendor, home, booked: true);
+  }
+
+  Future<void> _openProject(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DeliverablesPage(
+          bookingId: item.id,
+          projectName: item.displayProject,
+          vendorName: item.counterpart,
+          vendorRole: item.role,
+          vendorPhoto: item.photo,
+          dateLabel: item.dateLabel,
+          total: item.total,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _menu(BuildContext context, String value) async {
+    switch (value) {
+      case 'deliverables':
+        await _openProject(context);
+      case 'request_edit':
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => RequestEditPage(
+              bookingId: item.id,
+              fileName: item.displayProject,
+              fileUrl: item.photo,
+              vendorName: item.counterpart,
+              vendorRole: item.role,
+              projectName: item.projectName,
+            ),
+          ),
+        );
+      case 'approve':
+        final ok = await showApproveDeliverySheet(
+          context,
+          vendorName: item.counterpart,
+          vendorRole: item.role,
+          vendorPhoto: item.photo,
+          projectName: item.displayProject,
+          total: item.total,
+        );
+        if (ok && context.mounted) {
+          await _post(context, '/app/bookings/${item.id}/approve', const {}, 'Delivery approved. Files are unlocked.');
+        }
+      case 'refuse':
+        await _promptAction(
+          context,
+          title: 'Refuse delivery',
+          hint: 'Why are you refusing this delivery?',
+          confirm: 'Refuse',
+          path: '/app/bookings/${item.id}/refuse',
+          field: 'reason',
+          done: 'Delivery refused. Admin will review the complaint.',
+        );
+    }
+  }
+
+  Future<void> _promptAction(
+    BuildContext context, {
+    required String title,
+    required String hint,
+    required String confirm,
+    required String path,
+    required String field,
+    required String done,
+  }) async {
+    final note = TextEditingController();
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF161412),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        content: TextField(
+          controller: note,
+          maxLines: 4,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Color(0xFF8E8B84)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, note.text.trim().isNotEmpty),
+            style: FilledButton.styleFrom(backgroundColor: LensColors.primary),
+            child: Text(confirm),
+          ),
+        ],
+      ),
+    );
+    final text = note.text.trim();
+    note.dispose();
+    if (sent == true && text.isNotEmpty && context.mounted) {
+      await _post(context, path, {field: text}, done);
+    }
+  }
+
+  Future<bool> _confirm(BuildContext context, String message) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            backgroundColor: const Color(0xFF161412),
+            content: Text(message, style: const TextStyle(color: Colors.white)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: FilledButton.styleFrom(backgroundColor: LensColors.primary),
+                child: const Text('Approved delivery'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _post(BuildContext context, String path, Map<String, dynamic> body, String fallback) async {
+    var message = fallback;
+    if (LensConfig.useNetwork && SessionStore.instance.isClient) {
+      try {
+        final payload = await ApiClient().postJson(path, body);
+        message = payload['message']?.toString() ?? fallback;
+      } catch (error) {
+        message = error is ApiException ? error.message : 'Could not update this booking.';
+      }
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 }
 
@@ -531,11 +696,27 @@ class _BookingItem {
     required this.counterpart,
     required this.role,
     this.photo,
+    this.projectName = '',
+    this.vendorId,
+    this.vendor,
+    this.phone,
+    this.whatsapp,
   });
+
+  static String _projectNameOf(Map<String, dynamic> json) {
+    for (final key in ['project_name', 'project', 'title']) {
+      final value = json[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty && value.toLowerCase() != 'null') {
+        return value;
+      }
+    }
+    return '';
+  }
 
   factory _BookingItem.fromJson(Map<String, dynamic> json) {
     final status = json['status']?.toString() ?? '';
     final group = json['group']?.toString() ?? _groupFor(status);
+    final vendorJson = json['vendor'] is Map ? Map<String, dynamic>.from(json['vendor'] as Map) : null;
     return _BookingItem(
       id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
       reference: json['reference']?.toString() ?? '',
@@ -551,7 +732,12 @@ class _BookingItem {
       total: json['total'] is num ? (json['total'] as num).toDouble() : double.tryParse('${json['total']}') ?? 0,
       counterpart: json['counterpart']?.toString() ?? '',
       role: json['role']?.toString() ?? json['vendor_type']?.toString() ?? '',
-      photo: json['photo']?.toString(),
+      photo: json['photo']?.toString() ?? vendorJson?['profile_photo_url']?.toString(),
+      projectName: _BookingItem._projectNameOf(json),
+      vendorId: json['vendor_id'] is int ? json['vendor_id'] as int : int.tryParse('${json['vendor_id']}'),
+      vendor: vendorJson == null ? null : VendorCard.fromJson(vendorJson),
+      phone: json['phone']?.toString(),
+      whatsapp: json['whatsapp']?.toString(),
     );
   }
 
@@ -570,6 +756,54 @@ class _BookingItem {
   final String counterpart;
   final String role;
   final String? photo;
+  final String projectName;
+  String get displayProject {
+    final name = projectName.trim();
+    if (name.isNotEmpty && name.toLowerCase() != 'null') {
+      return name;
+    }
+    final pack = package.trim();
+    if (pack.isNotEmpty) {
+      return '${pack[0].toUpperCase()}${pack.substring(1)} session';
+    }
+    return 'Creative session';
+  }
+
+  final int? vendorId;
+  final VendorCard? vendor;
+  final String? phone;
+  final String? whatsapp;
+
+  VendorCard get fallbackVendor {
+    final name = counterpart.isEmpty ? 'Creator' : counterpart;
+    final parts = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+    final initials = parts.isEmpty ? 'C' : parts.take(2).map((part) => part.substring(0, 1).toUpperCase()).join();
+    final slug = switch (role.toLowerCase()) {
+      final value when value.contains('studio') => 'studio',
+      final value when value.contains('video') => 'videographer',
+      final value when value.contains('food') => 'food_stylist',
+      _ => 'photographer',
+    };
+    return VendorCard(
+      id: vendorId ?? id,
+      displayName: name,
+      vendorTypeName: role,
+      vendorType: slug,
+      city: location.contains(',') ? location.split(',').first.trim() : 'Cairo',
+      location: location,
+      ratingAvg: 0,
+      ratingCount: 0,
+      badges: const [],
+      coverUrl: photo,
+      profilePhotoUrl: photo,
+      initials: initials,
+      tags: const [],
+      startingFrom: total > 0 ? total : null,
+      verified: true,
+      latitude: null,
+      longitude: null,
+    );
+  }
 
   (Color, Color) get badgeColors {
     return switch (group) {
@@ -613,6 +847,7 @@ List<_BookingItem> _demoClient() {
       total: 1980,
       counterpart: 'Lana Mostafa',
       role: 'Food Stylist',
+      projectName: 'Yasmin Hall wedding',
       photo: VendorPhotos.shots('food_stylist', 0).first,
     ),
     _BookingItem(
@@ -630,6 +865,7 @@ List<_BookingItem> _demoClient() {
       total: 2200,
       counterpart: 'Ahmed Zaki',
       role: 'Photographer',
+      projectName: 'Brand portraits',
       photo: VendorPhotos.cover('photographer', 2),
     ),
     _BookingItem(
@@ -647,6 +883,7 @@ List<_BookingItem> _demoClient() {
       total: 2600,
       counterpart: 'Mariam Saad',
       role: 'Videographer',
+      projectName: 'Product film',
       photo: VendorPhotos.cover('videographer', 1),
     ),
     _BookingItem(
@@ -664,6 +901,7 @@ List<_BookingItem> _demoClient() {
       total: 1980,
       counterpart: 'Omar Fathy',
       role: 'Food Stylist',
+      projectName: 'Kitchen menu recap',
       photo: VendorPhotos.cover('food_stylist', 1),
     ),
     _BookingItem(
@@ -681,6 +919,7 @@ List<_BookingItem> _demoClient() {
       total: 1600,
       counterpart: 'Sara Khaled',
       role: 'Food Photographer',
+      projectName: 'Café launch',
       photo: VendorPhotos.cover('food_stylist', 2),
     ),
   ];

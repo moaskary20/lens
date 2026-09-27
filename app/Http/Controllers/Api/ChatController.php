@@ -20,7 +20,7 @@ class ChatController extends Controller
     {
         $this->assertChatEnabled();
         $user = AppClient::requireUser();
-        abort_unless($user->isClient(), 403, 'Only clients can start a vendor chat.');
+        abort_unless($user->canUseClientApp(), 403, 'Only clients can start a vendor chat.');
 
         $data = $request->validate([
             'vendor_id' => ['required', 'integer', 'exists:vendors,id'],

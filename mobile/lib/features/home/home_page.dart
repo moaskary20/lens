@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/features/home/ai_search_page.dart';
+import 'package:lens/features/home/categories_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/inbox.dart';
@@ -19,17 +22,20 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: CustomScrollView(
-        cacheExtent: 1200,
-        slivers: [
-          SliverToBoxAdapter(child: _Header(data: data, onOpenMenu: onOpenMenu)),
-          SliverToBoxAdapter(child: _SearchBar(data: data, onOpenSearch: onOpenSearch)),
-          if (data.on('ai_assistant')) SliverToBoxAdapter(child: _AiBanner(data: data)),
-          if (data.vendorTypes.isNotEmpty) SliverToBoxAdapter(child: _Categories(types: data.vendorTypes, home: data)),
-          ...data.popular.map((section) => SliverToBoxAdapter(child: _PopularBlock(section: section, data: data))),
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
-        ],
+    return ListenableBuilder(
+      listenable: SessionStore.instance,
+      builder: (context, _) => SafeArea(
+        child: CustomScrollView(
+          cacheExtent: 1200,
+          slivers: [
+            SliverToBoxAdapter(child: _Header(data: data, onOpenMenu: onOpenMenu)),
+            SliverToBoxAdapter(child: _SearchBar(data: data, onOpenSearch: onOpenSearch)),
+            if (data.on('ai_assistant')) SliverToBoxAdapter(child: _AiBanner(data: data)),
+            if (data.vendorTypes.isNotEmpty) SliverToBoxAdapter(child: _Categories(types: data.vendorTypes, home: data)),
+            ...data.popular.map((section) => SliverToBoxAdapter(child: _PopularBlock(section: section, data: data))),
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          ],
+        ),
       ),
     );
   }
@@ -239,9 +245,7 @@ class _AiBanner extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             FilledButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'AI Search')),
-              ),
+              onPressed: () => openAiSearch(context, data),
               style: FilledButton.styleFrom(
                 backgroundColor: LensColors.primary,
                 foregroundColor: Colors.white,
@@ -279,21 +283,27 @@ class _Categories extends StatelessWidget {
         children: [
           _SectionHead(
             title: 'Categories',
-            onViewAll: () => _openCategory(context, home, types.first),
+            viewAllKey: const Key('view-all-categories'),
+            onViewAll: () => openAllCategories(context, home),
           ),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: types.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              mainAxisExtent: 86,
-            ),
-            itemBuilder: (context, index) {
-              final type = types[index];
-              return _CategoryTile(type: type, featured: index == 0, home: home);
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 560 ? 4 : 3;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: types.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  mainAxisExtent: 88,
+                ),
+                itemBuilder: (context, index) {
+                  final type = types[index];
+                  return _CategoryTile(type: type, featured: index == 0, home: home);
+                },
+              );
             },
           ),
         ],
@@ -322,18 +332,27 @@ class _CategoryTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: featured ? const Color(0x55FF5A1F) : const Color(0xFF22242A)),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(_iconFor(type.slug), color: LensColors.primary, size: 24),
-              const SizedBox(height: 6),
-              Text(
-                type.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: LensColors.cream, fontSize: 10, fontWeight: FontWeight.w600, height: 1.15),
+              const SizedBox(height: 8),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  type.label,
+                  maxLines: 1,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: LensColors.cream,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1,
+                    letterSpacing: -0.2,
+                  ),
+                ),
               ),
             ],
           ),
@@ -363,9 +382,8 @@ class _PopularBlock extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
             child: _SectionHead(
               title: section.title,
-              onViewAll: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: section.title)),
-              ),
+              viewAllKey: Key('view-all-${section.slug}'),
+              onViewAll: () => _openCategory(context, data, _typeFor(data, section.slug, section.title), vendors: section.vendors),
             ),
           ),
           SizedBox(
@@ -562,7 +580,7 @@ class _VendorMeta extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          vendor.displayName,
+          vendor.publicName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
@@ -633,10 +651,11 @@ class _Cover extends StatelessWidget {
 }
 
 class _SectionHead extends StatelessWidget {
-  const _SectionHead({required this.title, required this.onViewAll});
+  const _SectionHead({required this.title, required this.onViewAll, this.viewAllKey});
 
   final String title;
   final VoidCallback onViewAll;
+  final Key? viewAllKey;
 
   @override
   Widget build(BuildContext context) {
@@ -654,6 +673,7 @@ class _SectionHead extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           GestureDetector(
+            key: viewAllKey,
             onTap: onViewAll,
             child: const Text('View all', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700)),
           ),
@@ -676,15 +696,23 @@ IconData _iconFor(String slug) {
   };
 }
 
-void _openCategory(BuildContext context, HomeData home, VendorTypeItem type) {
-  final vendors = home.popular
-      .where((section) => section.slug == type.slug)
-      .expand((section) => section.vendors)
-      .toList();
+VendorTypeItem _typeFor(HomeData home, String slug, [String? fallback]) {
+  for (final type in home.vendorTypes) {
+    if (type.slug == slug) {
+      return type;
+    }
+  }
+
+  return VendorTypeItem(slug: slug, label: fallback ?? slug);
+}
+
+void _openCategory(BuildContext context, HomeData home, VendorTypeItem type, {List<VendorCard>? vendors}) {
+  final items = vendors ??
+      home.popular.where((section) => section.slug == type.slug).expand((section) => section.vendors).toList();
 
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => CategoryListPage(type: type, home: home, vendors: vendors),
+      builder: (_) => CategoryListPage(type: type, home: home, vendors: items),
     ),
   );
 }

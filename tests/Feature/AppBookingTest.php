@@ -101,4 +101,38 @@ class AppBookingTest extends TestCase
             ])
             ->assertStatus(422);
     }
+
+    public function test_client_bookings_include_project_and_delivery_actions(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+        app(\App\Services\DeliveryService::class)->upload($booking->fresh(), 'deliverables/final.jpg', 'final.jpg');
+
+        $this->withHeaders($headers)
+            ->getJson('/api/app/bookings')
+            ->assertOk()
+            ->assertJsonFragment(['project_name' => 'Yasmin Hall wedding'])
+            ->assertJsonFragment(['project_name' => 'Zamalek rooftop session']);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/app/bookings/'.$booking->id.'/deliverables')
+            ->assertOk()
+            ->assertJsonPath('project_name', 'Yasmin Hall wedding')
+            ->assertJsonPath('deliverables.0.name', 'final.jpg')
+            ->assertJsonPath('total', 1980);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/request-edit', [
+                'note' => 'Soften the shadows on the cake.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'in_revision');
+
+        app(\App\Services\DeliveryService::class)->upload($booking->fresh(), 'deliverables/final-v2.jpg', 'final-v2.jpg');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/approve')
+            ->assertOk()
+            ->assertJsonPath('status', 'approved');
+    }
 }

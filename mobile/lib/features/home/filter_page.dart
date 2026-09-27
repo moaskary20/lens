@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/features/shell/app_shell.dart';
 
 class CategoryFilters {
   const CategoryFilters({
@@ -548,6 +549,9 @@ class _FilterPageState extends State<FilterPage> {
 
     return Scaffold(
       backgroundColor: LensColors.charcoal,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: AppShell.navFab(context),
+      bottomNavigationBar: AppShell.navBar(context, index: AppShell.searchIndex),
       body: SafeArea(
         child: Column(
           children: [

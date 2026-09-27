@@ -3,11 +3,14 @@ import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/contact_launch.dart';
 import 'package:lens/core/models/home_data.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/home/book_date_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
+import 'package:lens/features/shell/app_shell.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
 void openVendorProfile(BuildContext context, VendorCard vendor, HomeData home, {bool booked = false}) {
@@ -47,9 +50,13 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   late List<_Package> _packages;
   String _contactPhone = '';
   String _whatsapp = '';
+  final _tabScroll = ScrollController();
 
   VendorCard get vendor => widget.vendor;
   bool get booked => widget.booked;
+  bool get _guest => SessionStore.instance.isGuest;
+  String get _visibleName => vendor.publicName;
+  String get _visibleBio => _guest ? _bio.replaceAll(vendor.displayName, vendor.maskedName) : _bio;
 
   String get _phone {
     if (_contactPhone.isNotEmpty) {
@@ -73,6 +80,12 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     if (LensConfig.useNetwork) {
       _load();
     }
+  }
+
+  @override
+  void dispose() {
+    _tabScroll.dispose();
+    super.dispose();
   }
 
   void _hydrateFromCard() {
@@ -168,10 +181,18 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: SessionStore.instance,
+      builder: (context, _) => _scaffold(),
+    );
+  }
+
+  Widget _scaffold() {
     final location = vendor.location.isEmpty ? (vendor.city.isEmpty ? 'Cairo, Egypt' : '${vendor.city}, Egypt') : vendor.location;
 
     return Scaffold(
       backgroundColor: LensColors.charcoal,
+      bottomNavigationBar: AppShell.navBar(context, index: 0, withFab: false),
       body: Stack(
         children: [
           ListView(
@@ -266,7 +287,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
               borderRadius: BorderRadius.circular(22),
               child: InkWell(
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: '${vendor.displayName} showreel')),
+                  MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: '$_visibleName showreel')),
                 ),
                 borderRadius: BorderRadius.circular(22),
                 child: const Padding(
@@ -305,7 +326,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                       children: [
                         Flexible(
                           child: Text(
-                            vendor.displayName,
+                            _visibleName,
                             maxLines: 1,
                             softWrap: false,
                             overflow: TextOverflow.ellipsis,
@@ -489,68 +510,64 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Widget _tabBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 14, 8, 0),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              for (final tab in _tabs)
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _tab = tab),
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Text(
-                        tab,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: tab == _tab ? LensColors.primary : const Color(0xFF9A9A9A),
-                          fontWeight: tab == _tab ? FontWeight.w600 : FontWeight.w500,
-                          fontSize: 13.5,
-                          height: 1.2,
-                        ),
+    return Column(
+      children: [
+        SizedBox(
+          height: 46,
+          child: ListView.separated(
+            controller: _tabScroll,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            itemCount: _tabs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 22),
+            itemBuilder: (context, index) {
+              final tab = _tabs[index];
+              final selected = tab == _tab;
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _tab = tab);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    Scrollable.ensureVisible(
+                      context,
+                      alignment: 0.45,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                    );
+                  });
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      tab,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        color: selected ? LensColors.primary : const Color(0xFF9A9A9A),
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 14,
+                        height: 1.2,
                       ),
                     ),
-                  ),
-                ),
-            ],
-          ),
-          SizedBox(
-            height: 3,
-            child: Stack(
-              alignment: Alignment.bottomCenter,
-              children: [
-                const Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Divider(height: 1, thickness: 1, color: Color(0xFF3A3A3E)),
-                ),
-                Row(
-                  children: [
-                    for (final tab in _tabs)
-                      Expanded(
-                        child: Center(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            height: 3,
-                            width: tab == _tab ? 36 : 0,
-                            decoration: BoxDecoration(
-                              color: LensColors.primary,
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                          ),
-                        ),
+                    const SizedBox(height: 8),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 3,
+                      width: selected ? 36 : 0,
+                      decoration: BoxDecoration(
+                        color: LensColors.primary,
+                        borderRadius: BorderRadius.circular(99),
                       ),
+                    ),
                   ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+        const Divider(height: 1, thickness: 1, color: Color(0xFF3A3A3E)),
+      ],
     );
   }
 
@@ -598,7 +615,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     return switch (_tab) {
       'About' => Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(_bio, style: const TextStyle(color: _creamText, height: 1.45, fontSize: 14)),
+          child: Text(_visibleBio, style: const TextStyle(color: _creamText, height: 1.45, fontSize: 14)),
         ),
       'Specialties' => Wrap(
           spacing: 8,
@@ -787,6 +804,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Widget _bookNowBar() {
+    final guest = _guest;
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -803,18 +821,47 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
             height: 54,
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => BookDatePage(vendor: vendor, home: widget.home)),
-              ),
+              onPressed: guest ? _openLogin : _openBook,
               style: FilledButton.styleFrom(
                 backgroundColor: LensColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: const StadiumBorder(),
               ),
-              icon: const Icon(Icons.shopping_bag_outlined, size: 20),
-              label: const Text('Book Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              icon: Icon(guest ? Icons.login_rounded : Icons.shopping_bag_outlined, size: 20),
+              label: Text(guest ? 'Log In' : 'Book Now', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openBook() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => BookDatePage(vendor: vendor, home: widget.home)),
+    );
+  }
+
+  Future<void> _openLogin() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => Scaffold(
+          backgroundColor: const Color(0xFF070707),
+          body: Stack(
+            children: [
+              LoginView(
+                bootstrap: widget.home.registerCatalog,
+                onSuccess: () => Navigator.of(routeContext).pop(),
+              ),
+              SafeArea(
+                child: IconButton(
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.of(routeContext).pop(),
+                  icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
+                ),
+              ),
+            ],
           ),
         ),
       ),

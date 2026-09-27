@@ -1,3 +1,5 @@
+import 'package:lens/core/session_store.dart';
+
 class HomeData {
   const HomeData({
     required this.features,
@@ -14,6 +16,8 @@ class HomeData {
     this.banks = const [],
     this.telecomWallets = const [],
     this.vendorRegister = const [],
+    this.voiceInput = true,
+    this.moodboardMode = 'after_payment',
   });
 
   factory HomeData.fromJson(Map<String, dynamic> json) {
@@ -48,6 +52,8 @@ class HomeData {
       banks: (json['banks'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
       telecomWallets: (json['telecom_wallets'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
       vendorRegister: (json['vendor_register'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
+      voiceInput: json['voice_input_enabled'] != false,
+      moodboardMode: json['moodboard_mode']?.toString() ?? 'after_payment',
     );
   }
 
@@ -65,8 +71,12 @@ class HomeData {
   final List<Map<String, dynamic>> banks;
   final List<Map<String, dynamic>> telecomWallets;
   final List<Map<String, dynamic>> vendorRegister;
+  final bool voiceInput;
+  final String moodboardMode;
 
   bool on(String key) => features[key] ?? false;
+  bool get moodboardLocked => moodboardMode == 'after_payment';
+  bool get moodboardOn => moodboardMode != 'off';
 
   Map<String, dynamic> get registerCatalog => {
         'vendor_types': vendorTypes.map((item) => {'slug': item.slug, 'label': item.label}).toList(),
@@ -223,6 +233,21 @@ class VendorCard {
   double get mapLatitude => latitude ?? LensCities.latitude(city);
 
   double get mapLongitude => longitude ?? LensCities.longitude(city);
+
+  /// First letter of the first and last name, used when the visitor is a guest.
+  String get maskedName {
+    final parts = displayName.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+    if (parts.isEmpty) {
+      return 'C.';
+    }
+    String letter(String part) => part.substring(0, 1).toUpperCase();
+    if (parts.length == 1) {
+      return '${letter(parts.first)}.';
+    }
+    return '${letter(parts.first)}. ${letter(parts.last)}.';
+  }
+
+  String get publicName => SessionStore.instance.isGuest ? maskedName : displayName;
 }
 
 class LensCities {

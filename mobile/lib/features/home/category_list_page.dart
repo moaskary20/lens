@@ -3,6 +3,7 @@ import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/home/favorite_heart.dart';
@@ -11,8 +12,7 @@ import 'package:lens/features/home/inbox.dart';
 import 'package:lens/features/home/map_page.dart';
 import 'package:lens/features/home/sort_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
-import 'package:lens/features/shell/lens_nav_bar.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
+import 'package:lens/features/shell/app_shell.dart';
 
 class CategoryListPage extends StatefulWidget {
   const CategoryListPage({
@@ -196,33 +196,11 @@ class _CategoryListPageState extends State<CategoryListPage> {
   Widget build(BuildContext context) {
     final home = widget.home;
     final count = _total ?? _vendors.length;
-    final bookingsOn = home.on('bookings');
-
     return Scaffold(
       backgroundColor: LensColors.charcoal,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: LensNavBar.fab(
-        onPressed: () => _open(context, bookingsOn ? 'New booking' : 'Create'),
-      ),
-      bottomNavigationBar: LensNavBar.bar(
-        bookingsOn: bookingsOn,
-        index: 0,
-        onSelect: (index) {
-          if (index == 0) {
-            Navigator.of(context).pop();
-            return;
-          }
-          if (bookingsOn && index == 1) {
-            _open(context, 'Bookings');
-            return;
-          }
-          if (index == (bookingsOn ? 2 : 1)) {
-            _open(context, 'Search');
-            return;
-          }
-          _open(context, 'Profile');
-        },
-      ),
+      floatingActionButton: AppShell.navFab(context),
+      bottomNavigationBar: AppShell.navBar(context, index: 0),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,7 +236,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => _open(context, 'Search'),
+                    onPressed: () => AppShell.openTab(context, AppShell.searchIndex),
                     icon: const Icon(Icons.search, color: LensColors.cream),
                   ),
                   if (home.on('notifications'))
@@ -347,10 +325,6 @@ class _CategoryListPageState extends State<CategoryListPage> {
         'price_desc' => 'Price: high',
         _ => 'Recommended',
       };
-
-  void _open(BuildContext context, String title) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: title)));
-  }
 }
 
 class _ActionPill extends StatelessWidget {
@@ -426,11 +400,14 @@ class _ListingRow extends StatelessWidget {
                 Row(
                   children: [
                     Flexible(
-                      child: Text(
-                        vendor.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      child: ListenableBuilder(
+                        listenable: SessionStore.instance,
+                        builder: (context, _) => Text(
+                          vendor.publicName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                        ),
                       ),
                     ),
                     if (vendor.verified) ...[
