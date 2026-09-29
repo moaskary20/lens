@@ -90,7 +90,8 @@ class ClientInboxTest extends TestCase
             ->get('/admin/notification-settings')
             ->assertOk()
             ->assertSee('App notice', false)
-            ->assertSee('Send to the app', false);
+            ->assertSee('Send notice', false)
+            ->assertSee('Send notification emails', false);
 
         $count = LensNotifier::toClients('Shoot tomorrow', 'Your studio hold is confirmed.');
         $this->assertGreaterThan(0, $count);

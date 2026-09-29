@@ -207,11 +207,6 @@ class Booking extends Model
         return $this->hasMany(Payout::class);
     }
 
-    public function replacementOffers(): HasMany
-    {
-        return $this->hasMany(ReplacementOffer::class);
-    }
-
     public function moodboard(): HasOne
     {
         return $this->hasOne(Moodboard::class);

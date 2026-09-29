@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Support\AppClient;
 use App\Support\Feature;
+use App\Support\Roles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,6 +21,7 @@ class ChatController extends Controller
     {
         $this->assertChatEnabled();
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'in_app_chat', 'Chat is disabled for this role.');
         abort_unless($user->canUseClientApp(), 403, 'Only clients can start a vendor chat.');
 
         $data = $request->validate([
@@ -52,6 +54,7 @@ class ChatController extends Controller
     {
         $this->assertChatEnabled();
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'in_app_chat', 'Chat is disabled for this role.');
         $this->authorizeConversation($conversation, $user);
 
         return response()->json($this->present($conversation->load(['booking.vendor.vendorType', 'vendor', 'client']), $user));
@@ -61,6 +64,7 @@ class ChatController extends Controller
     {
         $this->assertChatEnabled();
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'in_app_chat', 'Chat is disabled for this role.');
         $this->authorizeConversation($conversation, $user);
 
         $data = $request->validate([

@@ -27,9 +27,9 @@ class AdminPanelTest extends TestCase
         $response->assertSee('lens-login', false);
         $response->assertSee('lang="en"', false);
         $response->assertSee('css/lens-admin.css', false);
-        $response->assertSee('vendor/lens/animate.min.css', false);
-        $response->assertSee('vendor/lens/aos.js', false);
-        $response->assertSee('vendor/lens/anime.min.js', false);
+        $response->assertSee('lens/animate.min.css', false);
+        $response->assertSee('lens/aos.js', false);
+        $response->assertSee('lens/anime.min.js', false);
         $response->assertSee('class="fi dark"', false);
         $response->assertDontSee('fi-theme-switcher', false);
         $response->assertSee("localStorage.setItem('theme', 'dark')", false);
@@ -72,6 +72,7 @@ class AdminPanelTest extends TestCase
             '/admin/escrow-transactions',
             '/admin/payouts',
             '/admin/disputes',
+            '/admin/issue-reports',
             '/admin/reviews',
             '/admin/deliverables',
             '/admin/portfolios',
@@ -79,7 +80,6 @@ class AdminPanelTest extends TestCase
             '/admin/app-screens',
             '/admin/cms-pages',
             '/admin/cancellation-policies',
-            '/admin/replacement-offers',
             '/admin/role-settings',
             '/admin/vendor-availabilities',
             '/admin/feature-settings',
@@ -120,6 +120,8 @@ class AdminPanelTest extends TestCase
             ->assertSee('Project name', false)
             ->assertSee('Map location', false)
             ->assertSee('Payment method', false)
-            ->assertSee('Vendor delivery files', false);
+            ->assertSee('Vendor delivery files', false)
+            ->assertSee('Latest revision request', false)
+            ->assertSee('Revision reference images', false);
     }
 }

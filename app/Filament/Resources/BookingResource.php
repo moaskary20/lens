@@ -30,9 +30,12 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -172,8 +175,15 @@ class BookingResource extends Resource
                         'pending' => 'Pending',
                         'paid' => 'Paid',
                     ]),
-                    TextInput::make('revision_count')->label('Revisions')->numeric(),
-                    Textarea::make('notes')->label('Notes')->columnSpanFull(),
+                    TextInput::make('revision_count')->label('Revisions')->numeric()
+                        ->helperText('Increments each time the client taps Send Revision Request in the app.'),
+                    Textarea::make('notes')->label('Latest revision request')
+                        ->helperText('Written from the mobile Request an Edit screen (quick chips, photo comment, and note). The same text is posted to Conversations for the vendor.')
+                        ->columnSpanFull(),
+                    Placeholder::make('revision_references')
+                        ->label('Revision reference images')
+                        ->content(fn (?Booking $record): HtmlString => self::revisionReferenceHtml($record))
+                        ->columnSpanFull(),
                 ])->columns(2),
             Section::make('Client project')
                 ->description('The client fills these fields on Tell them about your project. They follow the vendor specialty and include the chosen price and map pin.')
@@ -213,6 +223,8 @@ class BookingResource extends Resource
                         'in_revision', 'disputed' => 'warning',
                         default => 'gray',
                     }),
+                TextColumn::make('revision_count')->label('Edits')->toggleable(),
+                TextColumn::make('notes')->label('Latest edit request')->limit(36)->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('total_paid')->label('Held / paid')->money(Finance::currency()),
                 TextColumn::make('travel_fee')->label('Travel')->money(Finance::currency())->toggleable(),
                 TextColumn::make('escrow_status')->label('Escrow')->badge()
@@ -571,5 +583,25 @@ class BookingResource extends Resource
                     Notification::make()->title($exception->getMessage())->danger()->send();
                 }
             });
+    }
+
+    protected static function revisionReferenceHtml(?Booking $record): HtmlString
+    {
+        if (! $record?->id) {
+            return new HtmlString('<span class="text-sm text-gray-400">Save the booking first.</span>');
+        }
+
+        $files = Storage::disk('public')->files('revision-refs/'.$record->id);
+        if ($files === []) {
+            return new HtmlString('<span class="text-sm text-gray-400">No reference images from Request an Edit yet. They also appear in Conversations.</span>');
+        }
+
+        $thumbs = collect($files)->map(function (string $path): string {
+            $url = asset('storage/'.$path);
+
+            return '<a href="'.e($url).'" target="_blank" rel="noopener"><img src="'.e($url).'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid #2C3138;"></a>';
+        })->implode('');
+
+        return new HtmlString('<div style="display:flex;gap:8px;flex-wrap:wrap">'.$thumbs.'</div>');
     }
 }

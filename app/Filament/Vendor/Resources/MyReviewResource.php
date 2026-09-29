@@ -40,6 +40,7 @@ class MyReviewResource extends Resource
     {
         return Feature::enabled('reviews')
             && (bool) auth()->user()?->isVendor()
+            && auth()->user()?->roleCan('view_reviews')
             && auth()->user()?->vendor;
     }
 
@@ -49,6 +50,16 @@ class MyReviewResource extends Resource
     }
 
     public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
     {
         return false;
     }

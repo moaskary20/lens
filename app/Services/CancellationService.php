@@ -6,7 +6,6 @@ use App\Models\Booking;
 use App\Models\CancellationPolicy;
 use App\Models\EscrowTransaction;
 use App\Models\Payout;
-use App\Models\ReplacementOffer;
 use App\Support\Feature;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -97,15 +96,6 @@ class CancellationService
 
             if ($actor === 'vendor' && $booking->vendor) {
                 $this->reputation->bump($booking->vendor->fresh(), 'failed_sessions');
-            }
-
-            if ($actor === 'vendor' && Feature::enabled('replacement_workflow')) {
-                ReplacementOffer::query()->create([
-                    'booking_id' => $booking->id,
-                    'original_vendor_id' => $booking->vendor_id,
-                    'status' => 'open',
-                    'notes' => 'Critical vendor cancellation — offer a substitute from the marketplace.',
-                ]);
             }
 
             app(WalletService::class)->onCancellation($booking->fresh(['client', 'vendor.user']), $settlement);

@@ -11,6 +11,7 @@ use App\Services\MoodboardService;
 use App\Services\RecommendationService;
 use App\Services\VendorSearch;
 use App\Support\Feature;
+use App\Support\Roles;
 use App\Support\SearchEngine;
 use App\Support\SearchQuery;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +42,7 @@ class SearchController extends Controller
         if (! $assistant->enabled()) {
             return response()->json(['message' => 'AI assistant is disabled.'], 403);
         }
+        $this->assertAssistantAllowed($request);
 
         $message = trim((string) $request->input('message', $request->input('brief', '')));
         if ($message === '') {
@@ -72,6 +74,7 @@ class SearchController extends Controller
 
     public function assistant(Request $request, AiAssistant $assistant, VendorSearch $search, RecommendationService $recommendations): JsonResponse
     {
+        $this->assertAssistantAllowed($request);
         $brief = trim((string) $request->input('brief', $request->input('q', '')));
 
         if ($brief === '') {
@@ -113,6 +116,10 @@ class SearchController extends Controller
         if (! Feature::enabled('moodboard')) {
             return response()->json(['message' => 'Moodboard is disabled.'], 403);
         }
+        $client = $booking->client;
+        if ($client) {
+            Roles::abortUnlessCan($client, 'use_moodboard', 'Moodboard is disabled for this role.');
+        }
 
         $mode = SearchEngine::settings()['moodboard_mode'] ?? 'after_payment';
         $paid = in_array($booking->escrow_status, ['held', 'released', 'split'], true);
@@ -149,5 +156,13 @@ class SearchController extends Controller
         $user = $request->user();
 
         return $user?->isClient() ? $user : null;
+    }
+
+    protected function assertAssistantAllowed(Request $request): void
+    {
+        $client = $this->clientFrom($request);
+        if ($client) {
+            Roles::abortUnlessCan($client, 'use_ai_assistant', 'AI assistant is disabled for this role.');
+        }
     }
 }

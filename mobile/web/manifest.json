@@ -3,7 +3,7 @@
     "short_name": "Lens",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0D0D0F",
+    "background_color": "#000000",
     "theme_color": "#FF5A1F",
     "description": "Lens marketplace for photographers, studios, and clients",
     "orientation": "portrait-primary",

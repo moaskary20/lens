@@ -10,7 +10,7 @@ use App\Models\VendorType;
 use App\Services\VendorSearch;
 use App\Support\AppClient;
 use App\Support\Egypt;
-use App\Support\Feature;
+use App\Support\Roles;
 use App\Support\SearchEngine;
 use App\Support\VendorRegisterCatalog;
 use App\Support\SearchQuery;
@@ -25,12 +25,11 @@ class AppController extends Controller
     public function bootstrap(): JsonResponse
     {
         $search = SearchEngine::settings();
-        $features = Feature::flags();
-        $features['ai_assistant'] = Feature::enabled('ai_assistant') && (bool) ($search['ai_enabled'] ?? false);
+        $client = AppClient::user();
+        $features = Roles::appFeatures($client);
+        $features['ai_assistant'] = ($features['ai_assistant'] ?? false) && (bool) ($search['ai_enabled'] ?? false);
 
         $types = VendorType::query()->marketplace()->orderBy('sort_order')->get();
-
-        $client = AppClient::user();
 
         return response()->json([
             'name' => 'Lens',
@@ -42,10 +41,11 @@ class AppController extends Controller
             'ai_helper' => 'Describe your idea and let AI find the right creatives for you.',
             'voice_input_enabled' => (bool) ($search['voice_input_enabled'] ?? true),
             'moodboard_mode' => $search['moodboard_mode'] ?? 'after_payment',
-            'unread_notifications' => Feature::enabled('notifications') ? (int) ($client?->unreadNotifications()->count() ?? 0) : 0,
-            'favorite_ids' => Feature::enabled('favorites') && $client
+            'unread_notifications' => ($features['notifications'] ?? false) ? (int) ($client?->unreadNotifications()->count() ?? 0) : 0,
+            'favorite_ids' => ($features['favorites'] ?? false) && $client
                 ? $client->favorites()->pluck('vendor_id')->map(fn ($id) => (int) $id)->values()->all()
                 : [],
+            'capabilities' => $client ? Roles::capabilitiesFor($client->role) : [],
             'colors' => [
                 'primary' => '#FF5A1F',
                 'primary_deep' => '#B73A0F',

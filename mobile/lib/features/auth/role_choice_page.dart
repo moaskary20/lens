@@ -22,7 +22,7 @@ class _RoleChoicePageState extends State<RoleChoicePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070707),
+      backgroundColor: LensColors.charcoal,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

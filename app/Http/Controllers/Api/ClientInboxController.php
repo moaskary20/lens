@@ -7,6 +7,7 @@ use App\Models\Favorite;
 use App\Models\Vendor;
 use App\Support\AppClient;
 use App\Support\Feature;
+use App\Support\Roles;
 use App\Support\LensNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class ClientInboxController extends Controller
         abort_unless(Feature::enabled('favorites'), 404);
 
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'save_favorites', 'Favorites are disabled for this role.');
         $vendors = $user->favorites()
             ->with(['vendor.portfolios', 'vendor.city', 'vendor.badges', 'vendor.categories', 'vendor.vendorType'])
             ->latest()
@@ -42,6 +44,7 @@ class ClientInboxController extends Controller
         abort_unless($vendor->is_active, 404);
 
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'save_favorites', 'Favorites are disabled for this role.');
         $user->favoriteVendors()->syncWithoutDetaching([$vendor->id]);
 
         return response()->json([
@@ -55,6 +58,7 @@ class ClientInboxController extends Controller
         abort_unless(Feature::enabled('favorites'), 404);
 
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'save_favorites', 'Favorites are disabled for this role.');
         $user->favoriteVendors()->detach($vendor->id);
 
         return response()->json(['favorited' => false, 'id' => $vendor->id]);
@@ -65,6 +69,7 @@ class ClientInboxController extends Controller
         abort_unless(Feature::enabled('notifications'), 404);
 
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'receive_notifications', 'Notifications are disabled for this role.');
         $items = $user->notifications()->latest()->limit(80)->get()->map(fn (DatabaseNotification $item): array => $this->present($item));
 
         return response()->json([
@@ -78,6 +83,7 @@ class ClientInboxController extends Controller
         abort_unless(Feature::enabled('notifications'), 404);
 
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'receive_notifications', 'Notifications are disabled for this role.');
         $item = $user->notifications()->whereKey($notification)->firstOrFail();
         $item->markAsRead();
 
@@ -92,6 +98,7 @@ class ClientInboxController extends Controller
         abort_unless(Feature::enabled('notifications'), 404);
 
         $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'receive_notifications', 'Notifications are disabled for this role.');
         $user->unreadNotifications->markAsRead();
 
         return response()->json(['unread' => 0]);

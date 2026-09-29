@@ -11,11 +11,13 @@ use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Placeholder;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
 
@@ -42,10 +44,21 @@ class MyMessageResource extends Resource
     {
         return Feature::enabled('chat')
             && (bool) auth()->user()?->isVendor()
+            && auth()->user()?->roleCan('in_app_chat')
             && auth()->user()?->vendor;
     }
 
     public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
     {
         return false;
     }
@@ -60,12 +73,31 @@ class MyMessageResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Placeholder::make('thread')
-                ->hiddenLabel()
-                ->content(fn (?Conversation $record): HtmlString => $record
-                    ? ChatThread::html($record)
-                    : new HtmlString('<p>No conversation selected.</p>'))
-                ->columnSpanFull(),
+            Section::make('Session')
+                ->schema([
+                    Placeholder::make('client_name')
+                        ->label('Client')
+                        ->content(fn (?Conversation $record): string => $record?->client?->name ?: '—'),
+                    Placeholder::make('booking_ref')
+                        ->label('Booking')
+                        ->content(fn (?Conversation $record): string => $record?->booking?->reference ?: 'Unlinked chat'),
+                    Placeholder::make('booking_status')
+                        ->label('Status')
+                        ->content(fn (?Conversation $record): string => $record?->booking?->status
+                            ? ucfirst(str_replace('_', ' ', $record->booking->status))
+                            : 'Open chat'),
+                ])
+                ->columns(3),
+            Section::make('Live chat')
+                ->description('The same thread the client opens in Chat in App. Your replies appear on their phone.')
+                ->schema([
+                    Placeholder::make('thread')
+                        ->hiddenLabel()
+                        ->content(fn (?Conversation $record): HtmlString => $record
+                            ? ChatThread::html($record, 'vendor')
+                            : new HtmlString('<div class="lens-live-chat"><div class="lens-live-chat__empty"><p>Save the conversation to see messages.</p></div></div>'))
+                        ->columnSpanFull(),
+                ]),
         ]);
     }
 

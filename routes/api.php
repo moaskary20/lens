@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ClientInboxController;
+use App\Http\Controllers\Api\IssueController;
 use App\Http\Controllers\Api\SearchController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,7 @@ Route::get('app/account/settings', [AccountController::class, 'settings']);
 Route::post('app/account/settings', [AccountController::class, 'updateSettings']);
 Route::get('app/account/profile', [AccountController::class, 'profile']);
 Route::post('app/account/profile', [AccountController::class, 'updateProfile']);
+Route::post('app/issues', [IssueController::class, 'store']);
 Route::get('app/account/projects', [AccountController::class, 'projects']);
 Route::post('app/bookings/quote', [BookingController::class, 'quote']);
 Route::post('app/bookings', [BookingController::class, 'store']);
@@ -34,6 +36,9 @@ Route::get('app/bookings/{booking}/deliverables', [BookingController::class, 'de
 Route::post('app/bookings/{booking}/request-edit', [BookingController::class, 'requestEdit']);
 Route::post('app/bookings/{booking}/approve', [BookingController::class, 'approve']);
 Route::post('app/bookings/{booking}/refuse', [BookingController::class, 'refuse']);
+Route::get('app/disputes', [BookingController::class, 'disputes']);
+Route::get('app/bookings/{booking}/dispute', [BookingController::class, 'showDispute']);
+Route::post('app/bookings/{booking}/dispute', [BookingController::class, 'openDispute']);
 
 Route::post('app/conversations', [ChatController::class, 'open']);
 Route::get('app/conversations/{conversation}', [ChatController::class, 'show']);

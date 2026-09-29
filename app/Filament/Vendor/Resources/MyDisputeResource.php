@@ -52,6 +52,16 @@ class MyDisputeResource extends Resource
         return false;
     }
 
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $vendorId = auth()->user()?->vendor?->id ?: 0;

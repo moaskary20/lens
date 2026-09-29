@@ -9,7 +9,9 @@ use App\Models\Dispute;
 use App\Models\Message;
 use App\Support\DeliveryProtection;
 use App\Support\Feature;
+use App\Support\LensNotifier;
 use App\Support\StorageQuota;
+use Illuminate\Support\Str;
 use LogicException;
 
 class DeliveryService
@@ -52,34 +54,67 @@ class DeliveryService
         return $deliverable->fresh();
     }
 
-    public function requestRevision(Booking $booking, ?string $note = null, ?int $senderId = null): Booking
+    public function requestRevision(Booking $booking, ?string $note = null, ?int $senderId = null, array $attachmentPaths = []): Booking
     {
         if (! Feature::enabled('revisions')) {
             throw new LogicException('Revision cycles are disabled.');
         }
 
         $updated = $this->escrow->requestRevision($booking);
-
-        if (DeliveryProtection::settings()['revision_opens_chat'] && Feature::enabled('chat') && filled($note)) {
-            $conversation = Conversation::query()->firstOrCreate(
-                [
-                    'booking_id' => $booking->id,
-                    'client_id' => $booking->client_id,
-                    'vendor_id' => $booking->vendor_id,
-                ],
-                ['last_message_at' => now()],
-            );
-
-            Message::query()->create([
-                'conversation_id' => $conversation->id,
-                'sender_id' => $senderId ?? $booking->client_id,
-                'body' => $note,
-            ]);
-
-            $conversation->update(['last_message_at' => now()]);
+        if (filled($note)) {
+            $updated->update(['notes' => $note]);
         }
 
-        return $updated;
+        $this->postRevisionThread($updated, $note, $senderId, $attachmentPaths);
+
+        LensNotifier::staff(
+            LensNotifier::BOOKING_STATUS,
+            'Revision requested',
+            $updated->reference.(filled($note) ? ' · '.Str::limit(trim($note), 120) : ''),
+            $updated->client_id,
+        );
+
+        return $updated->fresh();
+    }
+
+    /**
+     * @param  array<int, string>  $attachmentPaths
+     */
+    protected function postRevisionThread(Booking $booking, ?string $note, ?int $senderId, array $attachmentPaths): void
+    {
+        if (! DeliveryProtection::settings()['revision_opens_chat'] || ! Feature::enabled('chat')) {
+            return;
+        }
+        if (! filled($note) && $attachmentPaths === []) {
+            return;
+        }
+
+        $conversation = Conversation::query()->firstOrCreate(
+            [
+                'booking_id' => $booking->id,
+                'client_id' => $booking->client_id,
+                'vendor_id' => $booking->vendor_id,
+            ],
+            ['last_message_at' => now()],
+        );
+
+        $urls = array_values(array_filter(array_map(
+            fn (string $path): ?string => $path === '' ? null : asset('storage/'.$path),
+            $attachmentPaths,
+        )));
+
+        Message::query()->create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $senderId ?? $booking->client_id,
+            'body' => filled($note) ? $note : 'Reference images attached.',
+            'type' => filled($note) ? 'text' : 'images',
+            'attachments' => $urls === [] ? null : [
+                'paths' => array_values($attachmentPaths),
+                'urls' => $urls,
+            ],
+        ]);
+
+        $conversation->update(['last_message_at' => now()]);
     }
 
     public function approve(Booking $booking): Booking

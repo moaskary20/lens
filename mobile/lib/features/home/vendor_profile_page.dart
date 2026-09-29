@@ -243,7 +243,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0x660D0D0F), Color(0x000D0D0F), Color(0x660D0D0F)],
+                colors: [Color(0x66000000), Color(0x00000000), Color(0x66000000)],
                 stops: [0, 0.38, 1],
               ),
             ),
@@ -744,7 +744,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                 gradient: LinearGradient(
                   begin: Alignment.center,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xB30D0D0F)],
+                  colors: [Colors.transparent, Color(0xB3000000)],
                 ),
               ),
             ),
@@ -810,7 +810,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0x000D0D0F), Color(0xCC0D0D0F), Color(0xF20D0D0F)],
+          colors: [Color(0x00000000), Color(0xCC000000), Color(0xF2000000)],
         ),
       ),
       child: SafeArea(
@@ -847,7 +847,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (routeContext) => Scaffold(
-          backgroundColor: const Color(0xFF070707),
+          backgroundColor: LensColors.charcoal,
           body: Stack(
             children: [
               LoginView(

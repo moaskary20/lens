@@ -7,12 +7,15 @@ class LensApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Lens',
-      debugShowCheckedModeBanner: false,
-      theme: LensTheme.dark(),
-      themeMode: ThemeMode.dark,
-      home: const SplashPage(),
+    return AnnotatedRegion(
+      value: LensTheme.overlay,
+      child: MaterialApp(
+        title: 'Lens',
+        debugShowCheckedModeBanner: false,
+        theme: LensTheme.dark(),
+        themeMode: ThemeMode.dark,
+        home: const SplashPage(),
+      ),
     );
   }
 }

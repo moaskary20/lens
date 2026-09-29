@@ -14,6 +14,7 @@ import 'package:lens/features/profile/app_settings_page.dart';
 import 'package:lens/features/profile/edit_profile_page.dart';
 import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/payment_methods_page.dart';
+import 'package:lens/features/profile/report_issue_page.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -53,14 +54,18 @@ class ProfilePage extends StatelessWidget {
                 }
                 _open(context, 'My Bookings');
               })),
-              _row(context, Icons.favorite_border_rounded, 'Saved Creators', onTap: () => openFavorites(context, data)),
+              if (data.on('favorites'))
+                _row(context, Icons.favorite_border_rounded, 'Saved Creators', onTap: () => openFavorites(context, data)),
               _row(context, Icons.credit_card_outlined, 'Payment Methods', onTap: () => _guard(context, () => _openPage(context, PaymentMethodsPage(home: data)))),
               _row(context, Icons.location_on_outlined, 'Addresses', onTap: () => _guard(context, () => _openPage(context, const AddressesPage()))),
-              _row(context, Icons.notifications_none_rounded, 'Notifications', onTap: () => _guard(context, () => openNotifications(context, data))),
-              _row(context, Icons.chat_bubble_outline_rounded, 'Messages', onTap: () => _guard(context, () => _openPage(context, MessagesPage(home: data)))),
+              if (data.on('notifications'))
+                _row(context, Icons.notifications_none_rounded, 'Notifications', onTap: () => _guard(context, () => openNotifications(context, data))),
+              if (data.on('chat'))
+                _row(context, Icons.chat_bubble_outline_rounded, 'Messages', onTap: () => _guard(context, () => _openPage(context, MessagesPage(home: data)))),
               _row(context, Icons.settings_outlined, 'App Settings', onTap: () => _openPage(context, AppSettingsPage(home: data))),
               _row(context, Icons.description_outlined, 'Policies'),
-              _row(context, Icons.help_outline_rounded, 'Report an Issue'),
+              if (data.on('issue_reports'))
+                _row(context, Icons.help_outline_rounded, 'Report an Issue', onTap: () => openReportIssue(context)),
               if (signedIn)
                 _row(context, Icons.logout_rounded, 'Log Out', danger: true, onTap: () => _logOut(context))
               else
@@ -317,7 +322,7 @@ class _AuthScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070707),
+      backgroundColor: LensColors.charcoal,
       body: Stack(
         children: [
           child,

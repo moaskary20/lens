@@ -465,7 +465,7 @@ class BookReviewPage extends StatelessWidget {
                         Positioned.fill(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: const Color(0x990D0D0F),
+                              color: const Color(0x99000000),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Center(

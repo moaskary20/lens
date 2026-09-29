@@ -23,6 +23,8 @@ class NotificationResource extends Resource
 
     protected static ?string $featureKey = 'notifications';
 
+    protected static ?string $staffCapability = 'view_notifications';
+
     protected static ?string $slug = 'notification-log';
 
     protected static ?string $navigationLabel = 'Notification log';

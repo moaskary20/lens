@@ -28,6 +28,8 @@ class ConversationResource extends Resource
 
     protected static ?string $featureKey = 'chat';
 
+    protected static ?string $staffCapability = 'view_chat';
+
     protected static ?string $navigationLabel = 'Conversations';
 
     protected static ?string $modelLabel = 'conversation';

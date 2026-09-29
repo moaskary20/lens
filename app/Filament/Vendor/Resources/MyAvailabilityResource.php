@@ -66,12 +66,16 @@ class MyAvailabilityResource extends Resource
                 ->schema([
                     DateTimePicker::make('starts_at')->label('Starts')->required(),
                     DateTimePicker::make('ends_at')->label('Ends')->required(),
-                    Select::make('status')->label('Status')->options([
-                        'open' => 'Open for booking',
-                        'blocked' => 'Blocked / unavailable',
-                        'booked' => 'Booked (locked)',
-                    ])->default('open')->required()
-                        ->disabled(fn (?VendorAvailability $record): bool => $record?->status === 'booked'),
+                    Select::make('status')->label('Status')->options(fn (?VendorAvailability $record): array => $record?->status === 'booked'
+                        ? ['booked' => 'Booked (locked)']
+                        : [
+                            'open' => 'Open for booking',
+                            'blocked' => 'Blocked / unavailable',
+                        ])->default('open')->required()
+                        ->disabled(fn (?VendorAvailability $record): bool => $record?->status === 'booked')
+                        ->helperText(fn (?VendorAvailability $record): ?string => $record?->status === 'booked'
+                            ? 'A booked slot stays locked until the session ends.'
+                            : null),
                     Textarea::make('notes')->label('Notes')->columnSpanFull(),
                 ])->columns(2),
         ]);

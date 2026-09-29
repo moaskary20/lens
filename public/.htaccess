@@ -18,6 +18,10 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # /vendor is the Filament vendor panel. public/vendor/ only holds published
+    # assets (filament, lens). Without this, Apache 403s the panel root.
+    RewriteRule ^vendor/?$ index.php [L]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f

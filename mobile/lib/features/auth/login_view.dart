@@ -108,14 +108,14 @@ class _LoginViewState extends State<LoginView> {
           fit: BoxFit.cover,
           alignment: const Alignment(0.9, -0.15),
           filterQuality: FilterQuality.high,
-          errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF070707)),
+          errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.charcoal),
         ),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0x66000000), Color(0xB8000000), Color(0xF2070707)],
+              colors: [Color(0x66000000), Color(0xB8000000), Color(0xF2000000)],
               stops: [0, 0.36, 0.62],
             ),
           ),

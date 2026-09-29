@@ -26,7 +26,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070707),
+      backgroundColor: LensColors.charcoal,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: 0),

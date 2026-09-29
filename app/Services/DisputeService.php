@@ -325,13 +325,33 @@ class DisputeService
 
     protected function notifyOpened(Dispute $dispute): void
     {
+        $booking = $dispute->booking;
         $openerId = (int) $dispute->opened_by;
-        $vendorUserId = (int) $dispute->booking?->vendor?->user_id;
+        $label = $dispute->kind === self::KIND_COMPLAINT ? 'complaint' : 'dispute';
+        $body = ($dispute->opener?->name ?: 'A client').' opened a '.$label.' on '.($booking?->reference ?: 'a session').'.';
+
+        \App\Support\LensNotifier::staff(
+            \App\Support\LensNotifier::BOOKING_STATUS,
+            'New '.$label,
+            $body,
+            $openerId ?: null,
+        );
+
+        if ($dispute->opener) {
+            \App\Support\LensNotifier::toUser(
+                $dispute->opener,
+                \App\Support\LensNotifier::BOOKING_STATUS,
+                ucfirst($label).' opened',
+                ($booking?->reference ?: 'Your session').' is with Lens support. Escrow stays held until a decision.',
+            );
+        }
+
+        $vendorUserId = (int) $booking?->vendor?->user_id;
         if ($vendorUserId && $vendorUserId !== $openerId) {
             VendorNotifier::send(
-                $dispute->booking?->vendor,
+                $booking?->vendor,
                 'Dispute opened',
-                ($dispute->opener?->name ?: 'A client').' opened a '.$dispute->kind.' on '.$dispute->booking?->reference.'.',
+                $body,
                 \App\Support\LensNotifier::BOOKING_STATUS,
             );
         }

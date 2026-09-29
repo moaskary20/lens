@@ -432,7 +432,7 @@ class _VendorSpotlight extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   stops: [0.38, 0.72, 1],
-                  colors: [Colors.transparent, Color(0x660D0D0F), Color(0xF20D0D0F)],
+                  colors: [Colors.transparent, Color(0x66000000), Color(0xF2000000)],
                 ),
               ),
             ),
@@ -485,7 +485,7 @@ class _ViewProfileButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         child: Ink(
           decoration: BoxDecoration(
-            color: const Color(0xE60D0D0F),
+            color: const Color(0xE6000000),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: LensColors.primary, width: 1.6),
           ),

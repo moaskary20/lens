@@ -66,6 +66,12 @@ class VendorChecklistTest extends TestCase
 
         $this->actingAs($vendor)->get('/vendor/my-profile')
             ->assertOk()
+            ->assertSee('Identity')
+            ->assertSee('Type profile')
+            ->assertSee('Previous projects')
+            ->assertSee('Pricing')
+            ->assertSee('Bank & payouts')
+            ->assertSee('Verification & quality')
             ->assertSee('National ID card')
             ->assertSee('Date of birth')
             ->assertSee('Profession / job title')
@@ -82,7 +88,10 @@ class VendorChecklistTest extends TestCase
             ->assertSee('Lenses available')
             ->assertSee('Lighting gear')
             ->assertSee('Filter tags')
-            ->assertSee('Verified — you can receive bookings.');
+            ->assertSee('Verified — you can receive bookings.')
+            ->assertDontSee('User account')
+            ->assertDontSee('Visible in marketplace')
+            ->assertDontSee('Featured on home');
 
         $this->actingAs($vendor)->get('/vendor/portfolio')->assertOk()->assertSee('Yasmin Hall wedding');
         $this->actingAs($vendor)->get('/vendor/availability')->assertOk()->assertSee('Half-day product slot');
@@ -92,10 +101,16 @@ class VendorChecklistTest extends TestCase
         $this->actingAs($vendor)->get('/vendor/earnings')->assertOk()->assertSee('Pending');
         $this->actingAs($vendor)->get('/vendor/ratings')->assertOk()->assertSee('Professional shoot and fast delivery.');
         $conversation = $vendor->vendor->conversations()->firstOrFail();
-        $this->actingAs($vendor)->get('/vendor/messages')->assertOk();
+        $this->actingAs($vendor)->get('/vendor/messages')
+            ->assertOk()
+            ->assertSee('Client chat')
+            ->assertDontSee('New conversation');
         $this->actingAs($vendor)->get('/vendor/messages/'.$conversation->id.'/edit')
             ->assertOk()
-            ->assertSee('Please confirm the hall access time.');
+            ->assertSee('Please confirm the hall access time.')
+            ->assertSee('Live chat')
+            ->assertDontSee('Participants')
+            ->assertDontSee('Admin notes');
         $this->actingAs($vendor)->get('/vendor')->assertOk()->assertSee('Pending earnings')->assertSee('Verified');
     }
 

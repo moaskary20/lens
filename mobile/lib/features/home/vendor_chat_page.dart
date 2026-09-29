@@ -42,7 +42,7 @@ class _VendorChatPageState extends State<VendorChatPage> {
   static const _muted = Color(0xFF8E8B84);
   static const _bubbleIn = Color(0xFF242428);
   static const _bubbleOut = Color(0xFFC45A32);
-  static const _bar = Color(0xFF141416);
+  static const _bar = LensColors.charcoal;
 
   final _input = TextEditingController();
   final _api = ApiClient();
@@ -726,7 +726,7 @@ class _VendorChatPageState extends State<VendorChatPage> {
               if (i == urls.length - 1 && item.extra > 0)
                 Positioned.fill(
                   child: DecoratedBox(
-                    decoration: BoxDecoration(color: const Color(0x990D0D0F), borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(color: const Color(0x99000000), borderRadius: BorderRadius.circular(10)),
                     child: Center(
                       child: Text('+${item.extra}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
                     ),

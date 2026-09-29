@@ -13,9 +13,14 @@ use App\Services\DeliveryService;
 use App\Services\EscrowService;
 use App\Services\ReviewService;
 use App\Services\WalletService;
+use App\Filament\Pages\NotificationSettings;
+use App\Models\Setting;
+use App\Notifications\LensAlert;
 use App\Support\LensNotifier;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class NotificationFlowTest extends TestCase
@@ -35,7 +40,10 @@ class NotificationFlowTest extends TestCase
             ->assertOk()
             ->assertSee('New account')
             ->assertSee('Request accepted')
-            ->assertSee('Money transfers');
+            ->assertSee('Money transfers')
+            ->assertSee('Send notification emails')
+            ->assertSee('Email new messages')
+            ->assertSee('Include message preview');
 
         $this->get('/admin/notification-log')->assertOk();
     }
@@ -158,6 +166,51 @@ class NotificationFlowTest extends TestCase
 
         app(WalletService::class)->redeemCoupon($client->fresh(), $coupon->fresh());
         $this->assertTrue($this->saw($client->fresh(), 'Offer credited'));
+    }
+
+    public function test_alerts_email_when_delivery_is_on(): void
+    {
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+
+        Notification::fake();
+        LensNotifier::toUser($client, LensNotifier::PAYMENT, 'Payment received', 'EGP 100 held in escrow.');
+
+        Notification::assertSentTo($client, LensAlert::class, function (LensAlert $alert, array $channels): bool {
+            return $alert->title === 'Payment received'
+                && in_array('database', $channels, true)
+                && in_array('mail', $channels, true);
+        });
+    }
+
+    public function test_message_email_can_be_turned_off(): void
+    {
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        Setting::setGroupValues('notifications', array_merge(LensNotifier::defaults(), [
+            'email_messages' => false,
+        ]));
+
+        Notification::fake();
+        LensNotifier::toUser($client, LensNotifier::MESSAGE, 'New message', 'What time should we meet?');
+
+        Notification::assertSentTo($client, LensAlert::class, function (LensAlert $alert, array $channels): bool {
+            return in_array('database', $channels, true)
+                && ! in_array('mail', $channels, true);
+        });
+    }
+
+    public function test_admin_can_save_email_and_message_settings(): void
+    {
+        Livewire::test(NotificationSettings::class)
+            ->set('data.email_enabled', true)
+            ->set('data.email_messages', false)
+            ->set('data.email_message_preview', false)
+            ->set('data.payment', true)
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue((bool) Setting::getValue('notifications.email_enabled', false));
+        $this->assertFalse((bool) Setting::getValue('notifications.email_messages', true));
+        $this->assertFalse((bool) Setting::getValue('notifications.email_message_preview', true));
     }
 
     protected function saw(User $user, string $title): bool

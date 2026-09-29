@@ -39,6 +39,10 @@ class LensNotifier
 
     public const APP_NOTICE = 'app_notice';
 
+    public const ISSUE_REPORTED = 'issue_reported';
+
+    public const ISSUE_UPDATED = 'issue_updated';
+
     protected static bool $muted = false;
 
     /**
@@ -59,6 +63,8 @@ class LensNotifier
         self::COMMISSION => ['label' => 'Commissions', 'description' => 'Vendor is told when platform commission is posted', 'default' => true],
         self::PAYOUT => ['label' => 'Money transfers', 'description' => 'Wallet top-ups, refunds, and payouts', 'default' => true],
         self::APP_NOTICE => ['label' => 'App notice', 'description' => 'Manual alerts staff send into the client app inbox', 'default' => true],
+        self::ISSUE_REPORTED => ['label' => 'App issue', 'description' => 'Staff are told when someone submits Report an Issue from the app', 'default' => true],
+        self::ISSUE_UPDATED => ['label' => 'Issue update', 'description' => 'The reporter is told when support receives or replies to an issue', 'default' => true],
     ];
 
     public static function mute(): void
@@ -79,11 +85,54 @@ class LensNotifier
     /**
      * @return array<string, bool>
      */
+    public static function channelDefaults(): array
+    {
+        return [
+            'email_enabled' => true,
+            'email_messages' => true,
+            'email_message_preview' => true,
+        ];
+    }
+
+    /**
+     * @return array<string, bool>
+     */
     public static function defaults(): array
     {
-        return collect(self::EVENTS)
-            ->mapWithKeys(fn (array $item, string $key) => [$key => $item['default']])
-            ->all();
+        return array_merge(
+            self::channelDefaults(),
+            collect(self::EVENTS)
+                ->mapWithKeys(fn (array $item, string $key) => [$key => $item['default']])
+                ->all(),
+        );
+    }
+
+    public static function emailEnabled(): bool
+    {
+        return (bool) Setting::getValue('notifications.email_enabled', true);
+    }
+
+    public static function messageEmailEnabled(): bool
+    {
+        return (bool) Setting::getValue('notifications.email_messages', true);
+    }
+
+    public static function messagePreviewEnabled(): bool
+    {
+        return (bool) Setting::getValue('notifications.email_message_preview', true);
+    }
+
+    public static function shouldEmail(string $event, ?User $user = null): bool
+    {
+        if (! self::emailEnabled() || ($user && ! filled($user->email))) {
+            return false;
+        }
+
+        if ($event === self::MESSAGE && ! self::messageEmailEnabled()) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -7,6 +7,7 @@ import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/bookings/approve_delivery_sheet.dart';
+import 'package:lens/features/bookings/booking_dispute_page.dart';
 import 'package:lens/features/bookings/deliverables_page.dart';
 import 'package:lens/features/bookings/request_edit_page.dart';
 import 'package:lens/features/home/inbox.dart';
@@ -101,6 +102,7 @@ class _BookingsPageState extends State<BookingsPage> {
         tab: _tab,
         onTab: (tab) => setState(() => _tab = tab),
         onBack: widget.onBack,
+        onReload: _load,
       );
     }
     return SafeArea(
@@ -168,6 +170,7 @@ class _ClientBookings extends StatelessWidget {
     required this.tab,
     required this.onTab,
     this.onBack,
+    this.onReload,
   });
 
   final HomeData home;
@@ -176,6 +179,7 @@ class _ClientBookings extends StatelessWidget {
   final String tab;
   final ValueChanged<String> onTab;
   final VoidCallback? onBack;
+  final VoidCallback? onReload;
 
   List<_BookingItem> get upcoming => items.where((item) => item.group == 'upcoming').toList();
   List<_BookingItem> get completed => items.where((item) => item.group == 'completed').toList();
@@ -331,16 +335,17 @@ class _ClientBookings extends StatelessWidget {
   Widget _card(_BookingItem item) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: _ClientCard(item: item, home: home),
+        child: _ClientCard(item: item, home: home, onReload: onReload),
     );
   }
 }
 
 class _ClientCard extends StatelessWidget {
-  const _ClientCard({required this.item, required this.home});
+  const _ClientCard({required this.item, required this.home, this.onReload});
 
   final _BookingItem item;
   final HomeData home;
+  final VoidCallback? onReload;
 
   VendorCard get vendor => item.vendor ?? item.fallbackVendor;
 
@@ -393,11 +398,16 @@ class _ClientCard extends StatelessWidget {
                           color: const Color(0xFF1A1A1A),
                           icon: const Icon(Icons.more_horiz, color: Color(0xFF8E8B84), size: 20),
                           onSelected: (value) => _menu(context, value),
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(value: 'deliverables', child: Text('Deliverables', style: TextStyle(color: Colors.white))),
-                            PopupMenuItem(value: 'request_edit', child: Text('Request edit', style: TextStyle(color: Colors.white))),
-                            PopupMenuItem(value: 'approve', child: Text('Approved delivery', style: TextStyle(color: Colors.white))),
-                            PopupMenuItem(value: 'refuse', child: Text('Refuse', style: TextStyle(color: Colors.white))),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'deliverables', child: Text('Deliverables', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(value: 'request_edit', child: Text('Request edit', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(value: 'approve', child: Text('Approved delivery', style: TextStyle(color: Colors.white))),
+                            if (home.on('disputes'))
+                              PopupMenuItem(
+                                value: 'dispute',
+                                child: Text(item.dispute != null ? 'View dispute' : 'Open dispute', style: const TextStyle(color: Colors.white)),
+                              ),
+                            const PopupMenuItem(value: 'refuse', child: Text('Refuse', style: TextStyle(color: Colors.white))),
                           ],
                         ),
                       ],
@@ -480,8 +490,8 @@ class _ClientCard extends StatelessWidget {
     openVendorProfile(context, vendor, home, booked: true);
   }
 
-  Future<void> _openProject(BuildContext context) {
-    return Navigator.of(context).push(
+  Future<void> _openProject(BuildContext context) async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DeliverablesPage(
           bookingId: item.id,
@@ -494,6 +504,7 @@ class _ClientCard extends StatelessWidget {
         ),
       ),
     );
+    onReload?.call();
   }
 
   Future<void> _menu(BuildContext context, String value) async {
@@ -501,8 +512,8 @@ class _ClientCard extends StatelessWidget {
       case 'deliverables':
         await _openProject(context);
       case 'request_edit':
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
+        final sent = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
             builder: (_) => RequestEditPage(
               bookingId: item.id,
               fileName: item.displayProject,
@@ -513,6 +524,9 @@ class _ClientCard extends StatelessWidget {
             ),
           ),
         );
+        if (sent == true) {
+          onReload?.call();
+        }
       case 'approve':
         final ok = await showApproveDeliverySheet(
           context,
@@ -525,6 +539,20 @@ class _ClientCard extends StatelessWidget {
         if (ok && context.mounted) {
           await _post(context, '/app/bookings/${item.id}/approve', const {}, 'Delivery approved. Files are unlocked.');
         }
+      case 'dispute':
+        await openBookingDispute(
+          context,
+          bookingId: item.id,
+          reference: item.reference,
+          vendorName: item.counterpart,
+          vendorRole: item.role,
+          projectName: item.displayProject,
+          dateLabel: item.dateLabel,
+          total: item.total,
+          photo: item.photo,
+          status: item.status,
+          dispute: item.dispute,
+        );
       case 'refuse':
         await _promptAction(
           context,
@@ -610,6 +638,7 @@ class _ClientCard extends StatelessWidget {
     }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      onReload?.call();
     }
   }
 }
@@ -701,6 +730,7 @@ class _BookingItem {
     this.vendor,
     this.phone,
     this.whatsapp,
+    this.dispute,
   });
 
   static String _projectNameOf(Map<String, dynamic> json) {
@@ -738,6 +768,7 @@ class _BookingItem {
       vendor: vendorJson == null ? null : VendorCard.fromJson(vendorJson),
       phone: json['phone']?.toString(),
       whatsapp: json['whatsapp']?.toString(),
+      dispute: _BookingItem._disputeOf(json['dispute']),
     );
   }
 
@@ -773,6 +804,7 @@ class _BookingItem {
   final VendorCard? vendor;
   final String? phone;
   final String? whatsapp;
+  final Map<String, dynamic>? dispute;
 
   VendorCard get fallbackVendor {
     final name = counterpart.isEmpty ? 'Creator' : counterpart;
@@ -806,6 +838,9 @@ class _BookingItem {
   }
 
   (Color, Color) get badgeColors {
+    if (status == 'disputed' || dispute != null) {
+      return (LensColors.primary, LensColors.primary);
+    }
     return switch (group) {
       'canceled' => (const Color(0xFFFF4D4F), const Color(0xFFFF4D4F)),
       'completed' => (const Color(0xFFD0CBC3), const Color(0xFFD0CBC3)),
@@ -822,11 +857,21 @@ class _BookingItem {
   }
 
   static String _badgeFor(String group, String status) {
+    if (status == 'disputed') {
+      return 'Disputed';
+    }
     return switch (group) {
       'canceled' => 'Canceled',
       'completed' => 'Completed',
       _ => status == 'pending' ? 'Pending' : 'Confirmed',
     };
+  }
+
+  static Map<String, dynamic>? _disputeOf(dynamic value) {
+    if (value is! Map) {
+      return null;
+    }
+    return Map<String, dynamic>.from(value);
   }
 }
 

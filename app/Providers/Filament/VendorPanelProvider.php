@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\VendorLogin;
 use App\Filament\Vendor\Pages\MyPricing;
 use App\Filament\Vendor\Pages\MyProfile;
 use App\Filament\Vendor\Widgets\VendorRequestStats;
@@ -28,7 +29,7 @@ class VendorPanelProvider extends PanelProvider
         $panel = $panel
             ->id('vendor')
             ->path('vendor')
-            ->login()
+            ->login(VendorLogin::class)
             ->brandName('Lens Vendor')
             ->favicon(asset('favicon.svg'))
             ->font('Inter')

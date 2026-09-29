@@ -19,6 +19,9 @@ class DemoBootstrap {
         'filters': true,
         'badges': true,
         'reviews': true,
+        'chat': true,
+        'issue_reports': true,
+        'disputes': true,
       },
       'vendor_types': const [
         {'slug': 'photographer', 'label': 'Photographers'},

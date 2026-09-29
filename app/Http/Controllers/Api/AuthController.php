@@ -11,6 +11,7 @@ use App\Models\VendorType;
 use Illuminate\Http\UploadedFile;
 use App\Support\AppClient;
 use App\Support\Egypt;
+use App\Support\Roles;
 use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -175,7 +176,7 @@ class AuthController extends Controller
     {
         $user = AppClient::requireUser()->load('vendor');
 
-        $query = Booking::query()->with(['vendor.vendorType', 'vendor.city', 'vendor.badges', 'client', 'category']);
+        $query = Booking::query()->with(['vendor.vendorType', 'vendor.city', 'vendor.badges', 'client', 'category', 'dispute']);
         if ($user->isVendor() && $user->vendor) {
             $query->where('vendor_id', $user->vendor->id);
             $view = 'vendor';
@@ -288,6 +289,7 @@ class AuthController extends Controller
             'vendor_id' => $user->vendor?->id,
             'vendor_name' => $user->vendor?->display_name,
             'verification_status' => $user->vendor?->verification_status,
+            'capabilities' => Roles::capabilitiesFor($user->role),
         ];
     }
 
@@ -309,12 +311,15 @@ class AuthController extends Controller
         $group = match ($booking->status) {
             'cancelled', 'rejected', 'failed', 'refunded' => 'canceled',
             'delivered', 'approved', 'completed' => 'completed',
+            'disputed' => 'upcoming',
             default => 'upcoming',
         };
-        $badge = match ($group) {
-            'canceled' => 'Canceled',
-            'completed' => 'Completed',
-            default => $booking->status === 'pending' ? 'Pending' : 'Confirmed',
+        $badge = match (true) {
+            $booking->status === 'disputed' => 'Disputed',
+            $group === 'canceled' => 'Canceled',
+            $group === 'completed' => 'Completed',
+            $booking->status === 'pending' => 'Pending',
+            default => 'Confirmed',
         };
 
         return [
@@ -339,6 +344,7 @@ class AuthController extends Controller
             'phone' => preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: '')) ?: null,
             'whatsapp' => preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendor?->contact_phone ?: '')) ?: null,
             'vendor_id' => $vendor?->id,
+            'dispute' => $booking->dispute?->toApp(),
             'vendor' => $view === 'client' ? [
                 'id' => $vendor?->id,
                 'display_name' => $vendor?->display_name,

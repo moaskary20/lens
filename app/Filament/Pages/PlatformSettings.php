@@ -174,7 +174,7 @@ class PlatformSettings extends Page
                         ])
                         ->required()
                         ->visible($whenOn)
-                        ->helperText('SMTP uses Laravel Mail. API posts to /v3/smtp/email and can use Brevo templates.'),
+                        ->helperText('SMTP uses Laravel Mail. API posts to /v3/smtp/email. Which events email goes from Notification events.'),
                     TextInput::make('brevo_api_key')->label('API key')->password()->revealable()
                         ->visible($whenOn)
                         ->dehydrated(fn ($state): bool => filled($state))
@@ -200,7 +200,7 @@ class PlatformSettings extends Page
                     TextInput::make('brevo_reply_to_email')->label('Reply-to email')->email(),
                     TextInput::make('brevo_reply_to_name')->label('Reply-to name'),
                     TextInput::make('brevo_bcc_email')->label('BCC staff copy')->email()
-                        ->helperText('Optional. A copy of every transactional email.'),
+                        ->helperText('Optional. A copy of every notification email.'),
                     Toggle::make('brevo_track_opens')->label('Track opens'),
                     Toggle::make('brevo_track_clicks')->label('Track clicks'),
                 ])->columns(2),
@@ -231,25 +231,6 @@ class PlatformSettings extends Page
                     TextInput::make('brevo_clients_list_id')->label('Clients list ID')->numeric(),
                     TextInput::make('brevo_vendors_list_id')->label('Vendors list ID')->numeric(),
                     TextInput::make('brevo_staff_list_id')->label('Staff list ID')->numeric(),
-                ])->columns(2),
-            Section::make('Brevo transactional templates')
-                ->description('Numeric template IDs from Campaigns → Templates. Leave blank to send a plain-text fallback. Used when Send through is API.')
-                ->visible($whenOn)
-                ->schema([
-                    TextInput::make('brevo_template_welcome')->label('Welcome / new account')->numeric(),
-                    TextInput::make('brevo_template_account_approved')->label('Account approved')->numeric(),
-                    TextInput::make('brevo_template_account_rejected')->label('Account rejected')->numeric(),
-                    TextInput::make('brevo_template_booking_created')->label('New booking request')->numeric(),
-                    TextInput::make('brevo_template_booking_accepted')->label('Booking accepted')->numeric(),
-                    TextInput::make('brevo_template_payment')->label('Payment / escrow held')->numeric(),
-                    TextInput::make('brevo_template_booking_status')->label('Booking status change')->numeric(),
-                    TextInput::make('brevo_template_booking_cancelled')->label('Booking cancelled')->numeric(),
-                    TextInput::make('brevo_template_delivery')->label('Deliverables uploaded')->numeric(),
-                    TextInput::make('brevo_template_revision')->label('Revision requested')->numeric(),
-                    TextInput::make('brevo_template_review')->label('New review')->numeric(),
-                    TextInput::make('brevo_template_offer')->label('Offers & coupons')->numeric(),
-                    TextInput::make('brevo_template_payout')->label('Payout / wallet')->numeric(),
-                    TextInput::make('brevo_template_password_reset')->label('Password reset')->numeric(),
                 ])->columns(2),
         ];
     }

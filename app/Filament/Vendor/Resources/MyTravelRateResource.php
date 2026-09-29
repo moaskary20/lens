@@ -46,6 +46,7 @@ class MyTravelRateResource extends Resource
     {
         return Feature::enabled('travel_fees')
             && (bool) auth()->user()?->isVendor()
+            && auth()->user()?->roleCan('set_travel_fees')
             && auth()->user()?->vendor;
     }
 

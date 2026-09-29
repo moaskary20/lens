@@ -30,7 +30,7 @@ class NotificationSettings extends Page
 
     protected static ?string $navigationLabel = 'Notification events';
 
-    protected static ?string $title = 'Which in-app alerts to send';
+    protected static ?string $title = 'Notification emails and events';
 
     protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
@@ -58,7 +58,7 @@ class NotificationSettings extends Page
     {
         return [
             Action::make('send')
-                ->label('Send to the app')
+                ->label('Send notice')
                 ->icon(Heroicon::OutlinedPaperAirplane)
                 ->form([
                     TextInput::make('title')->label('Title')->required()->maxLength(120),
@@ -82,7 +82,7 @@ class NotificationSettings extends Page
                     } else {
                         $count = LensNotifier::toClients($title, $body);
                     }
-                    Notification::make()->title("Sent to {$count} client inbox".($count === 1 ? '' : 'es'))->success()->send();
+                    Notification::make()->title("Sent to {$count} client inbox".($count === 1 ? '' : 'es').(LensNotifier::emailEnabled() ? ' and email' : ''))->success()->send();
                 }),
         ];
     }
@@ -105,8 +105,32 @@ class NotificationSettings extends Page
 
         return $schema
             ->components([
+                Section::make('Email delivery')
+                    ->description('Every enabled event below also goes out as email when this is on. Sending uses the Brevo connection in Platform settings.')
+                    ->schema([
+                        Toggle::make('email_enabled')
+                            ->label('Send notification emails')
+                            ->helperText('Inbox alerts stay in the app. Turn this on so the same alert is emailed too.')
+                            ->live()
+                            ->default(true),
+                    ]),
+                Section::make('Message emails')
+                    ->description('Chat alerts when a client or vendor posts in a booking conversation.')
+                    ->visible(fn (Get $get): bool => (bool) $get('email_enabled'))
+                    ->schema([
+                        Toggle::make('email_messages')
+                            ->label('Email new messages')
+                            ->helperText('Off keeps chat in the app inbox only.')
+                            ->live()
+                            ->default(true),
+                        Toggle::make('email_message_preview')
+                            ->label('Include message preview')
+                            ->helperText('Show the first lines of the chat in the email. Off sends “You have a new message on Lens.”')
+                            ->visible(fn (Get $get): bool => (bool) $get('email_messages'))
+                            ->default(true),
+                    ]),
                 Section::make('Events')
-                    ->description('Alerts land in the admin and vendor bells and in the client app inbox. Turn an event off without deleting history.')
+                    ->description('Alerts land in the admin and vendor bells, the client app inbox, and email when Email delivery is on. Turn an event off without deleting history.')
                     ->schema($toggles)
                     ->columns(2),
             ])
@@ -121,7 +145,7 @@ class NotificationSettings extends Page
                 ->livewireSubmitHandler('save')
                 ->footer([
                     Actions::make([
-                        Action::make('save')->label('Save notification events')->submit('save'),
+                        Action::make('save')->label('Save notification settings')->submit('save'),
                     ]),
                 ]),
         ]);
@@ -129,8 +153,14 @@ class NotificationSettings extends Page
 
     public function save(): void
     {
-        Setting::setGroupValues('notifications', $this->form->getState());
+        $state = array_merge(LensNotifier::defaults(), $this->form->getState(), $this->data);
+        $values = [];
+        foreach (LensNotifier::defaults() as $key => $default) {
+            $values[$key] = (bool) ($state[$key] ?? $default);
+        }
 
-        Notification::make()->title('Notification events saved')->success()->send();
+        Setting::setGroupValues('notifications', $values);
+
+        Notification::make()->title('Notification settings saved')->success()->send();
     }
 }

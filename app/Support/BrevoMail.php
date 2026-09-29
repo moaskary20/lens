@@ -39,20 +39,6 @@ class BrevoMail
             'vendors_list_id' => '',
             'staff_list_id' => '',
             'webhook_secret' => '',
-            'template_welcome' => '',
-            'template_account_approved' => '',
-            'template_account_rejected' => '',
-            'template_booking_created' => '',
-            'template_booking_accepted' => '',
-            'template_payment' => '',
-            'template_booking_status' => '',
-            'template_booking_cancelled' => '',
-            'template_delivery' => '',
-            'template_revision' => '',
-            'template_review' => '',
-            'template_offer' => '',
-            'template_payout' => '',
-            'template_password_reset' => '',
         ];
     }
 

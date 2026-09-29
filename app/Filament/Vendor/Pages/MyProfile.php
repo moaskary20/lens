@@ -2,10 +2,13 @@
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Filament\Vendor\Resources\MyPortfolioResource;
 use App\Models\Category;
+use App\Models\City;
 use App\Models\FilterTag;
 use App\Models\Vendor;
 use App\Support\Feature;
+use App\Support\Finance;
 use App\Support\VendorProfile;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -14,12 +17,15 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
-use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -48,7 +54,7 @@ class MyProfile extends Page
 
     public function mount(): void
     {
-        $vendor = $this->vendor()->loadMissing(['vendorType', 'categories', 'filterTags', 'badges']);
+        $vendor = $this->vendor()->loadMissing(['vendorType', 'categories', 'filterTags', 'badges', 'portfolios']);
 
         $this->form->fill([
             'vendor_type_id' => $vendor->vendor_type_id,
@@ -64,6 +70,9 @@ class MyProfile extends Page
             'whatsapp' => $vendor->whatsapp,
             'instagram' => $vendor->instagram,
             'city_id' => $vendor->city_id,
+            'address' => $vendor->address,
+            'latitude' => $vendor->latitude,
+            'longitude' => $vendor->longitude,
             'accepts_out_of_governorate' => $vendor->accepts_out_of_governorate,
             'default_travel_fee' => $vendor->default_travel_fee,
             'category_ids' => $vendor->categories()->pluck('categories.id')->all(),
@@ -72,6 +81,10 @@ class MyProfile extends Page
             'specialties' => $vendor->specialties,
             'delivery_formats' => $vendor->delivery_formats,
             'turnaround_hours' => $vendor->turnaround_hours,
+            'half_day_price' => $vendor->half_day_price,
+            'full_day_price' => $vendor->full_day_price,
+            'hourly_price' => $vendor->hourly_price,
+            'per_video_price' => $vendor->per_video_price,
             'extras' => $vendor->extras,
             'payout_method' => $vendor->payout_method,
             'bank_name' => $vendor->bank_name,
@@ -98,57 +111,35 @@ class MyProfile extends Page
         $vendor = $this->vendor()->loadMissing(['vendorType', 'badges']);
 
         return $schema
+            ->model($vendor)
             ->components([
                 Hidden::make('vendor_type_id'),
-                Section::make('Personal details')
-                    ->description('Identity, national ID, age, profession, and photo used for verification.')
-                    ->schema([
+                Tabs::make('vendor')->tabs([
+                    Tab::make('Identity')->schema([
                         Placeholder::make('vendor_type_label')
                             ->label('Vendor type')
-                            ->content($vendor->vendorType?->name_en ?: 'Assigned by Lens admin'),
+                            ->content($vendor->vendorType?->name_en ?: 'Assigned by Lens admin')
+                            ->helperText('Choosing a type is done by Lens staff. Matching filter-screen fields appear on Type profile.'),
                         TextInput::make('display_name')->label('Display name')->required(),
-                        FileUpload::make('cover_image')->label('Cover image')->image()->directory('vendors/covers')->columnSpanFull(),
                         ...VendorProfile::personalFields(),
-                    ])->columns(2),
-                Section::make('Verification')
-                    ->description('Staff review your national ID and profile. You cannot change this status yourself.')
-                    ->visible(fn (): bool => Feature::enabled('verification'))
-                    ->schema([
-                        Placeholder::make('verification_status_label')
-                            ->label('Status')
-                            ->content(match ($vendor->verification_status) {
-                                'verified' => 'Verified — you can receive bookings.',
-                                'rejected' => 'Rejected'.($vendor->verification_notes ? ': '.$vendor->verification_notes : '.'),
-                                default => 'Pending review by Lens staff.',
-                            }),
-                        Placeholder::make('badges_view')
-                            ->label('Incentive badges')
-                            ->content($vendor->badges->pluck('name_en')->filter()->implode(', ') ?: 'No badges yet')
-                            ->visible(fn (): bool => Feature::enabled('badges')),
-                    ])->columns(2),
-                Section::make('Contact')
-                    ->schema(VendorProfile::contactFields())
-                    ->columns(2),
-                Section::make('Work areas')
-                    ->description('Home governorate and whether you travel for sessions.')
-                    ->schema(VendorProfile::workAreaFields())
-                    ->columns(2),
-                Section::make('Services')
-                    ->schema([
+                        ...VendorProfile::contactFields(),
+                        Select::make('city_id')->label('Home governorate')
+                            ->options(fn (): array => City::query()->orderBy('name_en')->pluck('name_en', 'id')->all())
+                            ->searchable()
+                            ->preload(),
+                        TextInput::make('address')->label('Address'),
+                        TextInput::make('latitude')->label('Latitude')->numeric(),
+                        TextInput::make('longitude')->label('Longitude')->numeric(),
+                        FileUpload::make('cover_image')->label('Cover image')->image()->directory('vendors/covers')->columnSpanFull(),
                         Select::make('category_ids')
                             ->label('Services you offer')
                             ->multiple()
                             ->options(fn (): array => Category::query()->where('is_active', true)->orderBy('sort_order')->pluck('name_en', 'id')->all())
                             ->searchable()
                             ->preload(),
-                        Select::make('specialties')
-                            ->label('Specialties')
-                            ->multiple()
-                            ->options(VendorProfile::specialtyOptions())
-                            ->visible(fn (): bool => ! in_array($vendor->vendorType?->slug, ['photographer'], true)),
                         Select::make('filter_tag_ids')
                             ->label('Filter tags')
-                            ->helperText('Optional extra tags. The filter profile below matches the mobile filter screens.')
+                            ->helperText('Optional extra tags. The Type profile tab is the same catalog as the mobile filter screens.')
                             ->multiple()
                             ->searchable()
                             ->preload()
@@ -167,12 +158,49 @@ class MyProfile extends Page
                                 return $query->pluck('name_en', 'id')->all();
                             })
                             ->visible(fn (): bool => Feature::enabled('filters') && (bool) auth()->user()?->roleCan('gear_tags')),
+                        Placeholder::make('badges_view')
+                            ->label('Badges')
+                            ->content($vendor->badges->pluck('name_en')->filter()->implode(', ') ?: 'No badges yet')
+                            ->visible(fn (): bool => Feature::enabled('badges')),
                     ])->columns(2),
-                ...VendorProfile::typeSections(),
-                Section::make('Bank & payouts')
-                    ->description('Add a bank account, an Egyptian mobile wallet, or PayPal.')
-                    ->schema(VendorProfile::bankFields())
-                    ->columns(2),
+                    Tab::make('Type profile')->schema(VendorProfile::typeSections())->columns(1),
+                    Tab::make('Previous projects')->schema([
+                        VendorProfile::projectsRepeater()
+                            ->helperText('Past jobs you already delivered — photos, reels, UGC clips, or social links.')
+                            ->visible(fn (): bool => Feature::enabled('portfolio') && (bool) auth()->user()?->roleCan('build_portfolio')),
+                        Placeholder::make('portfolio_desk')
+                            ->hiddenLabel()
+                            ->content('You can also manage the same gallery from Previous work in the sidebar.')
+                            ->visible(fn (): bool => Feature::enabled('portfolio') && (bool) auth()->user()?->roleCan('build_portfolio')),
+                    ]),
+                    Tab::make('Pricing')->schema(VendorProfile::pricingFields())->columns(2),
+                    Tab::make('Bank & payouts')->schema(VendorProfile::bankFields())->columns(2),
+                    Tab::make('Verification & quality')->schema([
+                        Placeholder::make('verification_status_label')
+                            ->label('Verification')
+                            ->content(match ($vendor->verification_status) {
+                                'verified' => 'Verified — you can receive bookings.',
+                                'rejected' => 'Rejected'.($vendor->verification_notes ? ': '.$vendor->verification_notes : '.'),
+                                default => 'Pending review by Lens staff.',
+                            })
+                            ->helperText('Staff review your national ID and profile. You cannot change this status yourself.')
+                            ->visible(fn (): bool => Feature::enabled('verification')),
+                        Toggle::make('accepts_out_of_governorate')->label('Works outside home governorate')
+                            ->helperText('If on, a travel fee is added when the booking city is in another governorate.')
+                            ->live(),
+                        TextInput::make('default_travel_fee')->label('Default transportation fee')->numeric()->prefix(Finance::currency())
+                            ->helperText('Used when there is no specific rate for the destination governorate. Set per-governorate rates on Travel fees.')
+                            ->visible(fn (Get $get): bool => (bool) $get('accepts_out_of_governorate')),
+                        Placeholder::make('booked_sessions_view')->label('Sessions booked')->content((string) ($vendor->booked_sessions ?? 0)),
+                        Placeholder::make('accepted_sessions_view')->label('Accepted')->content((string) ($vendor->accepted_sessions ?? 0)),
+                        Placeholder::make('rejected_sessions_view')->label('Rejected')->content((string) ($vendor->rejected_sessions ?? 0)),
+                        Placeholder::make('completed_sessions_view')->label('Completed')->content((string) ($vendor->completed_sessions ?? 0)),
+                        Placeholder::make('failed_sessions_view')->label('Failed sessions')->content((string) ($vendor->failed_sessions ?? 0)),
+                        Placeholder::make('penalty_total_view')->label('Applied penalties')->content(number_format((float) ($vendor->penalty_total ?? 0), 0).' '.Finance::currency()),
+                        Placeholder::make('rating_avg_view')->label('Average rating')->content(number_format((float) ($vendor->rating_avg ?? 0), 2).' ★'),
+                        Placeholder::make('rating_count_view')->label('Review count')->content((string) ($vendor->rating_count ?? 0)),
+                    ])->columns(2),
+                ])->persistTabInQueryString()->columnSpanFull(),
             ])
             ->statePath('data');
     }
@@ -185,6 +213,11 @@ class MyProfile extends Page
                 ->livewireSubmitHandler('save')
                 ->footer([
                     Actions::make([
+                        Action::make('openPortfolio')
+                            ->label('Open previous work')
+                            ->url(MyPortfolioResource::getUrl('index'))
+                            ->color('gray')
+                            ->visible(fn (): bool => Feature::enabled('portfolio') && (bool) auth()->user()?->roleCan('build_portfolio')),
                         Action::make('save')->label('Save profile')->submit('save'),
                     ]),
                 ]),
@@ -198,14 +231,31 @@ class MyProfile extends Page
         $categoryIds = $state['category_ids'] ?? [];
         $filterTagIds = $state['filter_tag_ids'] ?? [];
         $profileFilters = is_array($state['profile_filters'] ?? null) ? $state['profile_filters'] : [];
-        unset($state['category_ids'], $state['filter_tag_ids'], $state['profile_filters'], $state['vendor_type_id']);
+        unset(
+            $state['category_ids'],
+            $state['filter_tag_ids'],
+            $state['profile_filters'],
+            $state['vendor_type_id'],
+            $state['portfolios'],
+            $state['verification_status'],
+            $state['verification_notes'],
+            $state['is_active'],
+            $state['is_featured'],
+            $state['user_id'],
+            $state['booked_sessions'],
+            $state['accepted_sessions'],
+            $state['rejected_sessions'],
+            $state['completed_sessions'],
+            $state['failed_sessions'],
+            $state['penalty_total'],
+            $state['rating_avg'],
+            $state['rating_count'],
+            $state['response_minutes'],
+        );
 
         $incomingExtras = is_array($state['extras'] ?? null) ? $state['extras'] : [];
         $existingExtras = $vendor->extras ?? [];
-        if (isset($existingExtras['prices'])) {
-            $incomingExtras['prices'] = $existingExtras['prices'];
-        }
-        $state['extras'] = $incomingExtras;
+        $state['extras'] = array_replace_recursive($existingExtras, $incomingExtras);
 
         $vendor->update($state);
         $vendor->categories()->sync($categoryIds);
@@ -214,6 +264,8 @@ class MyProfile extends Page
             ? $filterTagIds
             : [];
         VendorProfile::syncProfileFilters($vendor, $profileFilters, $extraIds);
+
+        $this->form->model($vendor->fresh())->saveRelationships();
 
         Notification::make()->title('Profile saved')->success()->send();
     }

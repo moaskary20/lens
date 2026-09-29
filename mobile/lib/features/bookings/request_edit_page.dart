@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
@@ -32,10 +33,11 @@ class RequestEditPage extends StatefulWidget {
 
 class _RequestEditPageState extends State<RequestEditPage> {
   static const _orange = LensColors.primary;
-  static const _bg = Color(0xFF000000);
-  static const _surface = Color(0xFF141414);
-  static const _muted = Color(0xFF8E8B84);
-  static const _hint = Color(0xFF6F6C66);
+  static const _bg = Color(0xFF101318);
+  static const _surface = Color(0xFF161A20);
+  static const _stroke = Color(0xFF2C3138);
+  static const _muted = Color(0xFF9AA0A8);
+  static const _hint = Color(0xFF6F7680);
   static const _chips = [
     (Icons.palette_outlined, 'Color'),
     (Icons.face_retouching_natural_outlined, 'Retouching'),
@@ -139,9 +141,14 @@ class _RequestEditPageState extends State<RequestEditPage> {
   }
 
   Widget _fileCard() {
+    final session = widget.projectName.isNotEmpty ? widget.projectName : widget.vendorRole;
     return Container(
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _stroke),
+      ),
       child: Row(
         children: [
           ClipRRect(
@@ -156,11 +163,8 @@ class _RequestEditPageState extends State<RequestEditPage> {
                 Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                 if (widget.vendorName.isNotEmpty)
                   Text(widget.vendorName, style: const TextStyle(color: _muted, fontSize: 13)),
-                if (widget.vendorRole.isNotEmpty || widget.projectName.isNotEmpty)
-                  Text(
-                    widget.vendorRole.isNotEmpty ? widget.vendorRole : widget.projectName,
-                    style: const TextStyle(color: _muted, fontSize: 12),
-                  ),
+                if (session.isNotEmpty)
+                  Text(session, style: const TextStyle(color: _muted, fontSize: 12)),
               ],
             ),
           ),
@@ -176,7 +180,11 @@ class _RequestEditPageState extends State<RequestEditPage> {
         Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 8),
         Container(
-          decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+            color: _surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _stroke),
+          ),
           child: Column(
             children: [
               TextField(
@@ -212,34 +220,51 @@ class _RequestEditPageState extends State<RequestEditPage> {
     final on = _selected.contains(label);
     return GestureDetector(
       onTap: () => setState(() => on ? _selected.remove(label) : _selected.add(label)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: _orange, size: 18),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: on ? _orange : Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-        ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: on ? const Color(0xFF2A150E) : _surface,
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: on ? _orange : _stroke),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: _orange, size: 16),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: on ? _orange : Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _references() {
-    return SizedBox(
-      height: 78,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _uploadTile(),
-          for (final file in _refs) ...[
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _stroke),
+      ),
+      child: SizedBox(
+        height: 78,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            _uploadTile(),
+            for (final file in _refs) ...[
+              const SizedBox(width: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(width: 72, height: 72, child: _fileThumb(file)),
+              ),
+            ],
             const SizedBox(width: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(width: 72, height: 72, child: _fileThumb(file)),
-            ),
+            _plusTile(),
           ],
-          const SizedBox(width: 8),
-          _plusTile(),
-        ],
+        ),
       ),
     );
   }
@@ -251,7 +276,7 @@ class _RequestEditPageState extends State<RequestEditPage> {
         width: 168,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF3A3A3E)),
+          border: Border.all(color: _stroke),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: const Column(
@@ -261,7 +286,7 @@ class _RequestEditPageState extends State<RequestEditPage> {
             Icon(Icons.add_photo_alternate_outlined, color: _muted),
             SizedBox(height: 6),
             Text('Upload reference images', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11)),
-            Text('JPG, PNG, HEIC (10 files)', style: TextStyle(color: _muted, fontSize: 10)),
+            Text('JPG, PNG, HEIC (Max 10 files)', style: TextStyle(color: _muted, fontSize: 10)),
           ],
         ),
       ),
@@ -274,7 +299,11 @@ class _RequestEditPageState extends State<RequestEditPage> {
       child: Container(
         width: 72,
         height: 72,
-        decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: const Color(0xFF12161C),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _stroke),
+        ),
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
     );
@@ -373,7 +402,22 @@ class _RequestEditPageState extends State<RequestEditPage> {
     var message = 'Edit requested. The creator will upload a new version.';
     if (_live) {
       try {
-        final payload = await ApiClient().postJson('/app/bookings/${widget.bookingId}/request-edit', {'note': note});
+        final body = <String, dynamic>{
+          'note': note,
+          'change': _change.text.trim(),
+          'comment': _comment.text.trim(),
+          'file_name': widget.fileName,
+          'quick_requests': _selected.toList(),
+        };
+        final files = <http.MultipartFile>[];
+        if (!kIsWeb) {
+          for (var i = 0; i < _refs.length; i++) {
+            files.add(await http.MultipartFile.fromPath('references[]', _refs[i].path, filename: _refs[i].name));
+          }
+        }
+        final payload = files.isEmpty
+            ? await ApiClient().postJson('/app/bookings/${widget.bookingId}/request-edit', body)
+            : await ApiClient().postForm('/app/bookings/${widget.bookingId}/request-edit', body, files: files);
         message = payload['message']?.toString() ?? message;
       } catch (error) {
         if (mounted) {

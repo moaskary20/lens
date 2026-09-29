@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Booking;
 use App\Models\Message;
-use App\Models\ReplacementOffer;
 use App\Models\Review;
 use App\Models\Setting;
 use App\Models\User;
@@ -61,6 +60,7 @@ class MarketplaceOpsTest extends TestCase
         $this->assertSame(1, $booking->revision_count);
         $this->assertSame(0, $booking->payouts()->count());
         $this->assertTrue(Message::query()->where('body', 'Soften the shadows on the cake.')->exists());
+        $this->assertSame('Soften the shadows on the cake.', $booking->notes);
     }
 
     public function test_approve_unlocks_originals_and_releases_vendor_net(): void
@@ -137,7 +137,7 @@ class MarketplaceOpsTest extends TestCase
         $this->assertEquals(1440.0, (float) $booking->payouts()->sum('amount'));
     }
 
-    public function test_same_day_vendor_cancel_charges_50_percent_and_opens_replacement(): void
+    public function test_same_day_vendor_cancel_charges_50_percent(): void
     {
         $booking = $this->heldBooking(now()->addHours(6));
 
@@ -149,7 +149,6 @@ class MarketplaceOpsTest extends TestCase
         $this->assertEquals(900.0, $quote['vendor_penalty']);
         $this->assertEquals(1800.0, (float) $booking->escrowTransactions()->where('type', 'refund')->sum('amount'));
         $this->assertEquals(900.0, (float) $booking->escrowTransactions()->where('type', 'penalty')->sum('amount'));
-        $this->assertTrue(ReplacementOffer::query()->where('booking_id', $booking->id)->where('status', 'open')->exists());
     }
 
     public function test_vendor_cancel_over_24_hours_charges_25_percent(): void

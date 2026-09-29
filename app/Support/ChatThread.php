@@ -8,7 +8,7 @@ use Illuminate\Support\HtmlString;
 
 class ChatThread
 {
-    public static function html(Conversation $conversation): HtmlString
+    public static function html(Conversation $conversation, string $audience = 'admin'): HtmlString
     {
         $conversation->loadMissing(['messages.sender', 'booking.vendor.vendorType', 'vendor.vendorType', 'vendor.city', 'client']);
 
@@ -26,18 +26,21 @@ class ChatThread
         }
 
         if ($rows === '') {
-            $rows = '<div class="lens-live-chat__empty"><span class="lens-live-chat__empty-icon">💬</span><p>No messages yet.</p><small>When the client or vendor writes, the thread appears here live.</small></div>';
+            $hint = $audience === 'vendor'
+                ? 'When the client writes, the thread appears here live.'
+                : 'When the client or vendor writes, the thread appears here live.';
+            $rows = '<div class="lens-live-chat__empty"><span class="lens-live-chat__empty-icon">💬</span><p>No messages yet.</p><small>'.$hint.'</small></div>';
         }
 
         return new HtmlString(
             '<div class="lens-live-chat">'.
-                self::header($conversation, $messages->count()).
+                self::header($conversation, $messages->count(), $audience).
                 '<div class="lens-live-chat__thread">'.$rows.'</div>'.
             '</div>'
         );
     }
 
-    protected static function header(Conversation $conversation, int $count): string
+    protected static function header(Conversation $conversation, int $count, string $audience = 'admin'): string
     {
         $booking = $conversation->booking;
         $vendor = $conversation->vendor;
@@ -47,6 +50,10 @@ class ChatThread
         $where = $booking?->location_text ?: ($vendor?->address ?: ($vendor?->city?->name_en ?: 'Egypt'));
         $status = self::statusLabel($booking?->status);
         $reference = $booking?->reference ?: 'Unlinked';
+        $heading = $audience === 'vendor'
+            ? e($client?->name ?: 'Client')
+            : e($client?->name ?: 'Client').' · '.e($vendor?->display_name ?: 'Vendor');
+        $sub = $audience === 'vendor' ? 'Client chat' : '';
 
         return '<div class="lens-live-chat__header">'.
             '<div class="lens-live-chat__people">'.
@@ -54,7 +61,8 @@ class ChatThread
                 '<div class="lens-live-chat__swap" aria-hidden="true">↔</div>'.
                 self::avatar($vendor?->display_name, 'vendor').
                 '<div class="lens-live-chat__meta">'.
-                    '<strong>'.e($client?->name ?: 'Client').' · '.e($vendor?->display_name ?: 'Vendor').'</strong>'.
+                    '<strong>'.$heading.'</strong>'.
+                    ($sub !== '' ? '<span>'.$sub.'</span>' : '').
                 '</div>'.
             '</div>'.
             '<div class="lens-live-chat__chips">'.

@@ -15,6 +15,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -60,24 +61,28 @@ class MyPortfolioResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('type')->label('Type')->options([
-                'image' => 'Photo',
-                'video' => 'Video',
-                'link' => 'Social / external link',
-            ])->default('image')->live()->required(),
-            TextInput::make('title')->label('Project title')->required(),
-            FileUpload::make('path')->label('Photo / video file')->directory('portfolios')
-                ->visible(fn (Get $get): bool => in_array($get('type'), ['image', 'video'], true))
-                ->acceptedFileTypes(fn (Get $get): array => $get('type') === 'video'
-                    ? ['video/mp4', 'video/quicktime', 'video/webm']
-                    : ['image/jpeg', 'image/png', 'image/webp'])
-                ->maxSize(fn (): int => \App\Support\StorageQuota::portfolioMaxSizeKb(auth()->user()?->vendor?->vendorType?->slug))
-                ->helperText(fn (): string => 'This vendor category may store up to '.\App\Support\StorageQuota::portfolioQuotaMb(auth()->user()?->vendor?->vendorType?->slug).' MB of portfolio files.'),
-            TextInput::make('completed_on')->label('Completed on')->placeholder('2025 or Jun 2025'),
-            TextInput::make('external_url')->label('Sample URL')->url()
-                ->visible(fn (Get $get): bool => in_array($get('type'), ['link', 'video'], true)),
-            Textarea::make('description')->label('What was delivered')->rows(3)->columnSpanFull(),
-            Toggle::make('is_featured')->label('Feature this project'),
+            Section::make('Previous work')
+                ->description('Photos, videos, or links clients see on your profile. You cannot assign work to another vendor.')
+                ->schema([
+                    Select::make('type')->label('Type')->options([
+                        'image' => 'Photo',
+                        'video' => 'Video',
+                        'link' => 'Social / external link',
+                    ])->default('image')->live()->required(),
+                    TextInput::make('title')->label('Project title')->required(),
+                    FileUpload::make('path')->label('Photo / video file')->directory('portfolios')
+                        ->visible(fn (Get $get): bool => in_array($get('type'), ['image', 'video'], true))
+                        ->acceptedFileTypes(fn (Get $get): array => $get('type') === 'video'
+                            ? ['video/mp4', 'video/quicktime', 'video/webm']
+                            : ['image/jpeg', 'image/png', 'image/webp'])
+                        ->maxSize(fn (): int => \App\Support\StorageQuota::portfolioMaxSizeKb(auth()->user()?->vendor?->vendorType?->slug))
+                        ->helperText(fn (): string => 'This vendor category may store up to '.\App\Support\StorageQuota::portfolioQuotaMb(auth()->user()?->vendor?->vendorType?->slug).' MB of portfolio files.'),
+                    TextInput::make('completed_on')->label('Completed on')->placeholder('2025 or Jun 2025'),
+                    TextInput::make('external_url')->label('Sample URL')->url()
+                        ->visible(fn (Get $get): bool => in_array($get('type'), ['link', 'video'], true)),
+                    Textarea::make('description')->label('What was delivered')->rows(3)->columnSpanFull(),
+                    Toggle::make('is_featured')->label('Feature this project'),
+                ])->columns(2),
         ]);
     }
 

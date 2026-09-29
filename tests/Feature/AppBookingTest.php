@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Booking;
+use App\Models\Message;
+use App\Models\User;
 use App\Models\Vendor;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AppBookingTest extends TestCase
@@ -119,7 +123,9 @@ class AppBookingTest extends TestCase
             ->assertOk()
             ->assertJsonPath('project_name', 'Yasmin Hall wedding')
             ->assertJsonPath('deliverables.0.name', 'final.jpg')
-            ->assertJsonPath('total', 1980);
+            ->assertJsonPath('total', 1980)
+            ->assertJsonPath('watermarked', true)
+            ->assertJsonPath('preview.watermark_text', 'Lens Protected');
 
         $this->withHeaders($headers)
             ->postJson('/api/app/bookings/'.$booking->id.'/request-edit', [
@@ -134,5 +140,40 @@ class AppBookingTest extends TestCase
             ->postJson('/api/app/bookings/'.$booking->id.'/approve')
             ->assertOk()
             ->assertJsonPath('status', 'approved');
+    }
+
+    public function test_request_edit_stores_note_chat_files_and_notifies_staff(): void
+    {
+        Storage::fake('public');
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+        app(\App\Services\DeliveryService::class)->upload($booking->fresh(), 'deliverables/preview.jpg', 'preview.jpg');
+
+        $this->withHeaders($headers)
+            ->post('/api/app/bookings/'.$booking->id.'/request-edit', [
+                'change' => 'Warm the skin tones.',
+                'comment' => 'Keep the cake sharp.',
+                'file_name' => 'preview.jpg',
+                'quick_requests' => ['Color', 'Retouching'],
+                'references' => [UploadedFile::fake()->image('mood.jpg', 80, 80)],
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'in_revision')
+            ->assertJsonPath('revision_count', 1);
+
+        $booking->refresh();
+        $this->assertSame('in_revision', $booking->status);
+        $this->assertSame('held', $booking->escrow_status);
+        $this->assertStringContainsString('Quick requests: Color, Retouching', (string) $booking->notes);
+        $this->assertStringContainsString('Warm the skin tones.', (string) $booking->notes);
+        $this->assertStringContainsString('Photo preview.jpg: Keep the cake sharp.', (string) $booking->notes);
+        $this->assertNotEmpty(Storage::disk('public')->files('revision-refs/'.$booking->id));
+        $this->assertTrue(Message::query()->where('body', $booking->notes)->exists());
+        $this->assertTrue(
+            User::query()->where('email', 'admin@lens.app')->firstOrFail()
+                ->notifications()
+                ->get()
+                ->contains(fn ($notification) => ($notification->data['title'] ?? null) === 'Revision requested'),
+        );
     }
 }

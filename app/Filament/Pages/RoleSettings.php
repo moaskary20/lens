@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\Setting;
 use App\Support\Roles;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -46,36 +45,66 @@ class RoleSettings extends Page
             'client' => Roles::capabilitiesFor('client'),
             'vendor' => Roles::capabilitiesFor('vendor'),
             'supervisor' => Roles::capabilitiesFor('supervisor'),
+            'admin' => Roles::capabilitiesFor('admin'),
         ]);
     }
 
     public function form(Schema $schema): Schema
     {
-        $sections = [];
+        $sections = [
+            Section::make('How roles work with Optional features')
+                ->description('Optional features switch a module on for Lens. These toggles decide which role may use a module that is on. Vendor types stay under Optional features. Replacement offers were removed; cancellation penalties remain under cancellation policies.')
+                ->schema([
+                    Placeholder::make('roles_help')
+                        ->hiddenLabel()
+                        ->content('Client and vendor flags drive the mobile app (book, chat, disputes, Report an Issue, wallet, AI). Supervisor flags drive the admin desks (disputes, app issues, chat, escrow, wallets, payouts). Platform admins always keep every staff capability.'),
+                ]),
+        ];
 
         foreach (['client', 'vendor', 'supervisor'] as $role) {
             $meta = Roles::CATALOG[$role];
-            $toggles = [];
+            $groups = [];
 
-            foreach ($meta['capabilities'] as $key => $capability) {
-                $toggles[] = Toggle::make("{$role}.{$key}")
-                    ->label($capability['label'])
-                    ->helperText($capability['description']);
+            foreach (Roles::groupedCatalog($role) as $group => $capabilities) {
+                $toggles = [];
+                foreach ($capabilities as $key => $capability) {
+                    $toggles[] = Toggle::make("{$role}.{$key}")
+                        ->label($capability['label'])
+                        ->helperText($capability['description']);
+                }
+
+                $groups[] = Section::make(Roles::GROUPS[$group] ?? $group)
+                    ->schema($toggles)
+                    ->columns(2);
             }
 
             $sections[] = Section::make($meta['label'])
                 ->description($meta['description'])
+                ->schema($groups)
+                ->collapsible();
+        }
+
+        $admin = Roles::CATALOG['admin'];
+        $adminGroups = [];
+        foreach (Roles::groupedCatalog('admin') as $group => $capabilities) {
+            $toggles = [];
+            foreach ($capabilities as $key => $capability) {
+                $toggles[] = Toggle::make("admin.{$key}")
+                    ->label($capability['label'])
+                    ->helperText($capability['description'])
+                    ->disabled()
+                    ->dehydrated(false);
+            }
+
+            $adminGroups[] = Section::make(Roles::GROUPS[$group] ?? $group)
                 ->schema($toggles)
                 ->columns(2);
         }
 
-        $sections[] = Section::make(Roles::CATALOG['admin']['label'])
-            ->description(Roles::CATALOG['admin']['description'])
-            ->schema([
-                Placeholder::make('admin_note')
-                    ->hiddenLabel()
-                    ->content('Platform admins always have every staff capability: verification, disputes, refund overrides, policy exceptions, and settings. Vendor types (Photographers, Videographers, Reels, Studios, Models, UGC, Food Stylists) are toggled under Optional features.'),
-            ]);
+        $sections[] = Section::make($admin['label'])
+            ->description($admin['description'])
+            ->schema($adminGroups)
+            ->collapsible();
 
         return $schema->components($sections)->statePath('data');
     }
@@ -99,7 +128,7 @@ class RoleSettings extends Page
         $state = $this->form->getState();
 
         foreach (['client', 'vendor', 'supervisor'] as $role) {
-            Setting::setValue("roles.{$role}", $state[$role] ?? []);
+            Roles::persist($role, $state[$role] ?? []);
         }
 
         Notification::make()->title('Role capabilities saved')->success()->send();

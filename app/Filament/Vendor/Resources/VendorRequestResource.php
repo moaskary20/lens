@@ -53,6 +53,21 @@ class VendorRequestResource extends Resource
             && auth()->user()?->vendor;
     }
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $vendorId = auth()->user()?->vendor?->id;
@@ -76,6 +91,7 @@ class VendorRequestResource extends Resource
                 TextColumn::make('session_price')->label('Your rate')->money(Finance::currency()),
                 TextColumn::make('status')->label('Status')->badge(),
                 TextColumn::make('revision_count')->label('Edits')->toggleable(),
+                TextColumn::make('notes')->label('Client edit request')->limit(40)->wrap()->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('status')->options([
@@ -123,7 +139,14 @@ class VendorRequestResource extends Resource
                             ->helperText(fn (): string => 'Up to '.\App\Support\StorageQuota::clientProjectQuotaMb().' MB per client project.'),
                         TextInput::make('original_name')->label('File name'),
                     ])
-                    ->modalDescription('Clients only see a protected preview. Originals stay locked until they tap Approve.')
+                    ->modalDescription(function (Booking $record): string {
+                        $note = trim((string) $record->notes);
+                        if ($record->status === 'in_revision' && $note !== '') {
+                            return 'Client revision request: '.$note;
+                        }
+
+                        return 'Clients only see a protected preview. Originals stay locked until they tap Approve.';
+                    })
                     ->action(function (Booking $record, array $data): void {
                         try {
                             $file = app(DeliveryService::class)->upload(

@@ -485,7 +485,7 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
                     hintStyle: const TextStyle(color: Color(0xFF6B6B70), letterSpacing: 0),
                     prefixIcon: const Icon(Icons.sell_outlined, color: Color(0xFF8E8B84)),
                     filled: true,
-                    fillColor: const Color(0xFF0D0D0F),
+                    fillColor: LensColors.charcoal,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2E))),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A2A2E))),

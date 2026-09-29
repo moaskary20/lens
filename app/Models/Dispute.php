@@ -42,4 +42,39 @@ class Dispute extends Model
     {
         return in_array($this->status, ['open', 'reviewing'], true);
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toApp(): array
+    {
+        $this->loadMissing(['booking.vendor.vendorType', 'booking.category']);
+
+        return [
+            'id' => $this->id,
+            'kind' => $this->kind ?: 'dispute',
+            'kind_label' => $this->kind === 'complaint' ? 'Complaint' : 'Dispute',
+            'status' => $this->status,
+            'status_label' => match ($this->status) {
+                'reviewing' => 'In review',
+                'resolved' => 'Resolved',
+                'closed' => 'Closed',
+                default => 'Open',
+            },
+            'decision' => $this->decision,
+            'decision_label' => match ($this->decision) {
+                'refund' => 'Refunded to you',
+                'payout' => 'Paid to creator',
+                'split' => 'Split',
+                'closed' => 'Closed',
+                default => null,
+            },
+            'reason' => $this->reason,
+            'booking_id' => $this->booking_id,
+            'reference' => $this->booking?->reference,
+            'vendor_name' => $this->booking?->vendor?->display_name,
+            'project_name' => $this->booking?->project_name,
+            'created_at' => $this->created_at?->toIso8601String(),
+        ];
+    }
 }

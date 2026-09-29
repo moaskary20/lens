@@ -30,7 +30,9 @@ class BrevoMailSettingsTest extends TestCase
             ->assertOk()
             ->assertSee('Brevo email', false)
             ->assertSee('Enable Brevo', false)
-            ->assertSee('Send Brevo test email', false);
+            ->assertSee('Send Brevo test email', false)
+            ->assertDontSee('Brevo transactional templates', false)
+            ->assertDontSee('Welcome / new account', false);
     }
 
     public function test_admin_can_save_brevo_settings_without_wiping_secrets(): void
@@ -48,7 +50,6 @@ class BrevoMailSettingsTest extends TestCase
                 'brevo_from_name' => 'Lens',
                 'brevo_smtp_host' => 'smtp-relay.brevo.com',
                 'brevo_smtp_port' => 587,
-                'brevo_template_welcome' => 12,
                 'brevo_clients_list_id' => 8,
             ])
             ->call('save')
@@ -57,7 +58,7 @@ class BrevoMailSettingsTest extends TestCase
         $this->assertTrue(BrevoMail::enabled());
         $this->assertSame('xkeysib-test-key', BrevoMail::settings()['api_key']);
         $this->assertSame('smtp-test-key', BrevoMail::settings()['smtp_password']);
-        $this->assertSame('12', BrevoMail::settings()['template_welcome']);
+        $this->assertArrayNotHasKey('template_welcome', BrevoMail::settings());
         $this->assertSame('8', BrevoMail::settings()['clients_list_id']);
         $this->assertSame('Lens', Setting::getValue('platform.app_name', 'Lens'));
 

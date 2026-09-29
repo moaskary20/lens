@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/shell/app_shell.dart';
 
@@ -11,7 +12,7 @@ class AuthPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070707),
+      backgroundColor: LensColors.charcoal,
       body: LoginView(
         intendedRole: intendedRole,
         bootstrap: bootstrap,

@@ -40,6 +40,7 @@ class MyPayoutResource extends Resource
     {
         return Feature::enabled('payouts')
             && (bool) auth()->user()?->isVendor()
+            && auth()->user()?->roleCan('request_payouts')
             && auth()->user()?->vendor;
     }
 
@@ -49,6 +50,16 @@ class MyPayoutResource extends Resource
     }
 
     public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
     {
         return false;
     }

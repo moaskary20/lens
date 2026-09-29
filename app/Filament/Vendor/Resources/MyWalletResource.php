@@ -41,6 +41,7 @@ class MyWalletResource extends Resource
     {
         return Feature::enabled('wallets')
             && (bool) auth()->user()?->isVendor()
+            && auth()->user()?->roleCan('use_wallet')
             && auth()->user()?->vendor;
     }
 
@@ -50,6 +51,16 @@ class MyWalletResource extends Resource
     }
 
     public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
     {
         return false;
     }
@@ -75,8 +86,8 @@ class MyWalletResource extends Resource
                 TextColumn::make('created_at')->label('When')->dateTime('Y-m-d H:i')->sortable(),
                 TextColumn::make('type')->label('Type')->badge()->formatStateUsing(fn (string $state): string => str_replace('_', ' ', $state)),
                 TextColumn::make('amount')->label('Amount')->money(Finance::currency()),
-                TextColumn::make('pending_delta')->label('Pending Δ')->numeric(decimalPlaces: 2),
-                TextColumn::make('available_delta')->label('Available Δ')->numeric(decimalPlaces: 2),
+                TextColumn::make('pending_delta')->label('Pending')->numeric(decimalPlaces: 2),
+                TextColumn::make('available_delta')->label('Available')->numeric(decimalPlaces: 2),
                 TextColumn::make('booking.reference')->label('Session')->placeholder('—'),
                 TextColumn::make('notes')->label('Notes')->limit(48)->wrap(),
             ])

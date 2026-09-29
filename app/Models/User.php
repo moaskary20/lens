@@ -160,6 +160,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(UserAddress::class);
     }
 
+    public function issueReports(): HasMany
+    {
+        return $this->hasMany(IssueReport::class);
+    }
+
     public function favoriteVendors(): BelongsToMany
     {
         return $this->belongsToMany(Vendor::class, 'favorites')->withTimestamps();

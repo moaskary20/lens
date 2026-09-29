@@ -30,6 +30,8 @@ class PayoutResource extends Resource
 
     protected static ?string $featureKey = 'payouts';
 
+    protected static ?string $staffCapability = 'manage_escrow';
+
     protected static ?string $navigationLabel = 'Payouts';
 
     protected static ?string $modelLabel = 'payout';

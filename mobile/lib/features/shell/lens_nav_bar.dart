@@ -27,7 +27,7 @@ class LensNavBar {
     bool withFab = true,
   }) {
     return BottomAppBar(
-      color: const Color(0xFF111114),
+      color: LensColors.charcoal,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       padding: EdgeInsets.zero,

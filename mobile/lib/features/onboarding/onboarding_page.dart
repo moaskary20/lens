@@ -75,113 +75,123 @@ class _OnboardingPageState extends State<OnboardingPage> {
   Widget build(BuildContext context) {
     final copy = _isRoleStep ? _copy.last : _copy[_index];
     return Scaffold(
-      backgroundColor: const Color(0xFF070707),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text('Lens', style: TextStyle(color: LensColors.primary, fontSize: 32, fontWeight: FontWeight.w800, height: 1)),
-                  ),
-                  if (_isRoleStep)
-                    const _StepMarks()
-                  else
-                    TextButton(
-                      onPressed: _finish,
-                      child: const Text('Skip', style: TextStyle(color: Color(0xFFB0ABA3), fontSize: 15, fontWeight: FontWeight.w600)),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: PageView(
-                controller: _pages,
-                onPageChanged: (index) => setState(() => _index = index),
-                children: [
-                  const _IdeaScene(),
-                  const _TrustScene(),
-                  _RoleScene(
-                    selected: _role,
-                    onSelect: (role) => setState(() => _role = role),
-                    onContinue: _continueAccount,
-                    onGuest: _finish,
-                  ),
-                ],
-              ),
-            ),
-            if (!_isRoleStep) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      backgroundColor: LensColors.charcoal,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView(
+            controller: _pages,
+            onPageChanged: (index) => setState(() => _index = index),
+            children: [
+              const _MockupScene(asset: 'lib/assits/onboard1.png'),
+              const _MockupScene(asset: 'lib/assits/onboard2.png'),
+              SafeArea(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text.rich(
-                      TextSpan(
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(20, 8, 16, 0),
+                      child: Row(
                         children: [
-                          TextSpan(
-                            text: copy.lead,
-                            style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, height: 1.08),
+                          Expanded(
+                            child: Text(
+                              'Lens',
+                              style: TextStyle(
+                                color: LensColors.primary,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                height: 1,
+                              ),
+                            ),
                           ),
-                          TextSpan(
-                            text: copy.accent,
-                            style: const TextStyle(color: LensColors.primary, fontSize: 34, fontWeight: FontWeight.w800, height: 1.08),
-                          ),
+                          _StepMarks(),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Text(copy.body, style: const TextStyle(color: Color(0xFFB0ABA3), fontSize: 15, height: 1.45)),
+                    Expanded(
+                      child: _RoleScene(
+                        selected: _role,
+                        onSelect: (role) => setState(() => _role = role),
+                        onContinue: _continueAccount,
+                        onGuest: _finish,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            ],
+          ),
+          if (!_isRoleStep)
+            SafeArea(
+              child: Column(
                 children: [
-                  for (var i = 0; i < 3; i++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == _index ? 22 : 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: i == _index ? LensColors.primary : const Color(0xFF3A3A3E),
-                        borderRadius: BorderRadius.circular(99),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _finish,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.transparent,
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                      ),
+                      child: const Text(
+                        'Skip',
+                        style: TextStyle(color: Colors.transparent, fontSize: 15, fontWeight: FontWeight.w600),
                       ),
                     ),
+                  ),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+                    child: SizedBox(
+                      height: 56,
+                      width: double.infinity,
+                      child: GestureDetector(
+                        onTap: _next,
+                        behavior: HitTestBehavior.opaque,
+                        child: const Center(
+                          child: Text(
+                            'Next',
+                            style: TextStyle(color: Colors.transparent, fontSize: 16, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
-                child: _PillButton(label: 'Next', onPressed: _next),
-              ),
-            ],
-          ],
-        ),
+            ),
+          IgnorePointer(
+            child: Opacity(
+              opacity: 0,
+              child: Text('${copy.lead}${copy.accent}'),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _IdeaScene extends StatelessWidget {
-  const _IdeaScene();
+class _MockupScene extends StatelessWidget {
+  const _MockupScene({required this.asset});
 
-  static const _asset = 'lib/assits/onboard1.png';
+  final String asset;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-      child: Image.asset(
-        _asset,
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite),
+    final padding = MediaQuery.paddingOf(context);
+    return ColoredBox(
+      color: LensColors.charcoal,
+      child: Padding(
+        padding: EdgeInsets.only(top: padding.top, bottom: padding.bottom),
+        child: SizedBox.expand(
+          child: Image.asset(
+            asset,
+            fit: BoxFit.fill,
+            alignment: Alignment.topCenter,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (_, __, ___) => const SizedBox.expand(),
+          ),
+        ),
       ),
     );
   }
@@ -376,29 +386,41 @@ class _RoleCard extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: LensColors.primary, width: selected ? 1.8 : 1.2),
+            border: Border.all(
+              color: selected ? LensColors.primary.withValues(alpha: 0.55) : const Color(0x22FF5A1F),
+              width: selected ? 1.2 : 0.8,
+            ),
             boxShadow: selected
-                ? [BoxShadow(color: LensColors.primary.withValues(alpha: 0.28), blurRadius: 16)]
+                ? [BoxShadow(color: LensColors.primary.withValues(alpha: 0.22), blurRadius: 22, spreadRadius: -4)]
                 : null,
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20.4),
+            borderRadius: BorderRadius.circular(21),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset(
-                  asset,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.centerRight,
-                  errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite),
+                ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (rect) => RadialGradient(
+                    center: Alignment.centerRight,
+                    radius: 1.15,
+                    colors: const [Color(0xFFFFFFFF), Color(0xE6FFFFFF), Color(0x00FFFFFF)],
+                    stops: const [0.46, 0.78, 1],
+                  ).createShader(rect),
+                  child: Image.asset(
+                    asset,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.centerRight,
+                    errorBuilder: (_, __, ___) => const ColoredBox(color: Colors.black),
+                  ),
                 ),
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
-                      colors: [Color(0xF2000000), Color(0xC2000000), Color(0x66000000), Color(0x14000000)],
-                      stops: [0, 0.42, 0.68, 1],
+                      colors: [Color(0xF2000000), Color(0x99000000), Color(0x33000000), Color(0x00000000)],
+                      stops: [0, 0.38, 0.7, 1],
                     ),
                   ),
                 ),
@@ -471,26 +493,6 @@ class _RoleCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TrustScene extends StatelessWidget {
-  const _TrustScene();
-
-  static const _asset = 'lib/assits/onboard2.png';
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-      child: Image.asset(
-        _asset,
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite),
       ),
     );
   }

@@ -141,7 +141,7 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
         final menuWidth = math.min(320.0, size.width * 0.78);
 
         return ColoredBox(
-          color: const Color(0xFF07070A),
+          color: LensColors.charcoal,
           child: Stack(
             children: [
               _LensMenu(

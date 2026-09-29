@@ -10,6 +10,7 @@ import 'package:lens/features/profile/app_settings_page.dart';
 import 'package:lens/features/profile/edit_profile_page.dart';
 import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/payment_methods_page.dart';
+import 'package:lens/features/profile/report_issue_page.dart';
 
 void main() {
   setUp(() {
@@ -83,5 +84,27 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(SessionStore.instance.account?.name, 'Nora Adel');
+  });
+
+  testWidgets('report an issue sends a ticket to support', (tester) async {
+    await SessionStore.instance.login(email: 'client@lens.app', password: 'password');
+    await tester.pumpWidget(MaterialApp(theme: LensTheme.dark(), home: const ReportIssuePage()));
+    await tester.pumpAndSettle();
+    expect(find.text('Report an issue'), findsOneWidget);
+    expect(find.text('Lens support'), findsOneWidget);
+    expect(find.text('Send report'), findsOneWidget);
+    await tester.tap(find.text('Payment'));
+    await tester.pump();
+    final fields = find.byType(TextField);
+    expect(fields, findsNWidgets(2));
+    await tester.enterText(fields.at(0), 'Escrow is stuck');
+    await tester.enterText(fields.at(1), 'Paid last night and still pending.');
+    await tester.pump();
+    await tester.ensureVisible(find.text('Send report'));
+    await tester.tap(find.text('Send report'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ticket sent.'), findsOneWidget);
+    expect(find.textContaining('ISS-'), findsWidgets);
+    expect(find.text('Back to profile'), findsOneWidget);
   });
 }

@@ -56,7 +56,11 @@ class AppChatTest extends TestCase
         $this->actingAs(User::query()->where('email', 'vendor@lens.app')->firstOrFail())
             ->get('/vendor/messages/'.$conversation->id.'/edit')
             ->assertOk()
-            ->assertSee('Hi, can we confirm the lighting setup?');
+            ->assertSee('Hi, can we confirm the lighting setup?')
+            ->assertSee('Live chat')
+            ->assertSee('Send message')
+            ->assertSee('lens-live-chat', false)
+            ->assertDontSee('Participants');
     }
 
     public function test_client_can_share_location_in_chat(): void

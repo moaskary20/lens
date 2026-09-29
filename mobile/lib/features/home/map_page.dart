@@ -139,7 +139,7 @@ class _MapPageState extends State<MapPage> {
     final items = _visible;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF070707),
+      backgroundColor: LensColors.charcoal,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: AppShell.searchIndex),

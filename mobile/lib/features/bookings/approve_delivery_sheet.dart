@@ -14,7 +14,7 @@ Future<bool> showApproveDeliverySheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: const Color(0x66000000),
+    barrierColor: const Color(0x99000000),
     builder: (sheetContext) => ApproveDeliverySheet(
       vendorName: vendorName,
       vendorRole: vendorRole,
@@ -42,6 +42,12 @@ class ApproveDeliverySheet extends StatelessWidget {
   final double total;
   final String? vendorPhoto;
 
+  static const _sheet = Color(0xFF101318);
+  static const _card = Color(0xFF161A20);
+  static const _stroke = Color(0xFF2C3138);
+  static const _muted = Color(0xFF9AA0A8);
+  static const _icon = Color(0xFFC5C9CF);
+
   String get _amount {
     final digits = total.round().abs().toString();
     final buffer = StringBuffer();
@@ -59,87 +65,115 @@ class ApproveDeliverySheet extends StatelessWidget {
     final name = vendorName.trim().isEmpty ? 'Creator' : vendorName;
     final role = vendorRole.trim();
     final project = projectName.trim().isEmpty ? 'Session' : projectName;
+    final photo = vendorPhoto;
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: FractionallySizedBox(
         widthFactor: 1,
-        heightFactor: 0.86,
+        heightFactor: 0.82,
         child: Material(
-          color: const Color(0xFF111111),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          color: _sheet,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           clipBehavior: Clip.antiAlias,
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 20, 22, 10),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
               child: Column(
                 children: [
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(color: const Color(0xFF3A4048), borderRadius: BorderRadius.circular(99)),
+                  ),
+                  const SizedBox(height: 18),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
                           Container(
-                            width: 58,
-                            height: 58,
+                            width: 56,
+                            height: 56,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: LensColors.primary, width: 2.2),
+                              color: const Color(0xFF1A120E),
+                              border: Border.all(color: LensColors.primary, width: 2.4),
                             ),
-                            child: const Icon(Icons.check, color: LensColors.primary, size: 28),
+                            child: const Icon(Icons.check_rounded, color: LensColors.primary, size: 28),
                           ),
                           const SizedBox(height: 16),
                           const Text(
                             'Approve this delivery?',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, height: 1.2),
+                            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, height: 1.15),
                           ),
                           const SizedBox(height: 8),
                           const Text(
                             'Approval unlocks your original files and releases the protected payment to the creator.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xFF8E8B84), fontSize: 14, height: 1.4),
+                            style: TextStyle(color: _muted, fontSize: 14, height: 1.4),
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: LensColors.graphite,
-                                backgroundImage: LensConfig.useNetwork && vendorPhoto != null && vendorPhoto!.isNotEmpty ? NetworkImage(vendorPhoto!) : null,
-                                child: LensConfig.useNetwork && vendorPhoto != null && vendorPhoto!.isNotEmpty
-                                    ? null
-                                    : Text(name.substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 18),
+                          _cardBox(
+                            child: Column(
+                              children: [
+                                Row(
                                   children: [
-                                    Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                                    if (role.isNotEmpty) Text(role, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13)),
+                                    CircleAvatar(
+                                      radius: 22,
+                                      backgroundColor: LensColors.graphite,
+                                      backgroundImage: LensConfig.useNetwork && photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
+                                      child: LensConfig.useNetwork && photo != null && photo.isNotEmpty
+                                          ? null
+                                          : Text(name.substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                                          if (role.isNotEmpty) Text(role, style: const TextStyle(color: _muted, fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              ),
-                            ],
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  child: Divider(height: 1, color: _stroke),
+                                ),
+                                _meta(Icons.description_outlined, 'Booking', project),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  child: Divider(height: 1, color: _stroke),
+                                ),
+                                _meta(Icons.credit_card_outlined, 'Total payment', _amount),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          _row(Icons.description_outlined, 'Booking', project),
-                          _row(Icons.credit_card_outlined, 'Total payment', _amount),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                            decoration: BoxDecoration(color: const Color(0xFF181818), borderRadius: BorderRadius.circular(16)),
+                          const SizedBox(height: 12),
+                          _cardBox(
                             child: const Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.info_outline, color: Color(0xFF8E8B84), size: 18),
-                                SizedBox(width: 8),
+                                Icon(Icons.info_outline, color: _icon, size: 18),
+                                SizedBox(width: 10),
                                 Expanded(
-                                  child: Text(
-                                    'This action cannot be undone.\nOnce you approve, the files will be permanently unlocked and the payment will be released to the creator.',
-                                    style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13, height: 1.35),
+                                  child: Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: 'This action cannot be undone.\n',
+                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, height: 1.35),
+                                        ),
+                                        TextSpan(
+                                          text: 'Once you approve, the files will be permanently unlocked and the payment will be released to the creator.',
+                                          style: TextStyle(color: _muted, fontSize: 13, height: 1.35),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
@@ -165,20 +199,22 @@ class ApproveDeliverySheet extends StatelessWidget {
                         alignment: Alignment.center,
                         children: [
                           Text('Approve & Release Funds', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Icon(Icons.chevron_right_rounded, size: 24),
-                          ),
+                          Align(alignment: Alignment.centerRight, child: Icon(Icons.chevron_right_rounded, size: 24)),
                         ],
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
-                    child: TextButton(
+                    child: OutlinedButton(
                       onPressed: () => Navigator.pop(context, false),
-                      style: TextButton.styleFrom(foregroundColor: LensColors.primary),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: LensColors.primary,
+                        side: const BorderSide(color: LensColors.primary, width: 1.5),
+                        shape: const StadiumBorder(),
+                      ),
                       child: const Text('Keep Reviewing', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                     ),
                   ),
@@ -191,24 +227,34 @@ class ApproveDeliverySheet extends StatelessWidget {
     );
   }
 
-  Widget _row(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF8E8B84), size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
-                Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
-              ],
-            ),
-          ),
-        ],
+  Widget _cardBox({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _stroke),
       ),
+      child: child,
+    );
+  }
+
+  Widget _meta(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: _icon, size: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(color: _muted, fontSize: 13)),
+              Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

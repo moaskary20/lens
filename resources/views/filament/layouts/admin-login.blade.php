@@ -12,6 +12,7 @@
     $livewire ??= null;
     $renderHookScopes = $livewire?->getRenderHookScopes();
     $maxContentWidth ??= (filament()->getSimplePageMaxContentWidth() ?? Width::Large);
+    $isVendor = filament()->getId() === 'vendor';
 
     if (is_string($maxContentWidth)) {
         $maxContentWidth = Width::tryFrom($maxContentWidth) ?? $maxContentWidth;
@@ -33,11 +34,21 @@
             </div>
             <div class="lens-login-copy">
                 <p class="lens-login-brand">Lens</p>
-                <p class="lens-login-tag">The marketplace for photographers, studios, and creators across Egypt.</p>
+                <p class="lens-login-tag">
+                    {{ $isVendor
+                        ? 'Your creator desk for bookings, delivery, and payouts across Egypt.'
+                        : 'The marketplace for photographers, studios, and creators across Egypt.' }}
+                </p>
                 <ul class="lens-login-points">
-                    <li>Bookings in escrow</li>
-                    <li>Verified talent</li>
-                    <li>Protected delivery</li>
+                    @if ($isVendor)
+                        <li>Bookings in escrow</li>
+                        <li>Protected delivery</li>
+                        <li>Wallet payouts</li>
+                    @else
+                        <li>Bookings in escrow</li>
+                        <li>Verified talent</li>
+                        <li>Protected delivery</li>
+                    @endif
                 </ul>
             </div>
         </aside>
@@ -53,7 +64,7 @@
             >
                 {{ $slot }}
             </main>
-            <p class="lens-login-foot">Staff only · English LTR · Dark console</p>
+            <p class="lens-login-foot">{{ $isVendor ? 'Creators' : 'Staff only' }} · English LTR · Dark console</p>
         </div>
 
         {{ FilamentView::renderHook(PanelsRenderHook::SIMPLE_LAYOUT_END, scopes: $renderHookScopes) }}

@@ -36,6 +36,8 @@ class WalletResource extends Resource
 
     protected static ?string $featureKey = 'wallets';
 
+    protected static ?string $staffCapability = 'manage_escrow';
+
     protected static ?string $navigationLabel = 'Wallets';
 
     protected static ?string $modelLabel = 'wallet';

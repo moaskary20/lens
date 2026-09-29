@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/demo_bootstrap.dart';
+import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/onboarding/onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -60,7 +61,7 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF050505),
+      backgroundColor: LensColors.charcoal,
       body: Stack(
         children: [
           Center(
@@ -176,7 +177,7 @@ class _AperturePainter extends CustomPainter {
     }
 
     final blade = Paint()
-      ..color = const Color(0xFF070707)
+      ..color = LensColors.charcoal
       ..strokeWidth = size.width * 0.055
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -193,7 +194,7 @@ class _AperturePainter extends CustomPainter {
       ..lineTo(center.dx + radius * 0.40, center.dy + radius * 0.52)
       ..lineTo(center.dx - radius * 0.46, center.dy + radius * 0.52)
       ..close();
-    canvas.drawPath(house, Paint()..color = const Color(0xFF050505));
+    canvas.drawPath(house, Paint()..color = LensColors.charcoal);
 
     canvas.restore();
 

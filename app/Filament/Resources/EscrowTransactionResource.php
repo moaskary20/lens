@@ -27,6 +27,8 @@ class EscrowTransactionResource extends Resource
 
     protected static ?string $featureKey = 'escrow';
 
+    protected static ?string $staffCapability = 'manage_escrow';
+
     protected static ?string $navigationLabel = 'Escrow wallet';
 
     protected static ?string $modelLabel = 'escrow transaction';

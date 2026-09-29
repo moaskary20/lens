@@ -2,8 +2,10 @@
 
 namespace App\Notifications;
 
+use App\Support\LensNotifier;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class LensAlert extends Notification
@@ -21,7 +23,26 @@ class LensAlert extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        $channels = ['database'];
+
+        if (LensNotifier::shouldEmail($this->event, $notifiable instanceof \App\Models\User ? $notifiable : null)) {
+            $channels[] = 'mail';
+        }
+
+        return $channels;
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $body = $this->body;
+        if ($this->event === LensNotifier::MESSAGE && ! LensNotifier::messagePreviewEnabled()) {
+            $body = 'You have a new message on Lens.';
+        }
+
+        return (new MailMessage)
+            ->subject($this->title)
+            ->greeting($this->title)
+            ->line($body);
     }
 
     /**
