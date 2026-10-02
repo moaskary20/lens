@@ -300,8 +300,30 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu_rounded));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.close_rounded));
+    expect(find.byTooltip('Close'), findsOneWidget);
+    expect(find.text('Home'), findsWidgets);
+    expect(find.text('Favorites'), findsWidgets);
+    expect(find.text('Bookings'), findsWidgets);
+    expect(find.text('Search'), findsWidgets);
+    expect(find.text('Profile'), findsWidgets);
+    expect(find.text('Notifications'), findsWidgets);
+    expect(find.text('Messages'), findsWidgets);
+    expect(find.text('Report an Issue'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('App Settings', skipOffstage: false),
+      120,
+      scrollable: find.descendant(of: find.byKey(const Key('lens-side-menu')), matching: find.byType(Scrollable)),
+    );
+    expect(find.text('App Settings'), findsOneWidget);
+    await tester.tap(find.text('App Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('App Settings'), findsWidgets);
+    expect(find.text('Push notifications'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.menu_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Photographers'));
@@ -872,6 +894,8 @@ Map<String, dynamic> _bootstrap() {
       'reviews': true,
       'vendor_photographers': true,
       'favorites': true,
+      'chat': true,
+      'issue_reports': true,
     },
     'vendor_types': [
       {'slug': 'photographer', 'label': 'Photographers'},

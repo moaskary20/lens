@@ -5,14 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/home_page.dart';
 import 'package:lens/features/home/inbox.dart';
 import 'package:lens/features/home/search_page.dart';
+import 'package:lens/features/profile/app_settings_page.dart';
+import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/profile_page.dart';
+import 'package:lens/features/profile/report_issue_page.dart';
 import 'package:lens/features/shell/lens_nav_bar.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.bootstrap});
@@ -133,83 +136,73 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
 
     final visibleIndex = _index.clamp(0, pages.length - 1);
 
+    final selected = visibleIndex == 0
+        ? 'home'
+        : (bookingsOn && visibleIndex == 1)
+            ? 'bookings'
+            : (visibleIndex == searchIndex)
+                ? 'search'
+                : 'profile';
+
     return AnimatedBuilder(
       animation: _menuAnim,
       builder: (context, child) {
         final t = _menuAnim.value;
         final size = MediaQuery.sizeOf(context);
-        final menuWidth = math.min(320.0, size.width * 0.78);
+        final menuWidth = math.min(340.0, size.width * 0.72);
+        final open = t > 0.04;
 
         return ColoredBox(
-          color: LensColors.charcoal,
+          color: const Color(0xFF07080A),
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              _LensMenu(
-                width: menuWidth,
-                progress: t,
-                bookingsOn: bookingsOn,
-                onClose: _closeMenu,
-                onOpen: (title) {
-                  _closeMenu();
-                  if (title == 'Home') {
-                    setState(() => _index = 0);
-                    return;
-                  }
-                  if (title == 'Search') {
-                    _openSearch();
-                    return;
-                  }
-                  if (title == 'Bookings' && bookingsOn) {
-                    setState(() => _index = 1);
-                    return;
-                  }
-                  if (title == 'Profile') {
-                    setState(() => _index = bookingsOn ? 3 : 2);
-                    return;
-                  }
-                  if (title == 'Favorites') {
-                    openFavorites(context, home);
-                    return;
-                  }
-                  if (title == 'Notifications') {
-                    openNotifications(context, home);
-                    return;
-                  }
-                  _open(context, title);
-                },
-              ),
               Transform(
                 alignment: Alignment.centerLeft,
-                transform: _contentTransform(t, size.width),
+                transform: _contentTransform(t),
                 child: GestureDetector(
-                  onTap: t > 0.05 ? _closeMenu : null,
+                  onTap: open ? _closeMenu : null,
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28 * t),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.55 * t),
-                          blurRadius: 48,
-                          spreadRadius: -4,
-                          offset: Offset(-18 * t, 12 * t),
+                          color: Colors.black.withValues(alpha: 0.5 * t),
+                          blurRadius: 36,
+                          offset: Offset(-10 * t, 14 * t),
                         ),
                         BoxShadow(
-                          color: LensColors.primary.withValues(alpha: 0.18 * t),
-                          blurRadius: 24,
-                          offset: Offset(-8 * t, 0),
+                          color: LensColors.primary.withValues(alpha: 0.22 * t),
+                          blurRadius: 28,
+                          offset: Offset(10 * t, 0),
                         ),
                       ],
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(28 * t),
                       child: IgnorePointer(
-                        ignoring: t > 0.05,
+                        ignoring: open,
                         child: child,
                       ),
                     ),
                   ),
                 ),
               ),
+              if (open)
+                Positioned(
+                  top: 10,
+                  bottom: 10,
+                  right: 8,
+                  width: menuWidth,
+                  child: _LensMenu(
+                    progress: t,
+                    selected: selected,
+                    home: home,
+                    bookingsOn: bookingsOn,
+                    onClose: _closeMenu,
+                    onOpen: (id) => _openMenuItem(context, home, bookingsOn, id),
+                  ),
+                ),
             ],
           ),
         );
@@ -236,12 +229,43 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
     );
   }
 
-  Matrix4 _contentTransform(double t, double width) {
+  Matrix4 _contentTransform(double t) {
     return Matrix4.identity()
-      ..setEntry(3, 2, 0.00135)
-      ..translate(-width * 0.18 * t, 24.0 * t)
-      ..rotateY(-0.72 * t)
-      ..scale(1 - 0.14 * t, 1 - 0.08 * t);
+      ..setEntry(3, 2, 0.0011)
+      ..translate(10.0 * t, 16.0 * t)
+      ..rotateY(0.9 * t)
+      ..scale(0.88 + 0.12 * (1 - t), 0.92 + 0.08 * (1 - t));
+  }
+
+  void _openMenuItem(BuildContext context, HomeData home, bool bookingsOn, String id) {
+    _closeMenu();
+    switch (id) {
+      case 'home':
+        setState(() => _index = 0);
+      case 'search':
+        _openSearch();
+      case 'bookings':
+        if (bookingsOn) {
+          setState(() => _index = 1);
+        }
+      case 'profile':
+        setState(() => _index = bookingsOn ? 3 : 2);
+      case 'favorites':
+        openFavorites(context, home);
+      case 'notifications':
+        openNotifications(context, home);
+      case 'messages':
+        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MessagesPage(home: home)));
+      case 'report':
+        openReportIssue(context);
+      case 'settings':
+        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AppSettingsPage(home: home)));
+      case 'signin':
+        setState(() => _index = bookingsOn ? 3 : 2);
+      case 'signout':
+        SessionStore.instance.signOut();
+        setState(() => _index = 0);
+    }
   }
 
   void openBookings({bool guestPreview = false}) {
@@ -263,106 +287,106 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
       _focusSearch = focus;
     });
   }
-
-  void _open(BuildContext context, String title) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: title)));
-  }
 }
 
 class _LensMenu extends StatelessWidget {
   const _LensMenu({
-    required this.width,
     required this.progress,
+    required this.selected,
+    required this.home,
     required this.bookingsOn,
     required this.onClose,
     required this.onOpen,
   });
 
-  final double width;
   final double progress;
+  final String selected;
+  final HomeData home;
   final bool bookingsOn;
   final VoidCallback onClose;
   final ValueChanged<String> onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final t = progress;
-    if (t == 0) {
-      return const SizedBox.shrink();
-    }
-
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Transform(
-        alignment: Alignment.centerRight,
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.0016)
-          ..translate(width * 0.35 * (1 - t))
-          ..rotateY(1.05 * (1 - t)),
-        child: Opacity(
-          opacity: t.clamp(0, 1),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(0, 28 + (1 - t) * 18, 12, 28 + (1 - t) * 18),
-            child: SizedBox(
-              width: width,
-              child: ClipRRect(
+    return Opacity(
+      opacity: progress.clamp(0, 1),
+      child: Transform.translate(
+        offset: Offset((1 - progress) * 36, 0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xF01C120E), Color(0xF0141418), Color(0xF00D0D10)],
-                      ),
-                      border: Border.all(color: const Color(0x44FF5A1F)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          blurRadius: 28,
-                          offset: const Offset(-12, 10),
-                        ),
-                        BoxShadow(
-                          color: LensColors.primary.withValues(alpha: 0.22),
-                          blurRadius: 18,
-                          offset: const Offset(-4, 0),
-                        ),
-                      ],
-                    ),
-                    child: SafeArea(
-                      left: false,
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-                        children: [
-                          Row(
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'Lens',
-                                  style: TextStyle(color: LensColors.primary, fontSize: 32, fontWeight: FontWeight.w800, height: 1),
+                color: const Color(0xF0121216),
+                border: Border.all(color: const Color(0x88FF5A1F), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: LensColors.primary.withValues(alpha: 0.18),
+                    blurRadius: 28,
+                    offset: const Offset(-8, 0),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                left: false,
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([SessionStore.instance, FavoritesStore.instance, NotificationsStore.instance]),
+                  builder: (context, _) {
+                    final signedIn = SessionStore.instance.account != null;
+                    return ListView(
+                      key: const Key('lens-side-menu'),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 12, 16),
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Lens',
+                                style: TextStyle(
+                                  color: LensColors.primary,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: LensColors.primary,
+                                  decorationThickness: 2,
                                 ),
                               ),
-                              IconButton(
-                                onPressed: onClose,
-                                icon: const Icon(Icons.close_rounded, color: LensColors.cream),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          Container(height: 1, color: const Color(0xFF2A2D34)),
-                          const SizedBox(height: 10),
-                          _item(Icons.home_outlined, 'Home'),
-                          _item(Icons.favorite_border_rounded, 'Favorites'),
-                          if (bookingsOn) _item(Icons.calendar_month_outlined, 'Bookings'),
-                          _item(Icons.search, 'Search'),
-                          _item(Icons.person_outline, 'Profile'),
-                          _item(Icons.notifications_none_rounded, 'Notifications'),
-                        ],
-                      ),
-                    ),
-                  ),
+                            ),
+                            IconButton(
+                              tooltip: 'Close',
+                              onPressed: onClose,
+                              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Divider(color: Color(0xFF2A2D34), height: 1),
+                        const SizedBox(height: 10),
+                        _item(id: 'home', icon: Icons.home_outlined, label: 'Home'),
+                        if (home.on('favorites'))
+                          _item(id: 'favorites', icon: Icons.favorite_border_rounded, label: 'Favorites', badge: FavoritesStore.instance.count),
+                        if (bookingsOn) _item(id: 'bookings', icon: Icons.calendar_month_outlined, label: 'Bookings'),
+                        _item(id: 'search', icon: Icons.search, label: 'Search'),
+                        _item(id: 'profile', icon: Icons.person_outline, label: 'Profile'),
+                        if (home.on('notifications'))
+                          _item(id: 'notifications', icon: Icons.notifications_none_rounded, label: 'Notifications', badge: NotificationsStore.instance.unread),
+                        const SizedBox(height: 8),
+                        const Divider(color: Color(0xFF2A2D34), height: 1),
+                        const SizedBox(height: 12),
+                        if (home.on('chat')) _item(id: 'messages', icon: Icons.chat_bubble_outline_rounded, label: 'Messages'),
+                        if (home.on('issue_reports')) _item(id: 'report', icon: Icons.help_outline_rounded, label: 'Report an Issue'),
+                        _item(id: 'settings', icon: Icons.settings_outlined, label: 'App Settings'),
+                        _item(
+                          id: signedIn ? 'signout' : 'signin',
+                          icon: signedIn ? Icons.logout_rounded : Icons.login_rounded,
+                          label: signedIn ? 'Log Out' : 'Sign In',
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -372,34 +396,47 @@ class _LensMenu extends StatelessWidget {
     );
   }
 
-  Widget _item(IconData icon, String title) {
+  Widget _item({required String id, required IconData icon, required String label, int badge = 0}) {
+    final on = selected == id;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: const Color(0x221C1D22),
-        borderRadius: BorderRadius.circular(16),
+        color: on ? const Color(0xFF2A2D34) : Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          onTap: () => onOpen(title),
-          borderRadius: BorderRadius.circular(16),
+          onTap: () => onOpen(id),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
             child: Row(
               children: [
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF24140E),
+                    color: const Color(0xFF1A100C),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0x55FF5A1F)),
+                    border: Border.all(color: const Color(0x66FF5A1F)),
                   ),
                   child: Icon(icon, color: LensColors.primary, size: 20),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: Text(title, style: const TextStyle(color: LensColors.cream, fontWeight: FontWeight.w700, fontSize: 15)),
+                  child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: LensColors.slate),
+                if (badge > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: LensColors.primary, borderRadius: BorderRadius.circular(99)),
+                      child: Text(
+                        badge > 99 ? '99+' : '$badge',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                const Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
               ],
             ),
           ),

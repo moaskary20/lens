@@ -90,8 +90,9 @@ class _Header extends StatelessWidget {
               badge: FavoritesStore.instance.count,
             ),
           ),
-          _HeaderIcon(
+                  _HeaderIcon(
             icon: Icons.menu_rounded,
+            tooltip: 'Menu',
             onPressed: onOpenMenu,
           ),
         ],
