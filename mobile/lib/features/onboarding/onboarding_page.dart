@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/auth/user_register_page.dart';
 import 'package:lens/features/auth/vendor_register_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
@@ -88,19 +89,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
               SafeArea(
                 child: Column(
                   children: [
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.fromLTRB(20, 8, 16, 0),
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              'Lens',
-                              style: TextStyle(
-                                color: LensColors.primary,
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                height: 1,
-                              ),
+                            child: BrandLogo(
+                              name: widget.bootstrap['name']?.toString() ?? 'Lens',
+                              logoUrl: widget.bootstrap['logo']?.toString(),
+                              width: 180,
+                              height: 40,
+                              fontSize: 32,
                             ),
                           ),
                           _StepMarks(),

@@ -11,6 +11,15 @@ class AppBootstrapTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_mobile_bootstrap_exposes_the_current_platform_logo(): void
+    {
+        Setting::setValue('platform.logo', 'branding/lens-logo.png');
+
+        $this->getJson('/api/app/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('logo', asset('storage/branding/lens-logo.png'));
+    }
+
     public function test_mobile_home_payload_follows_admin_features(): void
     {
         $this->seed(LensSeeder::class);

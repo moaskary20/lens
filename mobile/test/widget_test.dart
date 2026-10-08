@@ -16,6 +16,7 @@ import 'package:lens/features/home/book_review_page.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
+import 'package:lens/features/home/search_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
 import 'package:lens/features/auth/user_register_page.dart';
 import 'package:lens/features/auth/vendor_register_page.dart';
@@ -73,6 +74,31 @@ void main() {
     await tester.tap(find.text('Continue as a guest'));
     await tester.pumpAndSettle();
     expect(find.text('Find. Book. Create.'), findsOneWidget);
+  });
+
+  testWidgets('navbar plus asks guests to sign in before creating', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in to book photographers, studios, models and more.'), findsOneWidget);
+  });
+
+  testWidgets('navbar plus keeps the create action for signed-in users', (WidgetTester tester) async {
+    await SessionStore.instance.login(email: 'client@lens.app', password: 'password');
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SearchPage), findsOneWidget);
   });
 
   testWidgets('home view all opens the matching category', (WidgetTester tester) async {

@@ -7,6 +7,8 @@ import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
+import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/home_page.dart';
 import 'package:lens/features/home/inbox.dart';
@@ -25,6 +27,7 @@ class AppShell extends StatefulWidget {
   static void Function({bool guestPreview})? openBookingsTab;
   static void Function(int index)? selectTab;
   static HomeData? currentHome;
+  static Map<String, dynamic>? currentBootstrap;
 
   static bool get bookingsOn => currentHome?.on('bookings') ?? true;
   static int get searchIndex => bookingsOn ? 2 : 1;
@@ -46,7 +49,11 @@ class AppShell extends StatefulWidget {
     openTab(context, searchIndex);
   }
 
-  static Widget navBar(BuildContext context, {required int index, bool withFab = true}) {
+  static Widget navBar(
+    BuildContext context, {
+    required int index,
+    bool withFab = true,
+  }) {
     return LensNavBar.bar(
       bookingsOn: bookingsOn,
       index: index,
@@ -56,14 +63,42 @@ class AppShell extends StatefulWidget {
   }
 
   static Widget navFab(BuildContext context) {
-    return LensNavBar.fab(onPressed: () => openCreate(context));
+    return LensNavBar.fab(
+      onPressed: () {
+        if (!SessionStore.instance.isGuest) {
+          openCreate(context);
+          return;
+        }
+
+        final bootstrap = currentBootstrap ?? <String, dynamic>{};
+        final authenticatedBootstrap = Map<String, dynamic>.from(bootstrap);
+        final navigator = Navigator.of(context);
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => Scaffold(
+              backgroundColor: LensColors.charcoal,
+              body: LoginView(
+                bootstrap: bootstrap,
+                onSuccess: () => navigator.pushAndRemoveUntil(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AppShell(bootstrap: authenticatedBootstrap),
+                  ),
+                  (route) => false,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   State<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin {
+class AppShellState extends State<AppShell>
+    with SingleTickerProviderStateMixin {
   int _index = 0;
   bool _focusSearch = false;
   bool _guestBookings = false;
@@ -73,18 +108,28 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
   @override
   void initState() {
     super.initState();
-    _menu = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
-    _menuAnim = CurvedAnimation(parent: _menu, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    AppShell.currentBootstrap = widget.bootstrap;
+    _menu = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _menuAnim = CurvedAnimation(
+      parent: _menu,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
     final home = HomeData.fromJson(widget.bootstrap);
     FavoritesStore.instance.hydrate(home);
     NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
-    AppShell.openBookingsTab = ({bool guestPreview = false}) => openBookings(guestPreview: guestPreview);
+    AppShell.openBookingsTab = ({bool guestPreview = false}) =>
+        openBookings(guestPreview: guestPreview);
     AppShell.selectTab = (index) => setState(() {
       _index = index;
       if (index != 1) {
         _guestBookings = false;
       }
-      if (index != (HomeData.fromJson(widget.bootstrap).on('bookings') ? 2 : 1)) {
+      if (index !=
+          (HomeData.fromJson(widget.bootstrap).on('bookings') ? 2 : 1)) {
         _focusSearch = false;
       }
     });
@@ -101,6 +146,9 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
     if (AppShell.currentHome != null) {
       AppShell.currentHome = null;
     }
+    if (identical(AppShell.currentBootstrap, widget.bootstrap)) {
+      AppShell.currentBootstrap = null;
+    }
     _menu.dispose();
     super.dispose();
   }
@@ -116,7 +164,11 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
     final bookingsOn = home.on('bookings');
     final searchIndex = bookingsOn ? 2 : 1;
     final pages = [
-      HomePage(data: home, onOpenMenu: _openMenu, onOpenSearch: () => _openSearch(focus: true)),
+      HomePage(
+        data: home,
+        onOpenMenu: _openMenu,
+        onOpenSearch: () => _openSearch(focus: true),
+      ),
       if (bookingsOn)
         BookingsPage(
           home: home,
@@ -139,10 +191,10 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
     final selected = visibleIndex == 0
         ? 'home'
         : (bookingsOn && visibleIndex == 1)
-            ? 'bookings'
-            : (visibleIndex == searchIndex)
-                ? 'search'
-                : 'profile';
+        ? 'bookings'
+        : (visibleIndex == searchIndex)
+        ? 'search'
+        : 'profile';
 
     return AnimatedBuilder(
       animation: _menuAnim,
@@ -180,10 +232,7 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(28 * t),
-                      child: IgnorePointer(
-                        ignoring: open,
-                        child: child,
-                      ),
+                      child: IgnorePointer(ignoring: open, child: child),
                     ),
                   ),
                 ),
@@ -200,7 +249,8 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
                     home: home,
                     bookingsOn: bookingsOn,
                     onClose: _closeMenu,
-                    onOpen: (id) => _openMenuItem(context, home, bookingsOn, id),
+                    onOpen: (id) =>
+                        _openMenuItem(context, home, bookingsOn, id),
                   ),
                 ),
             ],
@@ -237,7 +287,12 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
       ..scale(0.88 + 0.12 * (1 - t), 0.92 + 0.08 * (1 - t));
   }
 
-  void _openMenuItem(BuildContext context, HomeData home, bool bookingsOn, String id) {
+  void _openMenuItem(
+    BuildContext context,
+    HomeData home,
+    bool bookingsOn,
+    String id,
+  ) {
     _closeMenu();
     switch (id) {
       case 'home':
@@ -255,11 +310,15 @@ class AppShellState extends State<AppShell> with SingleTickerProviderStateMixin 
       case 'notifications':
         openNotifications(context, home);
       case 'messages':
-        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MessagesPage(home: home)));
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => MessagesPage(home: home)),
+        );
       case 'report':
         openReportIssue(context);
       case 'settings':
-        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AppSettingsPage(home: home)));
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => AppSettingsPage(home: home)),
+        );
       case 'signin':
         setState(() => _index = bookingsOn ? 3 : 2);
       case 'signout':
@@ -332,7 +391,11 @@ class _LensMenu extends StatelessWidget {
               child: SafeArea(
                 left: false,
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([SessionStore.instance, FavoritesStore.instance, NotificationsStore.instance]),
+                  listenable: Listenable.merge([
+                    SessionStore.instance,
+                    FavoritesStore.instance,
+                    NotificationsStore.instance,
+                  ]),
                   builder: (context, _) {
                     final signedIn = SessionStore.instance.account != null;
                     return ListView(
@@ -341,47 +404,89 @@ class _LensMenu extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Expanded(
-                              child: Text(
-                                'Lens',
-                                style: TextStyle(
-                                  color: LensColors.primary,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: LensColors.primary,
-                                  decorationThickness: 2,
-                                ),
+                            Expanded(
+                              child: BrandLogo(
+                                name: home.name,
+                                logoUrl: home.logoUrl,
+                                width: 180,
+                                height: 40,
+                                fontSize: 32,
                               ),
                             ),
                             IconButton(
                               tooltip: 'Close',
                               onPressed: onClose,
-                              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 26,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
                         const Divider(color: Color(0xFF2A2D34), height: 1),
                         const SizedBox(height: 10),
-                        _item(id: 'home', icon: Icons.home_outlined, label: 'Home'),
+                        _item(
+                          id: 'home',
+                          icon: Icons.home_outlined,
+                          label: 'Home',
+                        ),
                         if (home.on('favorites'))
-                          _item(id: 'favorites', icon: Icons.favorite_border_rounded, label: 'Favorites', badge: FavoritesStore.instance.count),
-                        if (bookingsOn) _item(id: 'bookings', icon: Icons.calendar_month_outlined, label: 'Bookings'),
-                        _item(id: 'search', icon: Icons.search, label: 'Search'),
-                        _item(id: 'profile', icon: Icons.person_outline, label: 'Profile'),
+                          _item(
+                            id: 'favorites',
+                            icon: Icons.favorite_border_rounded,
+                            label: 'Favorites',
+                            badge: FavoritesStore.instance.count,
+                          ),
+                        if (bookingsOn)
+                          _item(
+                            id: 'bookings',
+                            icon: Icons.calendar_month_outlined,
+                            label: 'Bookings',
+                          ),
+                        _item(
+                          id: 'search',
+                          icon: Icons.search,
+                          label: 'Search',
+                        ),
+                        _item(
+                          id: 'profile',
+                          icon: Icons.person_outline,
+                          label: 'Profile',
+                        ),
                         if (home.on('notifications'))
-                          _item(id: 'notifications', icon: Icons.notifications_none_rounded, label: 'Notifications', badge: NotificationsStore.instance.unread),
+                          _item(
+                            id: 'notifications',
+                            icon: Icons.notifications_none_rounded,
+                            label: 'Notifications',
+                            badge: NotificationsStore.instance.unread,
+                          ),
                         const SizedBox(height: 8),
                         const Divider(color: Color(0xFF2A2D34), height: 1),
                         const SizedBox(height: 12),
-                        if (home.on('chat')) _item(id: 'messages', icon: Icons.chat_bubble_outline_rounded, label: 'Messages'),
-                        if (home.on('issue_reports')) _item(id: 'report', icon: Icons.help_outline_rounded, label: 'Report an Issue'),
-                        _item(id: 'settings', icon: Icons.settings_outlined, label: 'App Settings'),
+                        if (home.on('chat'))
+                          _item(
+                            id: 'messages',
+                            icon: Icons.chat_bubble_outline_rounded,
+                            label: 'Messages',
+                          ),
+                        if (home.on('issue_reports'))
+                          _item(
+                            id: 'report',
+                            icon: Icons.help_outline_rounded,
+                            label: 'Report an Issue',
+                          ),
+                        _item(
+                          id: 'settings',
+                          icon: Icons.settings_outlined,
+                          label: 'App Settings',
+                        ),
                         _item(
                           id: signedIn ? 'signout' : 'signin',
-                          icon: signedIn ? Icons.logout_rounded : Icons.login_rounded,
+                          icon: signedIn
+                              ? Icons.logout_rounded
+                              : Icons.login_rounded,
                           label: signedIn ? 'Log Out' : 'Sign In',
                         ),
                       ],
@@ -396,7 +501,12 @@ class _LensMenu extends StatelessWidget {
     );
   }
 
-  Widget _item({required String id, required IconData icon, required String label, int badge = 0}) {
+  Widget _item({
+    required String id,
+    required IconData icon,
+    required String label,
+    int badge = 0,
+  }) {
     final on = selected == id;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -422,21 +532,41 @@ class _LensMenu extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
                 if (badge > 0)
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: LensColors.primary, borderRadius: BorderRadius.circular(99)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: LensColors.primary,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                       child: Text(
                         badge > 99 ? '99+' : '$badge',
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
-                const Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF8E8B84),
+                ),
               ],
             ),
           ),

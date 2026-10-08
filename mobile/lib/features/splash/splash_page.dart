@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/demo_bootstrap.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/onboarding/onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -18,10 +19,12 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   Timer? _hold;
+  late Map<String, dynamic> _payload;
 
   @override
   void initState() {
     super.initState();
+    _payload = DemoBootstrap.payload();
     _boot();
   }
 
@@ -39,9 +42,18 @@ class _SplashPageState extends State<SplashPage> {
       final types = remote['vendor_types'];
       final popular = remote['popular'];
       final empty = (types is! List || types.isEmpty) && (popular is! List || popular.isEmpty);
-      payload = empty ? DemoBootstrap.payload() : remote;
+      if (empty) {
+        payload = DemoBootstrap.payload();
+        payload['name'] = remote['name']?.toString() ?? payload['name'];
+        payload['logo'] = remote['logo'];
+      } else {
+        payload = remote;
+      }
     } catch (_) {
       payload = DemoBootstrap.payload();
+    }
+    if (mounted) {
+      setState(() => _payload = payload);
     }
 
     final wait = const Duration(milliseconds: 1400) - DateTime.now().difference(started);
@@ -60,6 +72,9 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
+    final logoUrl = _payload['logo'] is String ? _payload['logo'] as String : null;
+    final name = _payload['name']?.toString() ?? 'Lens';
+
     return Scaffold(
       backgroundColor: LensColors.charcoal,
       body: Stack(
@@ -68,49 +83,62 @@ class _SplashPageState extends State<SplashPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 320,
-                  height: 260,
-                  child: Stack(
+                if (logoUrl != null && logoUrl.isNotEmpty)
+                  BrandLogo(
+                    name: name,
+                    logoUrl: logoUrl,
+                    width: 240,
+                    height: 180,
+                    color: const Color(0xFFF3E6C8),
                     alignment: Alignment.center,
-                    children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Color(0x00000000),
-                              Color(0x33FF5A1F),
-                              Color(0x77FF5A1F),
-                              Color(0x22FF5A1F),
-                              Color(0x00000000),
-                            ],
-                            stops: [0.12, 0.38, 0.52, 0.68, 1],
+                  )
+                else
+                  SizedBox(
+                    width: 320,
+                    height: 260,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                Color(0x00000000),
+                                Color(0x33FF5A1F),
+                                Color(0x77FF5A1F),
+                                Color(0x22FF5A1F),
+                                Color(0x00000000),
+                              ],
+                              stops: [0.12, 0.38, 0.52, 0.68, 1],
+                            ),
                           ),
+                          child: SizedBox.expand(),
                         ),
-                        child: SizedBox.expand(),
-                      ),
-                      SizedBox(
-                        width: 108,
-                        height: 108,
-                        child: CustomPaint(painter: _AperturePainter()),
-                      ),
-                    ],
-                  ),
-                ),
-                Transform.translate(
-                  offset: Offset(0, -18),
-                  child: Text(
-                    'Lens',
-                    style: TextStyle(
-                      color: Color(0xFFF3E6C8),
-                      fontSize: 52,
-                      fontWeight: FontWeight.w600,
-                      height: 1,
-                      letterSpacing: 0.4,
+                        SizedBox(
+                          width: 108,
+                          height: 108,
+                          child: CustomPaint(painter: _AperturePainter()),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                if (logoUrl != null && logoUrl.isNotEmpty)
+                  const SizedBox(height: 8)
+                else
+                  Transform.translate(
+                    offset: Offset(0, -18),
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        color: Color(0xFFF3E6C8),
+                        fontSize: 52,
+                        fontWeight: FontWeight.w600,
+                        height: 1,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

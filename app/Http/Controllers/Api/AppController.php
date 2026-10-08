@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AppScreen;
 use App\Models\City;
+use App\Models\Setting;
 use App\Models\Vendor;
 use App\Models\VendorType;
 use App\Services\VendorSearch;
@@ -28,11 +29,14 @@ class AppController extends Controller
         $client = AppClient::user();
         $features = Roles::appFeatures($client);
         $features['ai_assistant'] = ($features['ai_assistant'] ?? false) && (bool) ($search['ai_enabled'] ?? false);
+        $logoPath = Setting::getValue('platform.logo');
+        $logoUrl = is_string($logoPath) ? $this->publicUrl($logoPath) : null;
 
         $types = VendorType::query()->marketplace()->orderBy('sort_order')->get();
 
         return response()->json([
-            'name' => 'Lens',
+            'name' => Setting::getValue('platform.app_name', 'Lens'),
+            'logo' => $logoUrl,
             'tagline' => 'Find. Book. Create.',
             'locale' => 'en',
             'currency' => 'EGP',

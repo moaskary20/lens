@@ -3,6 +3,8 @@ import 'package:lens/core/session_store.dart';
 class HomeData {
   const HomeData({
     required this.features,
+    required this.name,
+    required this.logoUrl,
     required this.vendorTypes,
     required this.popular,
     required this.aiPrompt,
@@ -22,6 +24,8 @@ class HomeData {
 
   factory HomeData.fromJson(Map<String, dynamic> json) {
     return HomeData(
+      name: json['name']?.toString() ?? 'Lens',
+      logoUrl: json['logo']?.toString(),
       features: Map<String, bool>.from(
         (json['features'] as Map? ?? const {}).map((key, value) => MapEntry('$key', _asBool(value))),
       ),
@@ -58,6 +62,8 @@ class HomeData {
   }
 
   final Map<String, bool> features;
+  final String name;
+  final String? logoUrl;
   final List<VendorTypeItem> vendorTypes;
   final List<PopularSection> popular;
   final String aiPrompt;

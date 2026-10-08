@@ -5,6 +5,7 @@ import 'package:lens/core/notifications_store.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/ai_search_page.dart';
 import 'package:lens/features/home/categories_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
@@ -57,14 +58,12 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Lens',
-                  style: TextStyle(
-                    color: LensColors.primary,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
-                  ),
+                BrandLogo(
+                  name: data.name,
+                  logoUrl: data.logoUrl,
+                  width: 180,
+                  height: 42,
+                  fontSize: 34,
                 ),
                 const SizedBox(height: 4),
                 Text(data.tagline, style: const TextStyle(color: LensColors.slate, fontSize: 13)),
