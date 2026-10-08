@@ -16,7 +16,6 @@ import 'package:lens/features/home/book_review_page.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
-import 'package:lens/features/home/search_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
 import 'package:lens/features/auth/user_register_page.dart';
 import 'package:lens/features/auth/vendor_register_page.dart';
@@ -86,9 +85,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sign in to book photographers, studios, models and more.'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).at(0), 'client@lens.app');
+    await tester.enterText(find.byType(TextField).at(1), 'password');
+    await tester.ensureVisible(find.text('Sign In'));
+    await tester.tap(find.text('Sign In'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('What are you creating?'), findsOneWidget);
   });
 
-  testWidgets('navbar plus keeps the create action for signed-in users', (WidgetTester tester) async {
+  testWidgets('navbar plus opens the create flow for signed-in clients', (WidgetTester tester) async {
     await SessionStore.instance.login(email: 'client@lens.app', password: 'password');
     await tester.pumpWidget(MaterialApp(
       theme: LensTheme.dark(),
@@ -98,7 +104,38 @@ void main() {
     await tester.tap(find.byIcon(Icons.add));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SearchPage), findsOneWidget);
+    expect(find.text('What are you creating?'), findsOneWidget);
+  });
+
+  testWidgets('client plus guides category choices into recommendations', (WidgetTester tester) async {
+    await SessionStore.instance.login(email: 'client@lens.app', password: 'password');
+    await tester.pumpWidget(MaterialApp(
+      theme: LensTheme.dark(),
+      home: AppShell(bootstrap: _bootstrap()),
+    ));
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+    expect(find.text('What are you creating?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('create-category-photographer')));
+    await tester.pumpAndSettle();
+    expect(find.text('STEP 1 OF 4'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('create-option-service-portrait')));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('create-option-location-cairo')));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('create-option-budget-under-egp-1-000')));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('create-option-rating-4-0-')));
+    await tester.tap(find.text('Show my recommendations'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recommended for you'), findsOneWidget);
   });
 
   testWidgets('home view all opens the matching category', (WidgetTester tester) async {

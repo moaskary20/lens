@@ -20,11 +20,15 @@ class CategoryListPage extends StatefulWidget {
     required this.type,
     required this.home,
     this.vendors = const [],
+    this.initialFilters,
+    this.showRecommendations = false,
   });
 
   final VendorTypeItem type;
   final HomeData home;
   final List<VendorCard> vendors;
+  final CategoryFilters? initialFilters;
+  final bool showRecommendations;
 
   @override
   State<CategoryListPage> createState() => _CategoryListPageState();
@@ -35,13 +39,14 @@ class _CategoryListPageState extends State<CategoryListPage> {
   late List<VendorCard> _vendors;
   String _sort = 'recommended';
   int? _total;
-  CategoryFilters _filters = const CategoryFilters();
+  late CategoryFilters _filters;
 
   @override
   void initState() {
     super.initState();
+    _filters = widget.initialFilters ?? const CategoryFilters();
     _allVendors = List<VendorCard>.from(widget.vendors);
-    _vendors = List<VendorCard>.from(widget.vendors);
+    _vendors = _sorted(_applyFilters(_allVendors));
     if (LensConfig.useNetwork) {
       _load();
     }
@@ -117,7 +122,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
           return false;
         }
       }
-      if (widget.type.slug == 'model' && vendor.filterTags.isNotEmpty) {
+      if (widget.type.slug == 'model' && _filters.gender != 'All' && vendor.filterTags.isNotEmpty) {
         final genderSlug = switch (_filters.gender) {
           'Women' => 'model-female',
           'Kids' => 'model-kids',
@@ -264,6 +269,41 @@ class _CategoryListPageState extends State<CategoryListPage> {
                 ],
               ),
             ),
+            if (widget.showRecommendations)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF32190F), Color(0xFF1B1716)],
+                    ),
+                    border: Border.all(color: LensColors.primary.withValues(alpha: 0.38)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, color: LensColors.primary, size: 21),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Recommended for you', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Curated ${widget.type.label.toLowerCase()} based on your choices',
+                              style: const TextStyle(color: Color(0xFFB9AFA7), fontSize: 11, height: 1.3),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Row(
@@ -304,12 +344,45 @@ class _CategoryListPageState extends State<CategoryListPage> {
               ),
             ),
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
-                itemCount: _vendors.length,
-                separatorBuilder: (_, __) => const Divider(color: Color(0xFF22242A), height: 28),
-                itemBuilder: (context, index) => _ListingRow(vendor: _vendors[index], home: home),
-              ),
+              child: _vendors.isEmpty
+                  ? SingleChildScrollView(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                color: LensColors.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Icon(Icons.tune_rounded, color: LensColors.primary, size: 27),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text('No exact matches yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 7),
+                            const Text(
+                              'Try adjusting your choices and we’ll find more creatives for you.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: LensColors.slate, fontSize: 13, height: 1.4),
+                            ),
+                            const SizedBox(height: 14),
+                            TextButton.icon(
+                              onPressed: _openFilters,
+                              icon: const Icon(Icons.tune_rounded),
+                              label: const Text('Adjust filters'),
+                              style: TextButton.styleFrom(foregroundColor: LensColors.primary),
+                            ),
+                          ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
+                      itemCount: _vendors.length,
+                      separatorBuilder: (_, __) => const Divider(color: Color(0xFF22242A), height: 28),
+                      itemBuilder: (context, index) => _ListingRow(vendor: _vendors[index], home: home),
+                    ),
             ),
           ],
         ),

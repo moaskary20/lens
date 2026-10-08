@@ -8,6 +8,7 @@ import 'package:lens/core/notifications_store.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
+import 'package:lens/features/home/client_create_flow.dart';
 import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/home_page.dart';
@@ -20,9 +21,14 @@ import 'package:lens/features/profile/report_issue_page.dart';
 import 'package:lens/features/shell/lens_nav_bar.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.bootstrap});
+  const AppShell({
+    super.key,
+    required this.bootstrap,
+    this.openClientCreateOnStart = false,
+  });
 
   final Map<String, dynamic> bootstrap;
+  final bool openClientCreateOnStart;
 
   static void Function({bool guestPreview})? openBookingsTab;
   static void Function(int index)? selectTab;
@@ -65,6 +71,13 @@ class AppShell extends StatefulWidget {
   static Widget navFab(BuildContext context) {
     return LensNavBar.fab(
       onPressed: () {
+        if (SessionStore.instance.isClient) {
+          final home = currentHome;
+          if (home != null) {
+            openClientCreateFlow(context, home);
+            return;
+          }
+        }
         if (!SessionStore.instance.isGuest) {
           openCreate(context);
           return;
@@ -81,7 +94,10 @@ class AppShell extends StatefulWidget {
                 bootstrap: bootstrap,
                 onSuccess: () => navigator.pushAndRemoveUntil(
                   MaterialPageRoute<void>(
-                    builder: (_) => AppShell(bootstrap: authenticatedBootstrap),
+                    builder: (_) => AppShell(
+                      bootstrap: authenticatedBootstrap,
+                      openClientCreateOnStart: SessionStore.instance.isClient,
+                    ),
                   ),
                   (route) => false,
                 ),
@@ -119,8 +135,13 @@ class AppShellState extends State<AppShell>
       reverseCurve: Curves.easeInCubic,
     );
     final home = HomeData.fromJson(widget.bootstrap);
-    FavoritesStore.instance.hydrate(home);
-    NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      FavoritesStore.instance.hydrate(home);
+      NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
+    });
     AppShell.openBookingsTab = ({bool guestPreview = false}) =>
         openBookings(guestPreview: guestPreview);
     AppShell.selectTab = (index) => setState(() {
@@ -133,20 +154,21 @@ class AppShellState extends State<AppShell>
         _focusSearch = false;
       }
     });
+    if (widget.openClientCreateOnStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          openClientCreateFlow(context, home);
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
-    if (AppShell.openBookingsTab != null) {
-      AppShell.openBookingsTab = null;
-    }
-    if (AppShell.selectTab != null) {
-      AppShell.selectTab = null;
-    }
-    if (AppShell.currentHome != null) {
-      AppShell.currentHome = null;
-    }
     if (identical(AppShell.currentBootstrap, widget.bootstrap)) {
+      AppShell.openBookingsTab = null;
+      AppShell.selectTab = null;
+      AppShell.currentHome = null;
       AppShell.currentBootstrap = null;
     }
     _menu.dispose();
