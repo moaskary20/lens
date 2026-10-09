@@ -15,9 +15,12 @@ use App\Support\Feature;
 use App\Support\AppClient;
 use App\Support\Roles;
 use App\Support\Finance;
+use App\Support\StorageQuota;
 use App\Support\Travel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use LogicException;
 
@@ -137,7 +140,7 @@ class BookingController extends Controller
 
     public function deliverables(Booking $booking): JsonResponse
     {
-        $booking = $this->ownedBooking($booking)->load(['deliverables', 'vendor.vendorType', 'vendor.portfolios']);
+        $booking = $this->authorizedBooking($booking)->load(['deliverables', 'vendor.vendorType', 'vendor.portfolios']);
         $state = app(DeliveryService::class)->previewState($booking);
         $vendor = $booking->vendor;
         $unlocked = (bool) $state['downloads_unlocked'];
@@ -178,6 +181,79 @@ class BookingController extends Controller
             'watermarked' => $watermarked,
             'preview' => $state,
             'deliverables' => $files->values()->all(),
+        ]);
+    }
+
+    public function uploadDelivery(Request $request, Booking $booking): JsonResponse
+    {
+        $user = AppClient::requireUser();
+        $booking = $this->ownedVendorBooking($booking, $user);
+        Roles::abortUnlessCan($user, 'deliver_assets', 'Delivering files is disabled for this role.');
+        $data = $request->validate([
+            'files' => ['required', 'array', 'min:1', 'max:10'],
+            'files.*' => ['required', 'file', 'max:51200'],
+        ]);
+
+        $delivery = app(DeliveryService::class);
+        abort_unless($delivery->canUpload($booking), 422, 'Files can be uploaded only while the session is in delivery or revision.');
+
+        try {
+            $totalBytes = collect($data['files'])->sum(fn ($file): int => (int) $file->getSize());
+            StorageQuota::assertBookingFits($booking->load('deliverables'), $totalBytes);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        $storedPaths = [];
+        $uploaded = [];
+        try {
+            DB::transaction(function () use ($data, $booking, $delivery, &$storedPaths, &$uploaded): void {
+                foreach ($data['files'] as $file) {
+                    $path = $file->store('deliverables/'.$booking->id, 'public');
+                    $storedPaths[] = $path;
+                    $uploaded[] = $delivery->upload($booking->fresh(), $path, $file->getClientOriginalName());
+                }
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('public')->delete($storedPaths);
+
+            if ($exception instanceof LogicException) {
+                return response()->json(['message' => $exception->getMessage()], 422);
+            }
+
+            throw $exception;
+        }
+
+        return response()->json([
+            'status' => $booking->fresh()->status,
+            'uploaded' => collect($uploaded)->map(fn ($file): array => [
+                'id' => $file->id,
+                'name' => $file->original_name,
+                'version' => $file->version,
+            ])->values()->all(),
+            'message' => 'Project files uploaded for client review.',
+        ], 201);
+    }
+
+    public function cancelByVendor(Request $request, Booking $booking): JsonResponse
+    {
+        $user = AppClient::requireUser();
+        $booking = $this->ownedVendorBooking($booking, $user);
+        Roles::abortUnlessCan($user, 'receive_bookings', 'Booking actions are disabled for this role.');
+        abort_unless(in_array($booking->status, ['pending', 'accepted', 'checked_in', 'in_progress'], true), 422, 'This booking can no longer be cancelled.');
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $updated = app(\App\Services\CancellationService::class)->cancel($booking, 'vendor', $data['reason']);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'status' => $updated->status,
+            'message' => 'Booking cancelled. Cancellation terms have been applied.',
         ]);
     }
 
@@ -260,13 +336,17 @@ class BookingController extends Controller
     public function disputes(): JsonResponse
     {
         $user = AppClient::requireUser();
-        abort_unless($user->canUseClientApp(), 403, 'Only clients can open disputes.');
-
         $items = Dispute::query()
             ->with(['booking.vendor.vendorType', 'booking.category'])
             ->where(function ($query) use ($user): void {
                 $query->where('opened_by', $user->id)
-                    ->orWhereHas('booking', fn ($inner) => $inner->where('client_id', $user->id));
+                    ->orWhereHas('booking', function ($inner) use ($user): void {
+                        if ($user->isVendor() && $user->vendor) {
+                            $inner->where('vendor_id', $user->vendor->id);
+                        } else {
+                            $inner->where('client_id', $user->id);
+                        }
+                    });
             })
             ->latest('id')
             ->limit(40)
@@ -280,7 +360,7 @@ class BookingController extends Controller
 
     public function showDispute(Booking $booking): JsonResponse
     {
-        $booking = $this->ownedBooking($booking)->load(['dispute.booking.vendor.vendorType']);
+        $booking = $this->authorizedBooking($booking)->load(['dispute.booking.vendor.vendorType']);
         abort_unless($booking->dispute, 404, 'No dispute on this booking.');
 
         return response()->json($booking->dispute->toApp());
@@ -288,9 +368,12 @@ class BookingController extends Controller
 
     public function openDispute(Request $request, Booking $booking): JsonResponse
     {
-        $booking = $this->ownedBooking($booking);
+        $user = AppClient::requireUser();
+        $booking = $user->isVendor()
+            ? $this->ownedVendorBooking($booking, $user)
+            : $this->ownedBooking($booking);
         abort_unless(Feature::enabled('disputes'), 422, 'Disputes are disabled.');
-        Roles::abortUnlessCan(AppClient::requireUser(), 'open_disputes', 'Disputes are disabled for this role.');
+        Roles::abortUnlessCan($user, 'open_disputes', 'Disputes are disabled for this role.');
         $data = $request->validate([
             'kind' => ['required', Rule::in(['dispute', 'complaint'])],
             'reason' => ['required', 'string', 'max:2000'],
@@ -299,7 +382,7 @@ class BookingController extends Controller
         try {
             $dispute = app(DisputeService::class)->open(
                 $booking,
-                $booking->client_id,
+                $user->id,
                 $data['reason'],
                 $data['kind'],
             );
@@ -319,6 +402,22 @@ class BookingController extends Controller
         abort_unless($user->canUseClientApp() && (int) $booking->client_id === (int) $user->id, 403, 'This booking is not yours.');
 
         return $booking;
+    }
+
+    protected function ownedVendorBooking(Booking $booking, \App\Models\User $user): Booking
+    {
+        abort_unless($user->isVendor() && $user->vendor && (int) $booking->vendor_id === (int) $user->vendor->id, 403, 'This booking is not yours.');
+
+        return $booking;
+    }
+
+    protected function authorizedBooking(Booking $booking): Booking
+    {
+        $user = AppClient::requireUser();
+
+        return $user->isVendor()
+            ? $this->ownedVendorBooking($booking, $user)
+            : $this->ownedBooking($booking);
     }
 
     protected function nextReference(): string

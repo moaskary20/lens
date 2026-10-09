@@ -22,19 +22,32 @@ class ChatController extends Controller
         $this->assertChatEnabled();
         $user = AppClient::requireUser();
         Roles::abortUnlessCan($user, 'in_app_chat', 'Chat is disabled for this role.');
-        abort_unless($user->canUseClientApp(), 403, 'Only clients can start a vendor chat.');
 
         $data = $request->validate([
-            'vendor_id' => ['required', 'integer', 'exists:vendors,id'],
+            'vendor_id' => ['nullable', 'integer', 'exists:vendors,id', 'required_without:client_id'],
+            'client_id' => ['nullable', 'integer', 'exists:users,id', 'required_without:vendor_id'],
             'booking_id' => ['nullable', 'integer', 'exists:bookings,id'],
         ]);
 
-        $vendor = Vendor::query()->findOrFail($data['vendor_id']);
-        $booking = $this->resolveBooking($user->id, $vendor->id, $data['booking_id'] ?? null);
+        if ($user->isVendor()) {
+            abort_unless($user->vendor && isset($data['booking_id'], $data['client_id']), 422, 'Vendor chat requires a client and booking.');
+            $booking = Booking::query()
+                ->whereKey($data['booking_id'])
+                ->where('vendor_id', $user->vendor->id)
+                ->where('client_id', $data['client_id'])
+                ->firstOrFail();
+            $vendor = $user->vendor;
+            $clientId = $booking->client_id;
+        } else {
+            abort_unless($user->canUseClientApp(), 403, 'Only clients and vendors can open a booking chat.');
+            $vendor = Vendor::query()->findOrFail($data['vendor_id']);
+            $booking = $this->resolveBooking($user->id, $vendor->id, $data['booking_id'] ?? null);
+            $clientId = $user->id;
+        }
 
         $conversation = Conversation::query()->firstOrCreate(
             [
-                'client_id' => $user->id,
+                'client_id' => $clientId,
                 'vendor_id' => $vendor->id,
             ],
             [

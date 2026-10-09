@@ -142,6 +142,88 @@ class AppBookingTest extends TestCase
             ->assertJsonPath('status', 'approved');
     }
 
+    public function test_vendor_can_contact_client_deliver_cancel_and_open_booking_complaints(): void
+    {
+        Storage::fake('public');
+        $headers = ['X-Lens-Client' => 'vendor@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+
+        $this->withHeaders($headers)
+            ->getJson('/api/app/bookings')
+            ->assertOk()
+            ->assertJsonPath('bookings.0.client_id', $booking->client_id)
+            ->assertJsonPath('bookings.0.phone', '01011112233');
+
+        $chat = $this->withHeaders($headers)
+            ->postJson('/api/app/conversations', [
+                'client_id' => $booking->client_id,
+                'booking_id' => $booking->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('booking_id', $booking->id);
+        $this->withHeaders($headers)
+            ->postJson('/api/app/conversations/'.$chat->json('id').'/messages', [
+                'type' => 'text',
+                'body' => 'I have received your project details.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('message.mine', true);
+
+        $this->withHeaders($headers)
+            ->post('/api/app/bookings/'.$booking->id.'/deliverables', [
+                'files' => [UploadedFile::fake()->image('final.jpg')],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('uploaded.0.name', 'final.jpg');
+        $deliverable = \App\Models\Deliverable::query()->where('booking_id', $booking->id)->latest('id')->firstOrFail();
+        Storage::disk('public')->assertExists($deliverable->path);
+
+        $pending = Booking::query()->where('reference', 'LN-1003')->firstOrFail();
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$pending->id.'/dispute', [
+                'kind' => 'complaint',
+                'reason' => 'The project requirements need staff review.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('kind', 'complaint');
+        $this->assertDatabaseHas('disputes', [
+            'booking_id' => $pending->id,
+            'opened_by' => \App\Models\User::query()->where('email', 'vendor@lens.app')->value('id'),
+            'kind' => 'complaint',
+        ]);
+
+        $cancellable = $pending->replicate();
+        $cancellable->reference = 'LN-CANCEL-'.random_int(10000, 99999);
+        $cancellable->status = 'pending';
+        $cancellable->scheduled_at = now()->addDays(45)->setTime(10, 0);
+        $cancellable->availability_id = null;
+        $cancellable->save();
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$cancellable->id.'/cancel', [
+                'reason' => 'I am no longer available on this date.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'cancelled');
+
+        $otherVendorBooking = Booking::query()->where('reference', 'LN-1002')->firstOrFail();
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$otherVendorBooking->id.'/cancel', [
+                'reason' => 'Attempted unauthorized cancellation.',
+            ])
+            ->assertForbidden();
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$otherVendorBooking->id.'/dispute', [
+                'kind' => 'complaint',
+                'reason' => 'Attempted unauthorized complaint.',
+            ])
+            ->assertForbidden();
+        $this->withHeaders($headers)
+            ->post('/api/app/bookings/'.$otherVendorBooking->id.'/deliverables', [
+                'files' => [UploadedFile::fake()->image('private.jpg')],
+            ])
+            ->assertForbidden();
+    }
+
     public function test_request_edit_stores_note_chat_files_and_notifies_staff(): void
     {
         Storage::fake('public');

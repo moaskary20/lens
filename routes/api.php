@@ -33,6 +33,8 @@ Route::get('app/account/projects', [AccountController::class, 'projects']);
 Route::post('app/bookings/quote', [BookingController::class, 'quote']);
 Route::post('app/bookings', [BookingController::class, 'store']);
 Route::get('app/bookings/{booking}/deliverables', [BookingController::class, 'deliverables']);
+Route::post('app/bookings/{booking}/deliverables', [BookingController::class, 'uploadDelivery']);
+Route::post('app/bookings/{booking}/cancel', [BookingController::class, 'cancelByVendor']);
 Route::post('app/bookings/{booking}/request-edit', [BookingController::class, 'requestEdit']);
 Route::post('app/bookings/{booking}/approve', [BookingController::class, 'approve']);
 Route::post('app/bookings/{booking}/refuse', [BookingController::class, 'refuse']);

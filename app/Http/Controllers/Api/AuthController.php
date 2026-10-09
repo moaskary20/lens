@@ -337,13 +337,18 @@ class AuthController extends Controller
             'location' => $booking->location_text ?: ($vendor?->city?->name_en ? $vendor->city->name_en.', Egypt' : 'Egypt'),
             'total' => (float) ($booking->total_paid ?: $booking->session_price ?: 0),
             'counterpart' => $counterpart,
-            'photo' => $photo,
+            'photo' => $view === 'vendor' ? $booking->client?->avatarUrl() : $photo,
             'vendor_type' => $vendor?->vendorType?->name_en,
             'role' => $vendor?->vendorType?->name_en,
             'project_name' => $booking->project_name ?: ($booking->category?->name_en ? $booking->category->name_en.' session' : 'Creative session'),
-            'phone' => preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: '')) ?: null,
-            'whatsapp' => preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendor?->contact_phone ?: '')) ?: null,
+            'phone' => $view === 'vendor'
+                ? (preg_replace('/\D+/', '', (string) ($booking->client?->phone ?? '')) ?: null)
+                : (preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: '')) ?: null),
+            'whatsapp' => $view === 'vendor'
+                ? (preg_replace('/\D+/', '', (string) ($booking->client?->phone ?? '')) ?: null)
+                : (preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendor?->contact_phone ?: '')) ?: null),
             'vendor_id' => $vendor?->id,
+            'client_id' => $view === 'vendor' ? $booking->client_id : null,
             'dispute' => $booking->dispute?->toApp(),
             'vendor' => $view === 'client' ? [
                 'id' => $vendor?->id,

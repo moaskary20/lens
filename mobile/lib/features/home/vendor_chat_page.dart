@@ -24,6 +24,7 @@ class VendorChatPage extends StatefulWidget {
     this.location = '',
     this.status = 'Confirmed',
     this.bookingId,
+    this.clientId,
   });
 
   final VendorCard vendor;
@@ -33,6 +34,7 @@ class VendorChatPage extends StatefulWidget {
   final String location;
   final String status;
   final int? bookingId;
+  final int? clientId;
 
   @override
   State<VendorChatPage> createState() => _VendorChatPageState();
@@ -111,9 +113,11 @@ class _VendorChatPageState extends State<VendorChatPage> {
     return vendor.city.isEmpty ? 'Cairo, Egypt' : '${vendor.city}, Egypt';
   }
 
-  String get _statusLabel => (_remoteStatus ?? widget.status).trim().isEmpty ? 'Confirmed' : (_remoteStatus ?? widget.status);
+  String get _statusLabel => (_remoteStatus ?? widget.status).trim().isEmpty
+      ? 'Confirmed'
+      : (_remoteStatus ?? widget.status);
 
-  bool get _live => LensConfig.useNetwork && SessionStore.instance.isClient;
+  bool get _live => LensConfig.useNetwork && !SessionStore.instance.isGuest;
 
   List<String> get _shots => VendorPhotos.shots(vendor.vendorType, vendor.id);
 
@@ -139,18 +143,21 @@ class _VendorChatPageState extends State<VendorChatPage> {
       const _ChatItem.day('Today'),
       _ChatItem.text(
         mine: false,
-        text: "Hi! I'm looking forward to the session this Saturday. Do you have any specific shots in mind?",
+        text:
+            "Hi! I'm looking forward to the session this Saturday. Do you have any specific shots in mind?",
         time: '10:12 AM',
       ),
       _ChatItem.text(
         mine: true,
-        text: "Hi $_firstName! Yes, I've attached a few reference images. I'd like a mix of close-ups and some lifestyle shots similar to these.",
+        text:
+            "Hi $_firstName! Yes, I've attached a few reference images. I'd like a mix of close-ups and some lifestyle shots similar to these.",
         time: '10:15 AM',
       ),
       _ChatItem.images(mine: true, urls: photos, extra: 2, time: '10:15 AM'),
       _ChatItem.text(
         mine: false,
-        text: "Perfect! These references look great. I'll prepare a shot list and share it with you before the session.",
+        text:
+            "Perfect! These references look great. I'll prepare a shot list and share it with you before the session.",
         time: '10:18 AM',
       ),
       _ChatItem.file(
@@ -160,7 +167,11 @@ class _VendorChatPageState extends State<VendorChatPage> {
         time: '10:18 AM',
       ),
       const _ChatItem.audio(mine: true, duration: '0:28', time: '10:21 AM'),
-      const _ChatItem.text(mine: false, text: 'Got it! See you on Saturday.', time: '10:22 AM'),
+      const _ChatItem.text(
+        mine: false,
+        text: 'Got it! See you on Saturday.',
+        time: '10:22 AM',
+      ),
     ];
   }
 
@@ -170,7 +181,8 @@ class _VendorChatPageState extends State<VendorChatPage> {
     }
     try {
       final payload = await _api.postJson('/app/conversations', {
-        'vendor_id': vendor.id,
+        if (widget.clientId != null) 'client_id': widget.clientId,
+        if (widget.clientId == null) 'vendor_id': vendor.id,
         if (widget.bookingId != null) 'booking_id': widget.bookingId,
       });
       if (!mounted) {
@@ -183,7 +195,7 @@ class _VendorChatPageState extends State<VendorChatPage> {
       if (!mounted) {
         return;
       }
-      _toast('Could not open the vendor chat. Try again after signing in as a client.');
+      _toast('Could not open this booking chat. Please try again.');
     }
   }
 
@@ -200,13 +212,17 @@ class _VendorChatPageState extends State<VendorChatPage> {
   }
 
   void _applyPayload(Map<String, dynamic> payload) {
-    final session = payload['session'] is Map ? Map<String, dynamic>.from(payload['session'] as Map) : const <String, dynamic>{};
+    final session = payload['session'] is Map
+        ? Map<String, dynamic>.from(payload['session'] as Map)
+        : const <String, dynamic>{};
     final messages = (payload['messages'] as List<dynamic>? ?? const [])
         .whereType<Map>()
         .map((item) => _ChatItem.fromJson(Map<String, dynamic>.from(item)))
         .toList();
     setState(() {
-      _conversationId = payload['id'] is int ? payload['id'] as int : int.tryParse('${payload['id']}');
+      _conversationId = payload['id'] is int
+          ? payload['id'] as int
+          : int.tryParse('${payload['id']}');
       _remoteTitle = session['title']?.toString();
       _remoteWhen = session['when']?.toString();
       _remoteWhere = session['where']?.toString();
@@ -237,7 +253,11 @@ class _VendorChatPageState extends State<VendorChatPage> {
       return;
     }
     _input.clear();
-    await _postMessage(type: 'text', body: text, local: _ChatItem.text(mine: true, text: text, time: _now()));
+    await _postMessage(
+      type: 'text',
+      body: text,
+      local: _ChatItem.text(mine: true, text: text, time: _now()),
+    );
   }
 
   Future<void> _postMessage({
@@ -253,7 +273,7 @@ class _VendorChatPageState extends State<VendorChatPage> {
     }
     if (!_live) {
       if (local == null) {
-        _toast('Sign in as a client to send this to the vendor.');
+        _toast('Sign in to send a message.');
       }
       return;
     }
@@ -266,23 +286,23 @@ class _VendorChatPageState extends State<VendorChatPage> {
     setState(() => _busy = true);
     try {
       final payload = files.isEmpty
-          ? await _api.postJson('/app/conversations/$_conversationId/messages', {
-              'type': type,
-              if (body != null) 'body': body,
-              if (location != null) 'location_text': location,
-              if (widget.vendor.latitude != null) 'location_lat': vendor.latitude,
-              if (widget.vendor.longitude != null) 'location_lng': vendor.longitude,
-              if (duration != null) 'duration': duration,
-            })
-          : await _api.postForm(
-              '/app/conversations/$_conversationId/messages',
-              {
-                'type': type,
-                if (body != null) 'body': body,
-                if (duration != null) 'duration': duration,
-              },
-              files: files,
-            );
+          ? await _api
+                .postJson('/app/conversations/$_conversationId/messages', {
+                  'type': type,
+                  if (body != null) 'body': body,
+                  if (location != null) 'location_text': location,
+                  if (widget.vendor.latitude != null)
+                    'location_lat': vendor.latitude,
+                  if (widget.vendor.longitude != null)
+                    'location_lng': vendor.longitude,
+                  if (duration != null) 'duration': duration,
+                })
+          : await _api
+                .postForm('/app/conversations/$_conversationId/messages', {
+                  'type': type,
+                  if (body != null) 'body': body,
+                  if (duration != null) 'duration': duration,
+                }, files: files);
       if (mounted) {
         _applyPayload(payload);
       }
@@ -305,12 +325,23 @@ class _VendorChatPageState extends State<VendorChatPage> {
       }
       final files = <http.MultipartFile>[];
       for (var i = 0; i < picked.length; i++) {
-        files.add(await http.MultipartFile.fromPath('files[$i]', picked[i].path, filename: picked[i].name));
+        files.add(
+          await http.MultipartFile.fromPath(
+            'files[$i]',
+            picked[i].path,
+            filename: picked[i].name,
+          ),
+        );
       }
       await _postMessage(
         type: 'images',
         files: files,
-        local: _ChatItem.images(mine: true, urls: picked.map((item) => item.path).toList(), extra: 0, time: _now()),
+        local: _ChatItem.images(
+          mine: true,
+          urls: picked.map((item) => item.path).toList(),
+          extra: 0,
+          time: _now(),
+        ),
       );
     } catch (_) {
       _toast('Could not open the photo library.');
@@ -326,16 +357,29 @@ class _VendorChatPageState extends State<VendorChatPage> {
       }
       http.MultipartFile part;
       if (file.bytes != null) {
-        part = http.MultipartFile.fromBytes('files[0]', file.bytes!, filename: file.name);
+        part = http.MultipartFile.fromBytes(
+          'files[0]',
+          file.bytes!,
+          filename: file.name,
+        );
       } else if (file.path != null) {
-        part = await http.MultipartFile.fromPath('files[0]', file.path!, filename: file.name);
+        part = await http.MultipartFile.fromPath(
+          'files[0]',
+          file.path!,
+          filename: file.name,
+        );
       } else {
         return;
       }
       await _postMessage(
         type: 'file',
         files: [part],
-        local: _ChatItem.file(mine: true, name: file.name, size: _fileSize(file.size), time: _now()),
+        local: _ChatItem.file(
+          mine: true,
+          name: file.name,
+          size: _fileSize(file.size),
+          time: _now(),
+        ),
       );
     } catch (_) {
       _toast('Could not attach a file.');
@@ -351,10 +395,19 @@ class _VendorChatPageState extends State<VendorChatPage> {
           builder: (context, setDialog) {
             return AlertDialog(
               backgroundColor: const Color(0xFF141416),
-              title: const Text('Voice note', style: TextStyle(color: Colors.white)),
-              content: Text('Recording 0:${seconds.toString().padLeft(2, '0')}', style: const TextStyle(color: Color(0xFFD0CBC3))),
+              title: const Text(
+                'Voice note',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: Text(
+                'Recording 0:${seconds.toString().padLeft(2, '0')}',
+                style: const TextStyle(color: Color(0xFFD0CBC3)),
+              ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
                 TextButton(
                   onPressed: () {
                     seconds = seconds == 0 ? 3 : seconds;
@@ -371,7 +424,8 @@ class _VendorChatPageState extends State<VendorChatPage> {
     if (keep != true) {
       return;
     }
-    final duration = '0:${(seconds == 0 ? 3 : seconds).toString().padLeft(2, '0')}';
+    final duration =
+        '0:${(seconds == 0 ? 3 : seconds).toString().padLeft(2, '0')}';
     await _postMessage(
       type: 'audio',
       duration: duration,
@@ -392,7 +446,9 @@ class _VendorChatPageState extends State<VendorChatPage> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF141416),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       builder: (context) {
         return SafeArea(
           child: Padding(
@@ -401,24 +457,42 @@ class _VendorChatPageState extends State<VendorChatPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.image_outlined, color: Colors.white),
-                  title: const Text('Photo', style: TextStyle(color: Colors.white)),
+                  leading: const Icon(
+                    Icons.image_outlined,
+                    color: Colors.white,
+                  ),
+                  title: const Text(
+                    'Photo',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     _pickImages();
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.attach_file_rounded, color: Colors.white),
-                  title: const Text('File', style: TextStyle(color: Colors.white)),
+                  leading: const Icon(
+                    Icons.attach_file_rounded,
+                    color: Colors.white,
+                  ),
+                  title: const Text(
+                    'File',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     _pickFile();
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.mic_none_rounded, color: Colors.white),
-                  title: const Text('Voice note', style: TextStyle(color: Colors.white)),
+                  leading: const Icon(
+                    Icons.mic_none_rounded,
+                    color: Colors.white,
+                  ),
+                  title: const Text(
+                    'Voice note',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     _recordVoice();
@@ -462,7 +536,8 @@ class _VendorChatPageState extends State<VendorChatPage> {
 
   Future<void> _openFile(_ChatItem item) async {
     final url = item.fileUrl;
-    if (url != null && (url.startsWith('http://') || url.startsWith('https://'))) {
+    if (url != null &&
+        (url.startsWith('http://') || url.startsWith('https://'))) {
       final opened = await ContactLaunch.open(Uri.parse(url));
       if (!opened) {
         _toast(item.fileName ?? 'File attached');
@@ -511,7 +586,11 @@ class _VendorChatPageState extends State<VendorChatPage> {
           IconButton(
             tooltip: 'Back',
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.chevron_left_rounded, color: LensColors.cream, size: 30),
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+              color: LensColors.cream,
+              size: 30,
+            ),
           ),
           _avatar(34),
           const SizedBox(width: 10),
@@ -526,12 +605,20 @@ class _VendorChatPageState extends State<VendorChatPage> {
                         vendor.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     if (vendor.verified) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.verified, color: Color(0xFF3B82F6), size: 16),
+                      const Icon(
+                        Icons.verified,
+                        color: Color(0xFF3B82F6),
+                        size: 16,
+                      ),
                     ],
                   ],
                 ),
@@ -560,9 +647,27 @@ class _VendorChatPageState extends State<VendorChatPage> {
               }
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(value: 'details', child: Text('Project details', style: TextStyle(color: Colors.white))),
-              PopupMenuItem(value: 'call', child: Text('Call vendor', style: TextStyle(color: Colors.white))),
-              PopupMenuItem(value: 'whatsapp', child: Text('WhatsApp vendor', style: TextStyle(color: Colors.white))),
+              PopupMenuItem(
+                value: 'details',
+                child: Text(
+                  'Project details',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'call',
+                child: Text(
+                  'Call vendor',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'whatsapp',
+                child: Text(
+                  'WhatsApp vendor',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
             ],
           ),
         ],
@@ -571,7 +676,8 @@ class _VendorChatPageState extends State<VendorChatPage> {
   }
 
   Widget _sessionCard() {
-    final cover = vendor.coverUrl ?? VendorPhotos.cover(vendor.vendorType, vendor.id);
+    final cover =
+        vendor.coverUrl ?? VendorPhotos.cover(vendor.vendorType, vendor.id);
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
       child: Material(
@@ -597,18 +703,29 @@ class _VendorChatPageState extends State<VendorChatPage> {
                               _sessionTitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF163226),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Text(
                               _statusLabel,
-                              style: const TextStyle(color: Color(0xFF7DCEA0), fontSize: 11, fontWeight: FontWeight.w800),
+                              style: const TextStyle(
+                                color: Color(0xFF7DCEA0),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ],
@@ -616,27 +733,55 @@ class _VendorChatPageState extends State<VendorChatPage> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today_outlined, color: _muted, size: 13),
+                          const Icon(
+                            Icons.calendar_today_outlined,
+                            color: _muted,
+                            size: 13,
+                          ),
                           const SizedBox(width: 5),
                           Expanded(
-                            child: Text(_when, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11.5)),
+                            child: Text(
+                              _when,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _muted,
+                                fontSize: 11.5,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 3),
                       Row(
                         children: [
-                          const Icon(Icons.location_on_outlined, color: _muted, size: 14),
+                          const Icon(
+                            Icons.location_on_outlined,
+                            color: _muted,
+                            size: 14,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
-                            child: Text(_where, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11.5)),
+                            child: Text(
+                              _where,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _muted,
+                                fontSize: 11.5,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: _muted, size: 22),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: _muted,
+                  size: 22,
+                ),
               ],
             ),
           ),
@@ -650,7 +795,14 @@ class _VendorChatPageState extends State<VendorChatPage> {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Center(
-          child: Text(item.text ?? '', style: const TextStyle(color: _muted, fontSize: 12, fontWeight: FontWeight.w600)),
+          child: Text(
+            item.text ?? '',
+            style: const TextStyle(
+              color: _muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       );
     }
@@ -666,25 +818,36 @@ class _VendorChatPageState extends State<VendorChatPage> {
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: item.mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: item.mine
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
-          if (!item.mine) ...[
-            _avatar(22),
-            const SizedBox(width: 8),
-          ],
+          if (!item.mine) ...[_avatar(22), const SizedBox(width: 8)],
           Flexible(
             child: Column(
-              crossAxisAlignment: item.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: item.mine
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 child,
                 const SizedBox(height: 4),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(item.time, style: const TextStyle(color: Color(0xFF6B6B70), fontSize: 11)),
+                    Text(
+                      item.time,
+                      style: const TextStyle(
+                        color: Color(0xFF6B6B70),
+                        fontSize: 11,
+                      ),
+                    ),
                     if (item.mine) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.done_all_rounded, color: Color(0xFF8E8B84), size: 14),
+                      const Icon(
+                        Icons.done_all_rounded,
+                        color: Color(0xFF8E8B84),
+                        size: 14,
+                      ),
                     ],
                   ],
                 ),
@@ -698,7 +861,9 @@ class _VendorChatPageState extends State<VendorChatPage> {
 
   Widget _textCard(_ChatItem item) {
     return Container(
-      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+      ),
       padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
       decoration: BoxDecoration(
         color: item.mine ? _bubbleOut : _bubbleIn,
@@ -709,7 +874,10 @@ class _VendorChatPageState extends State<VendorChatPage> {
           bottomRight: Radius.circular(item.mine ? 6 : 18),
         ),
       ),
-      child: Text(item.text ?? '', style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4)),
+      child: Text(
+        item.text ?? '',
+        style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+      ),
     );
   }
 
@@ -726,9 +894,19 @@ class _VendorChatPageState extends State<VendorChatPage> {
               if (i == urls.length - 1 && item.extra > 0)
                 Positioned.fill(
                   child: DecoratedBox(
-                    decoration: BoxDecoration(color: const Color(0x99000000), borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(
+                      color: const Color(0x99000000),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     child: Center(
-                      child: Text('+${item.extra}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                      child: Text(
+                        '+${item.extra}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -754,17 +932,36 @@ class _VendorChatPageState extends State<VendorChatPage> {
               Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(color: const Color(0xFF3A1515), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFE24B4B), size: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3A1515),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: Color(0xFFE24B4B),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.fileName ?? 'File', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                    Text(
+                      item.fileName ?? 'File',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(item.fileSize ?? '', style: const TextStyle(color: _muted, fontSize: 11.5)),
+                    Text(
+                      item.fileSize ?? '',
+                      style: const TextStyle(color: _muted, fontSize: 11.5),
+                    ),
                   ],
                 ),
               ),
@@ -780,7 +977,10 @@ class _VendorChatPageState extends State<VendorChatPage> {
     return Container(
       width: 210,
       padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
-      decoration: BoxDecoration(color: _bubbleOut, borderRadius: BorderRadius.circular(22)),
+      decoration: BoxDecoration(
+        color: _bubbleOut,
+        borderRadius: BorderRadius.circular(22),
+      ),
       child: Row(
         children: [
           Material(
@@ -796,7 +996,9 @@ class _VendorChatPageState extends State<VendorChatPage> {
                 width: 34,
                 height: 34,
                 child: Icon(
-                  _playingKey == '${item.time}-${item.duration}-${item.mine}' ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  _playingKey == '${item.time}-${item.duration}-${item.mine}'
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
                   color: _bubbleOut,
                   size: 22,
                 ),
@@ -806,7 +1008,14 @@ class _VendorChatPageState extends State<VendorChatPage> {
           const SizedBox(width: 10),
           const Expanded(child: _Waveform()),
           const SizedBox(width: 8),
-          Text(item.duration ?? '0:00', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+          Text(
+            item.duration ?? '0:00',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -821,7 +1030,11 @@ class _VendorChatPageState extends State<VendorChatPage> {
           const SizedBox(width: 8),
           _action(Icons.location_on_outlined, 'Send Location', _shareLocation),
           const SizedBox(width: 8),
-          _action(Icons.description_outlined, 'Project Details', _projectDetails),
+          _action(
+            Icons.description_outlined,
+            'Project Details',
+            _projectDetails,
+          ),
         ],
       ),
     );
@@ -841,7 +1054,15 @@ class _VendorChatPageState extends State<VendorChatPage> {
               children: [
                 Icon(icon, color: const Color(0xFFD0CBC3), size: 18),
                 const SizedBox(height: 4),
-                Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 10.5, fontWeight: FontWeight.w600)),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFFD0CBC3),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -874,7 +1095,10 @@ class _VendorChatPageState extends State<VendorChatPage> {
                       style: const TextStyle(color: Colors.white, fontSize: 14),
                       decoration: const InputDecoration(
                         hintText: 'Type a message...',
-                        hintStyle: TextStyle(color: Color(0xFF6B6B70), fontSize: 14),
+                        hintStyle: TextStyle(
+                          color: Color(0xFF6B6B70),
+                          fontSize: 14,
+                        ),
                         border: InputBorder.none,
                         isDense: true,
                       ),
@@ -884,17 +1108,29 @@ class _VendorChatPageState extends State<VendorChatPage> {
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     onPressed: _pickImages,
-                    icon: const Icon(Icons.image_outlined, color: _muted, size: 20),
+                    icon: const Icon(
+                      Icons.image_outlined,
+                      color: _muted,
+                      size: 20,
+                    ),
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     onPressed: _pickFile,
-                    icon: const Icon(Icons.attach_file_rounded, color: _muted, size: 20),
+                    icon: const Icon(
+                      Icons.attach_file_rounded,
+                      color: _muted,
+                      size: 20,
+                    ),
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     onPressed: _recordVoice,
-                    icon: const Icon(Icons.mic_none_rounded, color: _muted, size: 20),
+                    icon: const Icon(
+                      Icons.mic_none_rounded,
+                      color: _muted,
+                      size: 20,
+                    ),
                   ),
                 ],
               ),
@@ -907,7 +1143,11 @@ class _VendorChatPageState extends State<VendorChatPage> {
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: _send,
-              child: const SizedBox(width: 46, height: 46, child: Icon(Icons.send_rounded, color: Colors.white, size: 20)),
+              child: const SizedBox(
+                width: 46,
+                height: 46,
+                child: Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              ),
             ),
           ),
         ],
@@ -922,13 +1162,19 @@ class _VendorChatPageState extends State<VendorChatPage> {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: SizedBox(width: 46, height: 46, child: Icon(icon, color: const Color(0xFFD0CBC3))),
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Icon(icon, color: const Color(0xFFD0CBC3)),
+        ),
       ),
     );
   }
 
   Widget _avatar(double size) {
-    final photo = vendor.profilePhotoUrl ?? VendorPhotos.portrait(vendor.vendorType, vendor.id);
+    final photo =
+        vendor.profilePhotoUrl ??
+        VendorPhotos.portrait(vendor.vendorType, vendor.id);
     return _photo(photo, size, radius: size / 2);
   }
 
@@ -941,26 +1187,44 @@ class _VendorChatPageState extends State<VendorChatPage> {
         errorBuilder: (_, __, ___) => _fallback(),
       );
     } else if (url.startsWith('http') && LensConfig.useNetwork) {
-      child = Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback());
+      child = Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
     }
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: LensColors.graphite, borderRadius: BorderRadius.circular(radius)),
+      decoration: BoxDecoration(
+        color: LensColors.graphite,
+        borderRadius: BorderRadius.circular(radius),
+      ),
       clipBehavior: Clip.antiAlias,
       child: child,
     );
   }
 
   Widget _fallback() {
-    return Center(child: Text(vendor.initials, style: const TextStyle(color: LensColors.cream, fontWeight: FontWeight.w800, fontSize: 11)));
+    return Center(
+      child: Text(
+        vendor.initials,
+        style: const TextStyle(
+          color: LensColors.cream,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+        ),
+      ),
+    );
   }
 
   void _projectDetails() {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF141416),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
@@ -968,7 +1232,14 @@ class _VendorChatPageState extends State<VendorChatPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_sessionTitle, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+              Text(
+                _sessionTitle,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const SizedBox(height: 8),
               Text(_sessionType, style: const TextStyle(color: _muted)),
               const SizedBox(height: 12),
@@ -976,7 +1247,13 @@ class _VendorChatPageState extends State<VendorChatPage> {
               const SizedBox(height: 6),
               Text(_where, style: const TextStyle(color: Colors.white70)),
               const SizedBox(height: 6),
-              Text(_statusLabel, style: const TextStyle(color: Color(0xFF7DCEA0), fontWeight: FontWeight.w700)),
+              Text(
+                _statusLabel,
+                style: const TextStyle(
+                  color: Color(0xFF7DCEA0),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         );
@@ -1002,40 +1279,95 @@ class _ChatItem {
     this.day,
   });
 
-  const _ChatItem.day(String label) : this._(kind: _ChatKind.day, mine: false, time: '', text: label);
+  const _ChatItem.day(String label)
+    : this._(kind: _ChatKind.day, mine: false, time: '', text: label);
 
-  const _ChatItem.text({required bool mine, required String text, required String time})
-      : this._(kind: _ChatKind.text, mine: mine, time: time, text: text);
+  const _ChatItem.text({
+    required bool mine,
+    required String text,
+    required String time,
+  }) : this._(kind: _ChatKind.text, mine: mine, time: time, text: text);
 
-  const _ChatItem.images({required bool mine, required List<String> urls, required int extra, required String time})
-      : this._(kind: _ChatKind.images, mine: mine, time: time, urls: urls, extra: extra);
+  const _ChatItem.images({
+    required bool mine,
+    required List<String> urls,
+    required int extra,
+    required String time,
+  }) : this._(
+         kind: _ChatKind.images,
+         mine: mine,
+         time: time,
+         urls: urls,
+         extra: extra,
+       );
 
-  const _ChatItem.file({required bool mine, required String name, required String size, required String time, String? url})
-      : this._(kind: _ChatKind.file, mine: mine, time: time, fileName: name, fileSize: size, fileUrl: url);
+  const _ChatItem.file({
+    required bool mine,
+    required String name,
+    required String size,
+    required String time,
+    String? url,
+  }) : this._(
+         kind: _ChatKind.file,
+         mine: mine,
+         time: time,
+         fileName: name,
+         fileSize: size,
+         fileUrl: url,
+       );
 
-  const _ChatItem.audio({required bool mine, required String duration, required String time})
-      : this._(kind: _ChatKind.audio, mine: mine, time: time, duration: duration);
+  const _ChatItem.audio({
+    required bool mine,
+    required String duration,
+    required String time,
+  }) : this._(
+         kind: _ChatKind.audio,
+         mine: mine,
+         time: time,
+         duration: duration,
+       );
 
   factory _ChatItem.fromJson(Map<String, dynamic> json) {
     final type = json['type']?.toString() ?? 'text';
     final mine = json['mine'] == true;
     final time = json['time']?.toString() ?? '';
     final day = json['day']?.toString();
-    final urls = (json['urls'] as List<dynamic>? ?? const []).map((item) => '$item').where((item) => item.isNotEmpty).toList();
+    final urls = (json['urls'] as List<dynamic>? ?? const [])
+        .map((item) => '$item')
+        .where((item) => item.isNotEmpty)
+        .toList();
     final body = (json['location'] ?? json['body'])?.toString() ?? '';
     return switch (type) {
-      'images' => _ChatItem._(kind: _ChatKind.images, mine: mine, time: time, urls: urls, day: day),
+      'images' => _ChatItem._(
+        kind: _ChatKind.images,
+        mine: mine,
+        time: time,
+        urls: urls,
+        day: day,
+      ),
       'file' => _ChatItem._(
-          kind: _ChatKind.file,
-          mine: mine,
-          time: time,
-          fileName: json['file_name']?.toString() ?? body,
-          fileSize: json['file_size']?.toString() ?? '',
-          fileUrl: urls.firstOrNull,
-          day: day,
-        ),
-      'audio' => _ChatItem._(kind: _ChatKind.audio, mine: mine, time: time, duration: json['duration']?.toString() ?? '0:00', day: day),
-      _ => _ChatItem._(kind: _ChatKind.text, mine: mine, time: time, text: body, day: day),
+        kind: _ChatKind.file,
+        mine: mine,
+        time: time,
+        fileName: json['file_name']?.toString() ?? body,
+        fileSize: json['file_size']?.toString() ?? '',
+        fileUrl: urls.firstOrNull,
+        day: day,
+      ),
+      'audio' => _ChatItem._(
+        kind: _ChatKind.audio,
+        mine: mine,
+        time: time,
+        duration: json['duration']?.toString() ?? '0:00',
+        day: day,
+      ),
+      _ => _ChatItem._(
+        kind: _ChatKind.text,
+        mine: mine,
+        time: time,
+        text: body,
+        day: day,
+      ),
     };
   }
 
@@ -1057,7 +1389,20 @@ class _Waveform extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const heights = [8.0, 14.0, 10.0, 18.0, 12.0, 20.0, 9.0, 16.0, 11.0, 19.0, 8.0, 13.0];
+    const heights = [
+      8.0,
+      14.0,
+      10.0,
+      18.0,
+      12.0,
+      20.0,
+      9.0,
+      16.0,
+      11.0,
+      19.0,
+      8.0,
+      13.0,
+    ];
     return Row(
       children: [
         for (final height in heights) ...[
@@ -1065,7 +1410,10 @@ class _Waveform extends StatelessWidget {
             child: Container(
               height: height,
               margin: const EdgeInsets.symmetric(horizontal: 1.2),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(99)),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(99),
+              ),
             ),
           ),
         ],

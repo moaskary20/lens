@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
+import 'package:lens/core/contact_launch.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
@@ -11,11 +12,18 @@ import 'package:lens/features/bookings/booking_dispute_page.dart';
 import 'package:lens/features/bookings/deliverables_page.dart';
 import 'package:lens/features/bookings/request_edit_page.dart';
 import 'package:lens/features/home/inbox.dart';
+import 'package:lens/features/home/vendor_chat_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
 import 'package:lens/features/profile/app_settings_page.dart';
+import 'package:lens/features/bookings/vendor_delivery_page.dart';
 
 class BookingsPage extends StatefulWidget {
-  const BookingsPage({super.key, required this.home, this.onBack, this.asRoute = false});
+  const BookingsPage({
+    super.key,
+    required this.home,
+    this.onBack,
+    this.asRoute = false,
+  });
 
   final HomeData home;
   final VoidCallback? onBack;
@@ -115,49 +123,39 @@ class _BookingsPageState extends State<BookingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Lens.', style: TextStyle(color: LensColors.primary, fontSize: 28, fontWeight: FontWeight.w800, height: 1)),
+                  Text(
+                    'Lens.',
+                    style: TextStyle(
+                      color: LensColors.primary,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
                   SizedBox(height: 6),
-                  Text('Incoming bookings', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                  Text(
+                    'Incoming bookings',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          Expanded(child: _vendorBody()),
+          Expanded(
+            child: _VendorBookings(
+              items: _items,
+              loading: _loading,
+              tab: _tab,
+              onTab: (tab) => setState(() => _tab = tab),
+              onReload: _load,
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _vendorBody() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: LensColors.primary));
-    }
-    if (_items.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 36),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.inbox_outlined, color: LensColors.primary, size: 42),
-              SizedBox(height: 14),
-              Text('No requests yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-              SizedBox(height: 8),
-              Text(
-                'When a client books you, the request will land here.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: LensColors.slate, height: 1.4),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
-      itemCount: _items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) => _VendorCard(item: _items[index]),
     );
   }
 }
@@ -181,9 +179,12 @@ class _ClientBookings extends StatelessWidget {
   final VoidCallback? onBack;
   final VoidCallback? onReload;
 
-  List<_BookingItem> get upcoming => items.where((item) => item.group == 'upcoming').toList();
-  List<_BookingItem> get completed => items.where((item) => item.group == 'completed').toList();
-  List<_BookingItem> get canceled => items.where((item) => item.group == 'canceled').toList();
+  List<_BookingItem> get upcoming =>
+      items.where((item) => item.group == 'upcoming').toList();
+  List<_BookingItem> get completed =>
+      items.where((item) => item.group == 'completed').toList();
+  List<_BookingItem> get canceled =>
+      items.where((item) => item.group == 'canceled').toList();
 
   @override
   Widget build(BuildContext context) {
@@ -198,20 +199,46 @@ class _ClientBookings extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Lens.', style: TextStyle(color: LensColors.primary, fontSize: 30, fontWeight: FontWeight.w800, height: 1)),
+                      Text(
+                        'Lens.',
+                        style: TextStyle(
+                          color: LensColors.primary,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          height: 1,
+                        ),
+                      ),
                       SizedBox(height: 3),
-                      Text('FIND. BOOK. CREATE.', style: TextStyle(color: LensColors.slate, fontSize: 9, letterSpacing: 1.5, fontWeight: FontWeight.w700)),
+                      Text(
+                        'FIND. BOOK. CREATE.',
+                        style: TextStyle(
+                          color: LensColors.slate,
+                          fontSize: 9,
+                          letterSpacing: 1.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 IconButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AppSettingsPage(home: home))),
-                  icon: const Icon(Icons.settings_outlined, color: LensColors.cream),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AppSettingsPage(home: home),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.settings_outlined,
+                    color: LensColors.cream,
+                  ),
                 ),
                 if (home.on('notifications'))
                   IconButton(
                     onPressed: () => openNotifications(context, home),
-                    icon: const Icon(Icons.notifications_none_rounded, color: LensColors.cream),
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: LensColors.cream,
+                    ),
                   ),
               ],
             ),
@@ -221,10 +248,25 @@ class _ClientBookings extends StatelessWidget {
             child: Row(
               children: [
                 IconButton(
-                  onPressed: onBack ?? (Navigator.of(context).canPop() ? () => Navigator.of(context).pop() : null),
-                  icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
+                  onPressed:
+                      onBack ??
+                      (Navigator.of(context).canPop()
+                          ? () => Navigator.of(context).pop()
+                          : null),
+                  icon: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: Colors.white,
+                    size: 30,
+                  ),
                 ),
-                const Text('My Bookings', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                const Text(
+                  'My Bookings',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
             ),
           ),
@@ -240,7 +282,9 @@ class _ClientBookings extends StatelessWidget {
           ),
           Expanded(
             child: loading
-                ? const Center(child: CircularProgressIndicator(color: LensColors.primary))
+                ? const Center(
+                    child: CircularProgressIndicator(color: LensColors.primary),
+                  )
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
                     children: _sections(),
@@ -255,18 +299,27 @@ class _ClientBookings extends StatelessWidget {
     if (tab == 'completed') {
       return [
         _sectionTitle('Completed bookings', null),
-        if (completed.isEmpty) _empty('No completed bookings yet') else ...completed.map(_card),
+        if (completed.isEmpty)
+          _empty('No completed bookings yet')
+        else
+          ...completed.map(_card),
       ];
     }
     if (tab == 'canceled') {
       return [
         _sectionTitle('Canceled bookings', null),
-        if (canceled.isEmpty) _empty('No canceled bookings yet') else ...canceled.map(_card),
+        if (canceled.isEmpty)
+          _empty('No canceled bookings yet')
+        else
+          ...canceled.map(_card),
       ];
     }
     return [
       _sectionTitle('Upcoming bookings', null),
-      if (upcoming.isEmpty) _empty('No upcoming bookings yet') else ...upcoming.map(_card),
+      if (upcoming.isEmpty)
+        _empty('No upcoming bookings yet')
+      else
+        ...upcoming.map(_card),
       if (completed.isNotEmpty) ...[
         const SizedBox(height: 18),
         _sectionTitle('Completed bookings', () => onTab('completed')),
@@ -297,7 +350,10 @@ class _ClientBookings extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Container(height: 2, color: selected ? LensColors.primary : Colors.transparent),
+            Container(
+              height: 2,
+              color: selected ? LensColors.primary : Colors.transparent,
+            ),
           ],
         ),
       ),
@@ -309,14 +365,34 @@ class _ClientBookings extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800))),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
           if (onViewAll != null)
             GestureDetector(
               onTap: onViewAll,
               child: const Row(
                 children: [
-                  Text('View all', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
-                  Icon(Icons.chevron_right_rounded, color: LensColors.primary, size: 18),
+                  Text(
+                    'View all',
+                    style: TextStyle(
+                      color: LensColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: LensColors.primary,
+                    size: 18,
+                  ),
                 ],
               ),
             ),
@@ -335,7 +411,7 @@ class _ClientBookings extends StatelessWidget {
   Widget _card(_BookingItem item) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-        child: _ClientCard(item: item, home: home, onReload: onReload),
+      child: _ClientCard(item: item, home: home, onReload: onReload),
     );
   }
 }
@@ -364,7 +440,12 @@ class _ClientCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(onTap: () => _openVendor(context), child: _VendorPhoto(url: item.photo ?? vendor.profilePhotoUrl ?? vendor.coverUrl)),
+              GestureDetector(
+                onTap: () => _openVendor(context),
+                child: _VendorPhoto(
+                  url: item.photo ?? vendor.profilePhotoUrl ?? vendor.coverUrl,
+                ),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -379,42 +460,95 @@ class _ClientCard extends StatelessWidget {
                               item.counterpart,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(99),
                             border: Border.all(color: colors.$1),
                           ),
-                          child: Text(item.badge, style: TextStyle(color: colors.$1, fontSize: 11, fontWeight: FontWeight.w700)),
+                          child: Text(
+                            item.badge,
+                            style: TextStyle(
+                              color: colors.$1,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 2),
                         PopupMenuButton<String>(
                           tooltip: 'Booking actions',
                           padding: EdgeInsets.zero,
                           color: const Color(0xFF1A1A1A),
-                          icon: const Icon(Icons.more_horiz, color: Color(0xFF8E8B84), size: 20),
+                          icon: const Icon(
+                            Icons.more_horiz,
+                            color: Color(0xFF8E8B84),
+                            size: 20,
+                          ),
                           onSelected: (value) => _menu(context, value),
                           itemBuilder: (context) => [
-                            const PopupMenuItem(value: 'deliverables', child: Text('Deliverables', style: TextStyle(color: Colors.white))),
-                            const PopupMenuItem(value: 'request_edit', child: Text('Request edit', style: TextStyle(color: Colors.white))),
-                            const PopupMenuItem(value: 'approve', child: Text('Approved delivery', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(
+                              value: 'deliverables',
+                              child: Text(
+                                'Deliverables',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'request_edit',
+                              child: Text(
+                                'Request edit',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'approve',
+                              child: Text(
+                                'Approved delivery',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
                             if (home.on('disputes'))
                               PopupMenuItem(
                                 value: 'dispute',
-                                child: Text(item.dispute != null ? 'View dispute' : 'Open dispute', style: const TextStyle(color: Colors.white)),
+                                child: Text(
+                                  item.dispute != null
+                                      ? 'View dispute'
+                                      : 'Open dispute',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
                               ),
-                            const PopupMenuItem(value: 'refuse', child: Text('Refuse', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(
+                              value: 'refuse',
+                              child: Text(
+                                'Refuse',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
                           ],
                         ),
                       ],
                     ),
                     if (item.role.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text(item.role, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13)),
+                      Text(
+                        item.role,
+                        style: const TextStyle(
+                          color: Color(0xFF8E8B84),
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 10),
                     Row(
@@ -423,7 +557,10 @@ class _ClientCard extends StatelessWidget {
                         Expanded(
                           child: Column(
                             children: [
-                              _meta(Icons.calendar_today_outlined, item.dateLabel),
+                              _meta(
+                                Icons.calendar_today_outlined,
+                                item.dateLabel,
+                              ),
                               _meta(Icons.access_time_rounded, item.timeLabel),
                               _meta(Icons.location_on_outlined, item.location),
                             ],
@@ -445,7 +582,12 @@ class _ClientCard extends StatelessWidget {
               item.displayProject,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: LensColors.primary, fontSize: 14, fontWeight: FontWeight.w700, height: 1.25),
+              style: const TextStyle(
+                color: LensColors.primary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
             ),
           ),
         ],
@@ -463,7 +605,12 @@ class _ClientCard extends StatelessWidget {
         children: [
           Icon(icon, color: const Color(0xFF8E8B84), size: 15),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13))),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13),
+            ),
+          ),
         ],
       ),
     );
@@ -473,11 +620,19 @@ class _ClientCard extends StatelessWidget {
     final cancel = item.group == 'upcoming';
     return OutlinedButton.icon(
       onPressed: () {},
-      icon: Icon(cancel ? Icons.delete_outline_rounded : Icons.chevron_right_rounded, size: 16),
-      label: Text(cancel ? 'Cancel Booking' : 'View Details', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+      icon: Icon(
+        cancel ? Icons.delete_outline_rounded : Icons.chevron_right_rounded,
+        size: 16,
+      ),
+      label: Text(
+        cancel ? 'Cancel Booking' : 'View Details',
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+      ),
       style: OutlinedButton.styleFrom(
         foregroundColor: cancel ? const Color(0xFFFF3B30) : Colors.white,
-        side: BorderSide(color: cancel ? const Color(0xFFFF3B30) : const Color(0xFF3A3A3E)),
+        side: BorderSide(
+          color: cancel ? const Color(0xFFFF3B30) : const Color(0xFF3A3A3E),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -537,7 +692,12 @@ class _ClientCard extends StatelessWidget {
           total: item.total,
         );
         if (ok && context.mounted) {
-          await _post(context, '/app/bookings/${item.id}/approve', const {}, 'Delivery approved. Files are unlocked.');
+          await _post(
+            context,
+            '/app/bookings/${item.id}/approve',
+            const {},
+            'Delivery approved. Files are unlocked.',
+          );
         }
       case 'dispute':
         await openBookingDispute(
@@ -580,7 +740,13 @@ class _ClientCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF161412),
-        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         content: TextField(
           controller: note,
           maxLines: 4,
@@ -591,9 +757,13 @@ class _ClientCard extends StatelessWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, note.text.trim().isNotEmpty),
+            onPressed: () =>
+                Navigator.pop(dialogContext, note.text.trim().isNotEmpty),
             style: FilledButton.styleFrom(backgroundColor: LensColors.primary),
             child: Text(confirm),
           ),
@@ -614,10 +784,15 @@ class _ClientCard extends StatelessWidget {
             backgroundColor: const Color(0xFF161412),
             content: Text(message, style: const TextStyle(color: Colors.white)),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                style: FilledButton.styleFrom(backgroundColor: LensColors.primary),
+                style: FilledButton.styleFrom(
+                  backgroundColor: LensColors.primary,
+                ),
                 child: const Text('Approved delivery'),
               ),
             ],
@@ -626,18 +801,27 @@ class _ClientCard extends StatelessWidget {
         false;
   }
 
-  Future<void> _post(BuildContext context, String path, Map<String, dynamic> body, String fallback) async {
+  Future<void> _post(
+    BuildContext context,
+    String path,
+    Map<String, dynamic> body,
+    String fallback,
+  ) async {
     var message = fallback;
     if (LensConfig.useNetwork && SessionStore.instance.isClient) {
       try {
         final payload = await ApiClient().postJson(path, body);
         message = payload['message']?.toString() ?? fallback;
       } catch (error) {
-        message = error is ApiException ? error.message : 'Could not update this booking.';
+        message = error is ApiException
+            ? error.message
+            : 'Could not update this booking.';
       }
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
       onReload?.call();
     }
   }
@@ -656,23 +840,471 @@ class _VendorPhoto extends StatelessWidget {
         width: 96,
         height: 96,
         child: url == null
-            ? const ColoredBox(color: LensColors.graphite, child: Icon(Icons.person, color: LensColors.cream))
+            ? const ColoredBox(
+                color: LensColors.graphite,
+                child: Icon(Icons.person, color: LensColors.cream),
+              )
             : Image.network(
                 url!,
                 fit: BoxFit.cover,
                 alignment: Alignment.center,
                 filterQuality: FilterQuality.high,
-                errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite, child: Icon(Icons.person, color: LensColors.cream)),
+                errorBuilder: (_, __, ___) => const ColoredBox(
+                  color: LensColors.graphite,
+                  child: Icon(Icons.person, color: LensColors.cream),
+                ),
               ),
       ),
     );
   }
 }
 
+class _VendorBookings extends StatelessWidget {
+  const _VendorBookings({
+    required this.items,
+    required this.loading,
+    required this.tab,
+    required this.onTab,
+    required this.onReload,
+  });
+
+  final List<_BookingItem> items;
+  final bool loading;
+  final String tab;
+  final ValueChanged<String> onTab;
+  final Future<void> Function() onReload;
+
+  static const _tabs = ['new', 'active', 'delivered', 'history'];
+
+  List<_BookingItem> _forTab(String selected) {
+    return items.where((item) {
+      return switch (selected) {
+        'new' => item.status == 'pending',
+        'active' => [
+          'accepted',
+          'checked_in',
+          'in_progress',
+          'in_revision',
+          'disputed',
+        ].contains(item.status),
+        'delivered' => item.status == 'delivered',
+        _ => [
+          'approved',
+          'completed',
+          'cancelled',
+          'rejected',
+          'failed',
+          'refunded',
+        ].contains(item.status),
+      };
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedTab = _tabs.contains(tab) ? tab : 'new';
+    final visible = _forTab(selectedTab);
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+          child: Row(
+            children: [
+              _VendorTab(
+                label: 'New requests',
+                value: 'new',
+                count: _forTab('new').length,
+                selected: selectedTab == 'new',
+                onTap: onTab,
+              ),
+              _VendorTab(
+                label: 'In progress',
+                value: 'active',
+                count: _forTab('active').length,
+                selected: selectedTab == 'active',
+                onTap: onTab,
+              ),
+              _VendorTab(
+                label: 'Delivered',
+                value: 'delivered',
+                count: _forTab('delivered').length,
+                selected: selectedTab == 'delivered',
+                onTap: onTab,
+              ),
+              _VendorTab(
+                label: 'History',
+                value: 'history',
+                count: _forTab('history').length,
+                selected: selectedTab == 'history',
+                onTap: onTab,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: LensColors.primary),
+                )
+              : visible.isEmpty
+              ? RefreshIndicator(
+                  onRefresh: onReload,
+                  color: LensColors.primary,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.16,
+                      ),
+                      Icon(
+                        selectedTab == 'delivered'
+                            ? Icons.cloud_done_outlined
+                            : Icons.inbox_outlined,
+                        color: LensColors.primary,
+                        size: 44,
+                      ),
+                      const SizedBox(height: 14),
+                      Center(
+                        child: Text(
+                          items.isEmpty
+                              ? 'No bookings yet'
+                              : 'Nothing here for now',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 36),
+                          child: Text(
+                            'Your client requests, project files and deliveries will appear here.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: LensColors.slate,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: onReload,
+                  color: LensColors.primary,
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
+                    itemCount: visible.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemBuilder: (context, index) =>
+                        _VendorCard(item: visible[index], onReload: onReload),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VendorTab extends StatelessWidget {
+  const _VendorTab({
+    required this.label,
+    required this.value,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final int count;
+  final bool selected;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () => onTap(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+          decoration: BoxDecoration(
+            color: selected
+                ? LensColors.primary.withValues(alpha: 0.16)
+                : const Color(0xFF191A1F),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: selected ? LensColors.primary : const Color(0xFF303138),
+            ),
+          ),
+          child: Row(
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? LensColors.primary : LensColors.cream,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: selected ? LensColors.primary : LensColors.slate,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _VendorCard extends StatelessWidget {
-  const _VendorCard({required this.item});
+  const _VendorCard({required this.item, required this.onReload});
 
   final _BookingItem item;
+  final Future<void> Function() onReload;
+
+  bool get _canCancel => [
+    'pending',
+    'accepted',
+    'checked_in',
+    'in_progress',
+  ].contains(item.status);
+  bool get _canDeliver => [
+    'accepted',
+    'checked_in',
+    'in_progress',
+    'in_revision',
+    'delivered',
+  ].contains(item.status);
+  bool get _canComplain => ![
+    'cancelled',
+    'rejected',
+    'failed',
+    'refunded',
+    'approved',
+    'completed',
+    'disputed',
+  ].contains(item.status);
+
+  void _toast(BuildContext context, String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _launchContact(
+    BuildContext context,
+    Uri uri,
+    String contactMethod,
+  ) async {
+    final launched = await ContactLaunch.open(uri);
+    if (!launched && context.mounted) {
+      _toast(context, 'Could not open $contactMethod.');
+    }
+  }
+
+  Future<void> _cancel(BuildContext context) async {
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF191A1F),
+        title: const Text(
+          'Cancel this booking?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: reason,
+          maxLines: 3,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Please tell the client why',
+            hintStyle: TextStyle(color: LensColors.slate),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep booking'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel booking'),
+          ),
+        ],
+      ),
+    );
+    final note = reason.text.trim();
+    reason.dispose();
+    if (!context.mounted) {
+      return;
+    }
+    if (confirmed != true || note.isEmpty) {
+      if (confirmed == true) {
+        _toast(context, 'Add a reason before cancelling.');
+      }
+      return;
+    }
+    try {
+      final result = await ApiClient().postJson(
+        '/app/bookings/${item.id}/cancel',
+        {'reason': note},
+      );
+      if (!context.mounted) {
+        return;
+      }
+      _toast(context, result['message']?.toString() ?? 'Booking cancelled.');
+      await onReload();
+    } catch (error) {
+      if (context.mounted) {
+        _toast(context, error.toString().replaceFirst('ApiException: ', ''));
+      }
+    }
+  }
+
+  Future<void> _complain(BuildContext context) async {
+    final reason = TextEditingController();
+    final submitted = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF191A1F),
+        title: const Text(
+          'Open a complaint',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: reason,
+          maxLines: 4,
+          maxLength: 2000,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Describe what happened',
+            hintStyle: TextStyle(color: LensColors.slate),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, reason.text.trim()),
+            child: const Text('Send complaint'),
+          ),
+        ],
+      ),
+    );
+    reason.dispose();
+    if (!context.mounted) {
+      return;
+    }
+    if (submitted == null) {
+      return;
+    }
+    if (submitted.isEmpty) {
+      _toast(context, 'Add details before sending the complaint.');
+      return;
+    }
+    try {
+      await ApiClient().postJson('/app/bookings/${item.id}/dispute', {
+        'kind': 'complaint',
+        'reason': submitted,
+      });
+      if (!context.mounted) {
+        return;
+      }
+      _toast(context, 'Your complaint was sent to Lens support.');
+      await onReload();
+    } catch (error) {
+      if (context.mounted) {
+        _toast(context, error.toString().replaceFirst('ApiException: ', ''));
+      }
+    }
+  }
+
+  Future<void> _openChat(BuildContext context) async {
+    final client = _clientCard;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VendorChatPage(
+          vendor: client,
+          clientId: item.clientId,
+          bookingId: item.id,
+          projectName: item.displayProject,
+          dateLabel: item.dateLabel,
+          time: item.timeLabel,
+          location: item.location,
+          status: item.statusLabel,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openDelivery(BuildContext context) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => VendorDeliveryPage(
+          bookingId: item.id,
+          projectName: item.displayProject,
+        ),
+      ),
+    );
+    if (changed == true) {
+      await onReload();
+    }
+  }
+
+  VendorCard get _clientCard {
+    final name = item.counterpart.isEmpty ? 'Client' : item.counterpart;
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    final initials = parts.isEmpty
+        ? 'C'
+        : parts
+              .take(2)
+              .map((part) => part.substring(0, 1).toUpperCase())
+              .join();
+    return VendorCard(
+      id: item.clientId ?? item.id,
+      displayName: name,
+      vendorTypeName: item.role,
+      vendorType: item.role.toLowerCase().contains('video')
+          ? 'videographer'
+          : 'photographer',
+      city: item.location,
+      location: item.location,
+      ratingAvg: 0,
+      ratingCount: 0,
+      badges: const [],
+      coverUrl: item.photo,
+      profilePhotoUrl: item.photo,
+      initials: initials,
+      tags: const [],
+      startingFrom: null,
+      verified: false,
+      latitude: null,
+      longitude: null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -688,21 +1320,208 @@ class _VendorCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(item.counterpart, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16))),
-              Text(item.statusLabel, style: const TextStyle(color: LensColors.primary, fontSize: 11, fontWeight: FontWeight.w700)),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF25262C),
+                backgroundImage: item.photo == null || item.photo!.isEmpty
+                    ? null
+                    : NetworkImage(item.photo!),
+                child: item.photo == null || item.photo!.isEmpty
+                    ? Text(
+                        _clientCard.initials,
+                        style: const TextStyle(
+                          color: LensColors.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.counterpart.isEmpty ? 'Client' : item.counterpart,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      item.reference,
+                      style: const TextStyle(
+                        color: LensColors.slate,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: LensColors.primary.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  item.statusLabel,
+                  style: const TextStyle(
+                    color: LensColors.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(item.reference, style: const TextStyle(color: LensColors.slate, fontWeight: FontWeight.w700, fontSize: 12)),
-          const SizedBox(height: 8),
-          Text(item.when, style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13)),
-          if (item.location.isNotEmpty) Text(item.location, style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13)),
+          const SizedBox(height: 13),
+          Text(
+            item.displayProject,
+            style: const TextStyle(
+              color: LensColors.cream,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 9),
+          _BookingDetailRow(
+            icon: Icons.calendar_month_outlined,
+            text: item.when,
+          ),
+          if (item.location.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _BookingDetailRow(
+              icon: Icons.location_on_outlined,
+              text: item.location,
+            ),
+          ],
+          if (item.total > 0) ...[
+            const SizedBox(height: 6),
+            _BookingDetailRow(
+              icon: Icons.payments_outlined,
+              text: 'EGP ${item.total.toStringAsFixed(0)}',
+            ),
+          ],
           if (item.status == 'pending')
             const Padding(
-              padding: EdgeInsets.only(top: 6),
-              child: Text('Waiting for you to accept', style: TextStyle(color: Color(0xFFD0CBC3), fontSize: 12)),
+              padding: EdgeInsets.only(top: 9),
+              child: Text(
+                'New request — contact the client to coordinate.',
+                style: TextStyle(color: LensColors.slate, fontSize: 12),
+              ),
             ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (item.clientId != null)
+                _BookingAction(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: 'In-app chat',
+                  onTap: () => _openChat(context),
+                ),
+              if (item.phone?.isNotEmpty == true)
+                _BookingAction(
+                  icon: Icons.call_outlined,
+                  label: 'Call',
+                  onTap: () => _launchContact(
+                    context,
+                    ContactLaunch.tel(item.phone!),
+                    'the phone app',
+                  ),
+                ),
+              if (item.whatsapp?.isNotEmpty == true)
+                _BookingAction(
+                  icon: Icons.message_outlined,
+                  label: 'WhatsApp',
+                  onTap: () => _launchContact(
+                    context,
+                    ContactLaunch.whatsapp(item.whatsapp!),
+                    'WhatsApp',
+                  ),
+                ),
+              if (_canDeliver)
+                _BookingAction(
+                  icon: Icons.cloud_upload_outlined,
+                  label: 'Project delivery',
+                  highlighted: true,
+                  onTap: () => _openDelivery(context),
+                ),
+              if (_canCancel)
+                _BookingAction(
+                  icon: Icons.event_busy_outlined,
+                  label: 'Cancel',
+                  onTap: () => _cancel(context),
+                ),
+              if (_canComplain)
+                _BookingAction(
+                  icon: Icons.support_agent_rounded,
+                  label: 'Open complaint',
+                  onTap: () => _complain(context),
+                ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _BookingDetailRow extends StatelessWidget {
+  const _BookingDetailRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: LensColors.primary, size: 15),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BookingAction extends StatelessWidget {
+  const _BookingAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 15),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: highlighted ? LensColors.primary : LensColors.cream,
+        side: BorderSide(
+          color: highlighted ? LensColors.primary : const Color(0xFF383A41),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
@@ -727,6 +1546,7 @@ class _BookingItem {
     this.photo,
     this.projectName = '',
     this.vendorId,
+    this.clientId,
     this.vendor,
     this.phone,
     this.whatsapp,
@@ -746,25 +1566,39 @@ class _BookingItem {
   factory _BookingItem.fromJson(Map<String, dynamic> json) {
     final status = json['status']?.toString() ?? '';
     final group = json['group']?.toString() ?? _groupFor(status);
-    final vendorJson = json['vendor'] is Map ? Map<String, dynamic>.from(json['vendor'] as Map) : null;
+    final vendorJson = json['vendor'] is Map
+        ? Map<String, dynamic>.from(json['vendor'] as Map)
+        : null;
     return _BookingItem(
-      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+      id: json['id'] is int
+          ? json['id'] as int
+          : int.tryParse('${json['id']}') ?? 0,
       reference: json['reference']?.toString() ?? '',
       status: status,
       statusLabel: json['status_label']?.toString() ?? status,
       badge: json['badge']?.toString() ?? _badgeFor(group, status),
       group: group,
       when: json['when']?.toString() ?? '',
-      dateLabel: json['date_label']?.toString() ?? json['when']?.toString() ?? '',
+      dateLabel:
+          json['date_label']?.toString() ?? json['when']?.toString() ?? '',
       timeLabel: json['time_label']?.toString() ?? '',
       package: json['package']?.toString() ?? '',
       location: json['location']?.toString() ?? '',
-      total: json['total'] is num ? (json['total'] as num).toDouble() : double.tryParse('${json['total']}') ?? 0,
+      total: json['total'] is num
+          ? (json['total'] as num).toDouble()
+          : double.tryParse('${json['total']}') ?? 0,
       counterpart: json['counterpart']?.toString() ?? '',
       role: json['role']?.toString() ?? json['vendor_type']?.toString() ?? '',
-      photo: json['photo']?.toString() ?? vendorJson?['profile_photo_url']?.toString(),
+      photo:
+          json['photo']?.toString() ??
+          vendorJson?['profile_photo_url']?.toString(),
       projectName: _BookingItem._projectNameOf(json),
-      vendorId: json['vendor_id'] is int ? json['vendor_id'] as int : int.tryParse('${json['vendor_id']}'),
+      vendorId: json['vendor_id'] is int
+          ? json['vendor_id'] as int
+          : int.tryParse('${json['vendor_id']}'),
+      clientId: json['client_id'] is int
+          ? json['client_id'] as int
+          : int.tryParse('${json['client_id']}'),
       vendor: vendorJson == null ? null : VendorCard.fromJson(vendorJson),
       phone: json['phone']?.toString(),
       whatsapp: json['whatsapp']?.toString(),
@@ -801,6 +1635,7 @@ class _BookingItem {
   }
 
   final int? vendorId;
+  final int? clientId;
   final VendorCard? vendor;
   final String? phone;
   final String? whatsapp;
@@ -808,8 +1643,17 @@ class _BookingItem {
 
   VendorCard get fallbackVendor {
     final name = counterpart.isEmpty ? 'Creator' : counterpart;
-    final parts = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
-    final initials = parts.isEmpty ? 'C' : parts.take(2).map((part) => part.substring(0, 1).toUpperCase()).join();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    final initials = parts.isEmpty
+        ? 'C'
+        : parts
+              .take(2)
+              .map((part) => part.substring(0, 1).toUpperCase())
+              .join();
     final slug = switch (role.toLowerCase()) {
       final value when value.contains('studio') => 'studio',
       final value when value.contains('video') => 'videographer',
