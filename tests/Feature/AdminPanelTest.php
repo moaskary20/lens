@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class AdminPanelTest extends TestCase
@@ -50,6 +51,47 @@ class AdminPanelTest extends TestCase
             ->assertSee('Operations', false)
             ->assertSee('class="fi dark"', false)
             ->assertDontSee('fi-theme-switcher', false);
+    }
+
+    public function test_admin_password_can_be_reset_from_the_console(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+
+        $this->artisan('lens:reset-admin-password', ['--password' => 'password'])
+            ->expectsOutput('Admin password updated.')
+            ->assertSuccessful();
+
+        $this->assertTrue(Hash::check('password', $admin->fresh()->password));
+        $this->assertTrue($admin->fresh()->is_active);
+        $this->assertTrue($admin->fresh()->isAdmin());
+    }
+
+    public function test_admin_account_can_be_created_from_the_console(): void
+    {
+        User::query()->where('email', 'ops@lens.app')->delete();
+
+        $this->artisan('lens:reset-admin-password', [
+            'email' => 'ops@lens.app',
+            '--password' => 'password',
+            '--name' => 'Ops Admin',
+        ])
+            ->expectsOutput('Admin account created and password set.')
+            ->assertSuccessful();
+
+        $admin = User::query()->where('email', 'ops@lens.app')->firstOrFail();
+        $this->assertTrue(Hash::check('password', $admin->password));
+        $this->assertTrue($admin->isAdmin());
+        $this->assertTrue($admin->is_active);
+    }
+
+    public function test_admin_password_reset_refuses_non_staff_accounts(): void
+    {
+        $this->artisan('lens:reset-admin-password', [
+            'email' => 'client@lens.app',
+            '--password' => 'password',
+        ])
+            ->expectsOutput('That email belongs to a non-staff account and was left unchanged.')
+            ->assertFailed();
     }
 
     public function test_core_resources_render(): void
