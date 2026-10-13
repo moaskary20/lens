@@ -16,6 +16,8 @@ class Roles
 
     public const SUPERVISOR = 'supervisor';
 
+    public const SUPPORT = 'support';
+
     /**
      * @var array<string, string>
      */
@@ -110,6 +112,17 @@ class Roles
                 'manage_escrow' => ['label' => 'Manage escrow and wallets', 'description' => 'Escrow ledger, user wallets, and vendor payouts', 'default' => true, 'group' => 'finance'],
                 'manage_settings' => ['label' => 'Change platform settings', 'description' => 'Fees, features, search, delivery — admin only by default', 'default' => false, 'group' => 'platform'],
                 'manage_roles' => ['label' => 'Change role capabilities', 'description' => 'Reserved for platform admin', 'default' => false, 'group' => 'platform'],
+            ],
+        ],
+        'support' => [
+            'label' => 'Support',
+            'description' => 'Handles app issue reports, conversation threads, and dispute follow-up. Can view users but cannot manage verification, funds, or platform settings.',
+            'panel' => true,
+            'capabilities' => [
+                'view_users' => ['label' => 'View users', 'description' => 'Read the user directory without creating, editing, or deleting accounts', 'default' => true, 'group' => 'operations'],
+                'triage_issues' => ['label' => 'Triage app issues', 'description' => 'Work Report an Issue tickets under App issues', 'default' => true, 'group' => 'support'],
+                'view_chat' => ['label' => 'Review conversation threads', 'description' => 'Read client–creator chat when handling a support case', 'default' => true, 'group' => 'support'],
+                'resolve_disputes' => ['label' => 'Handle dispute follow-up', 'description' => 'Review cases, mark them in review, or close without moving funds', 'default' => true, 'group' => 'support'],
             ],
         ],
         'admin' => [
@@ -246,7 +259,8 @@ class Roles
             return true;
         }
 
-        return $user->isSupervisor() && self::can(self::SUPERVISOR, $capability);
+        return ($user->isSupervisor() || $user->isSupport())
+            && self::can($user->role, $capability);
     }
 
     public static function roleCan(?User $user, string $capability): bool
@@ -275,7 +289,7 @@ class Roles
     public static function appFeatures(?User $user): array
     {
         $features = Feature::flags();
-        if (! $user || $user->isStaff()) {
+        if (! $user || $user->isStaff() || $user->isSupport()) {
             return $features;
         }
 

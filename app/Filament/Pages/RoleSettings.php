@@ -45,6 +45,7 @@ class RoleSettings extends Page
             'client' => Roles::capabilitiesFor('client'),
             'vendor' => Roles::capabilitiesFor('vendor'),
             'supervisor' => Roles::capabilitiesFor('supervisor'),
+            'support' => Roles::capabilitiesFor('support'),
             'admin' => Roles::capabilitiesFor('admin'),
         ]);
     }
@@ -57,11 +58,11 @@ class RoleSettings extends Page
                 ->schema([
                     Placeholder::make('roles_help')
                         ->hiddenLabel()
-                        ->content('Client and vendor flags drive the mobile app (book, chat, disputes, Report an Issue, wallet, AI). Supervisor flags drive the admin desks (disputes, app issues, chat, escrow, wallets, payouts). Platform admins always keep every staff capability.'),
+                        ->content('Client and vendor flags drive the mobile app. Supervisor flags control operational desks and finance. Support flags control app issues, conversations, disputes, and read-only user access. Platform admins always keep every staff capability.'),
                 ]),
         ];
 
-        foreach (['client', 'vendor', 'supervisor'] as $role) {
+        foreach (['client', 'vendor', 'supervisor', 'support'] as $role) {
             $meta = Roles::CATALOG[$role];
             $groups = [];
 
@@ -127,7 +128,7 @@ class RoleSettings extends Page
     {
         $state = $this->form->getState();
 
-        foreach (['client', 'vendor', 'supervisor'] as $role) {
+        foreach (['client', 'vendor', 'supervisor', 'support'] as $role) {
             Roles::persist($role, $state[$role] ?? []);
         }
 

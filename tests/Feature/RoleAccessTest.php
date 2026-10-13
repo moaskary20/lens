@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Filament\Auth\VendorLogin;
 use App\Filament\Pages\RoleSettings;
+use App\Filament\Resources\DisputeResource;
+use App\Models\Dispute;
 use App\Models\User;
 use App\Models\VendorAvailability;
 use App\Models\VendorType;
@@ -12,6 +14,7 @@ use Database\Seeders\LensSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class RoleAccessTest extends TestCase
@@ -145,6 +148,52 @@ class RoleAccessTest extends TestCase
         $this->actingAs($supervisor)->get('/admin/pricing-models')->assertForbidden();
     }
 
+    public function test_support_role_is_limited_to_support_pages_and_read_only_users(): void
+    {
+        $support = User::factory()->create([
+            'role' => Roles::SUPPORT,
+            'email' => 'support@lens.app',
+        ]);
+
+        $this->assertTrue($support->isSupport());
+        $this->assertFalse($support->isStaff());
+        $this->assertTrue($support->canAccessPanel(Filament::getPanel('admin')));
+        $this->assertTrue($support->staffCan('view_users'));
+        $this->assertTrue($support->staffCan('triage_issues'));
+        $this->assertTrue($support->staffCan('view_chat'));
+        $this->assertTrue($support->staffCan('resolve_disputes'));
+        $this->assertFalse($support->staffCan('manage_escrow'));
+        $this->assertFalse($support->staffCan('verify_vendors'));
+        $this->assertFalse($support->staffCan('manage_settings'));
+
+        $this->actingAs($support)->get('/admin')->assertOk();
+        $this->actingAs($support)->get('/admin/users')->assertOk();
+        $this->actingAs($support)->get('/admin/issue-reports')->assertOk();
+        $this->actingAs($support)->get('/admin/conversations')->assertOk();
+        $this->actingAs($support)->get('/admin/disputes')->assertOk();
+        $this->actingAs($support)->get('/admin/users/create')->assertForbidden();
+        $this->actingAs($support)->get('/admin/users/'.User::query()->where('role', 'client')->value('id').'/edit')->assertForbidden();
+        $this->actingAs($support)->get('/admin/vendors')->assertForbidden();
+        $this->actingAs($support)->get('/admin/bookings')->assertForbidden();
+        $this->actingAs($support)->get('/admin/wallets')->assertForbidden();
+        $this->actingAs($support)->get('/admin/feature-settings')->assertForbidden();
+        $this->actingAs($support)->get('/admin/role-settings')->assertForbidden();
+    }
+
+    public function test_support_cannot_move_escrow_from_dispute_outcomes(): void
+    {
+        $support = User::factory()->create([
+            'role' => Roles::SUPPORT,
+            'email' => 'support-finance@lens.app',
+        ]);
+        $dispute = Dispute::query()->where('status', 'open')->firstOrFail();
+
+        $this->actingAs($support);
+        $this->expectException(HttpException::class);
+
+        DisputeResource::applyFormOutcome($dispute, null, 'refund');
+    }
+
     public function test_all_seven_vendor_types_are_marketplace_ready(): void
     {
         $slugs = VendorType::query()->marketplace()->pluck('slug')->all();
@@ -170,6 +219,7 @@ class RoleAccessTest extends TestCase
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
 
         $this->actingAs($admin)->get('/admin/role-settings')->assertOk();
+        $this->actingAs($admin)->get('/admin/users/create')->assertOk()->assertSee('Support');
         $this->actingAs($admin)->get('/admin/vendor-availabilities')->assertOk();
     }
 
@@ -187,6 +237,7 @@ class RoleAccessTest extends TestCase
         $this->assertTrue($vendor->roleCan('use_wallet'));
         $this->assertArrayHasKey('report_issues', Roles::blueprint()['roles']['client']['capabilities']);
         $this->assertArrayHasKey('triage_issues', Roles::blueprint()['roles']['supervisor']['capabilities']);
+        $this->assertArrayHasKey('view_users', Roles::blueprint()['roles']['support']['capabilities']);
 
         $this->actingAs($admin)->get('/admin/role-settings')
             ->assertOk()
@@ -195,9 +246,20 @@ class RoleAccessTest extends TestCase
             ->assertSee('In-app chat', false)
             ->assertSee('Save favorites', false)
             ->assertSee('Manage escrow and wallets', false)
+            ->assertSee('Read the user directory without creating, editing, or deleting accounts', false)
+            ->assertSee('Support', false)
             ->assertSee('Set travel fees', false)
             ->assertSee('Replacement offers were removed', false)
             ->assertDontSee('Replacement Offers', false);
+
+        $supportCapabilities = Roles::capabilitiesFor('support');
+        $supportCapabilities['view_chat'] = false;
+        Livewire::test(RoleSettings::class)
+            ->fillForm(['support' => $supportCapabilities])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertFalse(Roles::can('support', 'view_chat'));
     }
 
     public function test_turning_off_client_issue_reports_blocks_the_api(): void

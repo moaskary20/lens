@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Support\Feature;
+use App\Support\Roles;
 use App\Support\VendorMetrics;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -17,7 +18,7 @@ class QualityStatsOverview extends StatsOverviewWidget
 
     public static function canView(): bool
     {
-        return (bool) auth()->user()?->isStaff()
+        return Roles::staffCan(auth()->user(), 'view_operations')
             && (Feature::enabled('reviews') || Feature::enabled('badges') || Feature::enabled('bookings'));
     }
 

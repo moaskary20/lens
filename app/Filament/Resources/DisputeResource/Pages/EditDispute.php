@@ -4,6 +4,7 @@ namespace App\Filament\Resources\DisputeResource\Pages;
 
 use App\Filament\Resources\DisputeResource;
 use App\Models\Dispute;
+use App\Support\Roles;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -27,7 +28,8 @@ class EditDispute extends EditRecord
             $action->record($record);
         }
 
-        $actions[] = DeleteAction::make()->visible(fn (): bool => $record->isOpen());
+        $actions[] = DeleteAction::make()->visible(fn (): bool => $record->isOpen()
+            && Roles::staffCan(auth()->user(), 'view_operations'));
 
         return $actions;
     }

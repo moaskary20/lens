@@ -5,7 +5,9 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasOptionalFeature;
 use App\Filament\Resources\IssueReportResource\Pages;
 use App\Models\IssueReport;
+use App\Models\User;
 use App\Support\LensNotifier;
+use App\Support\Roles;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -113,7 +115,10 @@ class IssueReportResource extends Resource
                 SelectFilter::make('topic')->label('Topic')->options(IssueReport::TOPICS),
             ])
             ->defaultSort('created_at', 'desc')
-            ->recordActions([EditAction::make(), DeleteAction::make()]);
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make()->visible(fn (): bool => Roles::staffCan(auth()->user(), 'view_operations')),
+            ]);
     }
 
     public static function getPages(): array
@@ -128,7 +133,7 @@ class IssueReportResource extends Resource
     {
         $user = $issue->user;
         if (! $user) {
-            $user = \App\Models\User::query()->where('email', $issue->email)->where('is_active', true)->first();
+            $user = User::query()->where('email', $issue->email)->where('is_active', true)->first();
         }
         if (! $user) {
             return;

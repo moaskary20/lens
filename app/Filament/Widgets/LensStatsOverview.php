@@ -7,9 +7,11 @@ use App\Models\Dispute;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Support\Finance;
+use App\Support\Roles;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Database\Eloquent\Builder;
 
 class LensStatsOverview extends StatsOverviewWidget
 {
@@ -17,7 +19,8 @@ class LensStatsOverview extends StatsOverviewWidget
 
     public static function canView(): bool
     {
-        return (bool) auth()->user()?->isStaff();
+        return Roles::staffCan(auth()->user(), 'view_operations')
+            && Roles::staffCan(auth()->user(), 'manage_escrow');
     }
 
     protected function getStats(): array
@@ -51,7 +54,7 @@ class LensStatsOverview extends StatsOverviewWidget
 
     /**
      * @param  class-string  $model
-     * @param  callable(\Illuminate\Database\Eloquent\Builder): \Illuminate\Database\Eloquent\Builder|null  $scope
+     * @param  callable(Builder): Builder|null  $scope
      * @return list<float>
      */
     protected function weekSeries(string $model, ?callable $scope = null): array

@@ -6,8 +6,9 @@ use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
 use App\Support\ClientPreferences;
+use App\Support\Egypt;
+use App\Support\Finance;
 use App\Support\Roles;
-use Illuminate\Database\Eloquent\Model;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -28,6 +29,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class UserResource extends Resource
@@ -53,8 +55,8 @@ class UserResource extends Resource
                 TextInput::make('name')->label('Name')->required()->maxLength(255),
                 TextInput::make('email')->label('Email')->email()->required()->unique(ignoreRecord: true),
                 TextInput::make('phone')->label('Phone')->tel()->unique(ignoreRecord: true)
-                    ->rule(\App\Support\Egypt::mobileRule())
-                    ->validationMessages(['regex' => \App\Support\Egypt::mobileMessage()])
+                    ->rule(Egypt::mobileRule())
+                    ->validationMessages(['regex' => Egypt::mobileMessage()])
                     ->helperText('Egyptian mobile: 11 digits starting with 010, 011, 012, or 015.'),
                 TextInput::make('password')->label('Password')->password()->revealable()
                     ->required(fn (string $operation): bool => $operation === 'create')
@@ -64,6 +66,7 @@ class UserResource extends Resource
                         ? [
                             'admin' => 'Platform admin',
                             'supervisor' => 'Supervisor',
+                            'support' => 'Support',
                             'client' => 'Client (Customer)',
                             'vendor' => 'Vendor (Creator / Studio)',
                         ]
@@ -72,7 +75,7 @@ class UserResource extends Resource
                             'vendor' => 'Vendor (Creator / Studio)',
                         ])
                     ->disabled(fn (?User $record): bool => (bool) $record && $record->isStaff() && ! (auth()->user()?->isAdmin() ?? false))
-                    ->helperText('Clients browse and book. Vendors onboard under a type. Supervisors handle verification and disputes. Admins own settings.')
+                    ->helperText('Clients browse and book. Vendors onboard under a type. Supervisors handle operations. Support handles app issues, chat, and dispute follow-up. Admins own settings.')
                     ->native(false),
                 Select::make('city_id')->label('Governorate')->relationship('city', 'name_en')->searchable()->preload(),
                 Select::make('locale')->label('Language')->options(ClientPreferences::languages())->default('en')->live()
@@ -170,6 +173,7 @@ class UserResource extends Resource
                 TextColumn::make('role')->label('Role')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
                     'admin' => 'Admin',
                     'supervisor' => 'Supervisor',
+                    'support' => 'Support',
                     'client' => 'Client',
                     'vendor' => 'Vendor',
                     default => $state,
@@ -180,7 +184,8 @@ class UserResource extends Resource
                     default => 'gray',
                 }),
                 TextColumn::make('city.name_en')->label('Governorate'),
-                TextColumn::make('wallet.available')->label('Wallet')->money(\App\Support\Finance::currency())->placeholder('—'),
+                TextColumn::make('wallet.available')->label('Wallet')->money(Finance::currency())->placeholder('—')
+                    ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow')),
                 IconColumn::make('is_active')->label('Active')->boolean(),
                 TextColumn::make('created_at')->label('Joined')->dateTime('Y-m-d')->sortable(),
             ])
@@ -188,17 +193,18 @@ class UserResource extends Resource
                 SelectFilter::make('role')->label('Role')->options([
                     'admin' => 'Admin',
                     'supervisor' => 'Supervisor',
+                    'support' => 'Support',
                     'client' => 'Client',
                     'vendor' => 'Vendor',
                 ]),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()->visible(fn (): bool => static::canManageAccounts()),
+                DeleteAction::make()->visible(fn (): bool => static::canManageAccounts()),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()->visible(fn (): bool => static::canManageAccounts()),
                 ]),
             ]);
     }
@@ -209,6 +215,22 @@ class UserResource extends Resource
     }
 
     public static function canViewAny(): bool
+    {
+        return Roles::staffCan(auth()->user(), 'view_operations')
+            || Roles::staffCan(auth()->user(), 'view_users');
+    }
+
+    public static function canCreate(): bool
+    {
+        return static::canManageAccounts();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return static::canManageAccounts();
+    }
+
+    public static function canManageAccounts(): bool
     {
         return Roles::staffCan(auth()->user(), 'view_operations');
     }

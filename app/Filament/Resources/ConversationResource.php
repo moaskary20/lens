@@ -6,6 +6,7 @@ use App\Filament\Concerns\HasOptionalFeature;
 use App\Filament\Resources\ConversationResource\Pages;
 use App\Models\Conversation;
 use App\Support\ChatThread;
+use App\Support\Roles;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -15,9 +16,10 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\HtmlString;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use UnitEnum;
 
 class ConversationResource extends Resource
@@ -45,9 +47,12 @@ class ConversationResource extends Resource
         return $schema->components([
             Section::make('Participants')
                 ->schema([
-                    Select::make('client_id')->label('Client')->relationship('client', 'name')->searchable()->preload()->required(),
-                    Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name')->searchable()->preload()->required(),
-                    Select::make('booking_id')->label('Booking')->relationship('booking', 'reference')->searchable()->preload(),
+                    Select::make('client_id')->label('Client')->relationship('client', 'name')->searchable()->preload()->required()
+                        ->disabled(fn (): bool => ! Roles::staffCan(auth()->user(), 'view_operations')),
+                    Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name')->searchable()->preload()->required()
+                        ->disabled(fn (): bool => ! Roles::staffCan(auth()->user(), 'view_operations')),
+                    Select::make('booking_id')->label('Booking')->relationship('booking', 'reference')->searchable()->preload()
+                        ->disabled(fn (): bool => ! Roles::staffCan(auth()->user(), 'view_operations')),
                 ])
                 ->columns(3),
             Section::make('Live chat')
@@ -73,7 +78,20 @@ class ConversationResource extends Resource
                 TextColumn::make('messages_count')->counts('messages')->label('Messages'),
                 TextColumn::make('last_message_at')->label('Last message')->since(),
             ])
-            ->recordActions([EditAction::make(), DeleteAction::make()]);
+            ->recordActions([
+                EditAction::make()->visible(fn (): bool => Roles::staffCan(auth()->user(), 'view_chat')),
+                DeleteAction::make()->visible(fn (): bool => Roles::staffCan(auth()->user(), 'view_operations')),
+            ]);
+    }
+
+    public static function canCreate(): bool
+    {
+        return Roles::staffCan(auth()->user(), 'view_operations');
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return Roles::staffCan(auth()->user(), 'view_operations');
     }
 
     public static function getPages(): array

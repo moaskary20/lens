@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\WalletService;
+use App\Support\LensNotifier;
 use App\Support\Roles;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -54,7 +56,7 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return match ($panel->getId()) {
-            'admin' => $this->isStaff(),
+            'admin' => $this->isStaff() || $this->isSupport(),
             'vendor' => $this->isVendor() && $this->vendor()->exists(),
             default => false,
         };
@@ -68,6 +70,11 @@ class User extends Authenticatable implements FilamentUser
     public function isSupervisor(): bool
     {
         return $this->role === Roles::SUPERVISOR;
+    }
+
+    public function isSupport(): bool
+    {
+        return $this->role === Roles::SUPPORT;
     }
 
     public function isStaff(): bool
@@ -186,18 +193,18 @@ class User extends Authenticatable implements FilamentUser
     protected static function booted(): void
     {
         static::created(function (User $user): void {
-            app(\App\Services\WalletService::class)->ensure($user);
+            app(WalletService::class)->ensure($user);
 
             if (in_array($user->role, ['client', 'vendor'], true)) {
-                \App\Support\LensNotifier::staff(
-                    \App\Support\LensNotifier::ACCOUNT_REGISTERED,
+                LensNotifier::staff(
+                    LensNotifier::ACCOUNT_REGISTERED,
                     'New account',
                     $user->name.' registered as '.$user->role.'.',
                     $user->id,
                 );
-                \App\Support\LensNotifier::toUser(
+                LensNotifier::toUser(
                     $user,
-                    \App\Support\LensNotifier::ACCOUNT_REGISTERED,
+                    LensNotifier::ACCOUNT_REGISTERED,
                     'Welcome to Lens',
                     'Your '.$user->role.' account is ready.',
                 );

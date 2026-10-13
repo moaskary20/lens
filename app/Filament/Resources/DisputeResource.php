@@ -7,6 +7,7 @@ use App\Filament\Resources\DisputeResource\Pages;
 use App\Models\Dispute;
 use App\Services\DisputeService;
 use App\Support\Finance;
+use App\Support\Roles;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -22,6 +23,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use LogicException;
 use UnitEnum;
@@ -77,6 +79,7 @@ class DisputeResource extends Resource
                     ->placeholder('Pending')
                     ->native(false)
                     ->nullable()
+                    ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow'))
                     ->disabled(fn (?Dispute $record): bool => filled($record?->id) && ! $record->isOpen())
                     ->helperText('Choose an outcome, then Save. Refund / pay / split moves escrow.'),
                 Textarea::make('reason')->label('Complaint / reason')->required()->columnSpanFull(),
@@ -91,9 +94,12 @@ class DisputeResource extends Resource
                 Placeholder::make('chat_case')->hiddenLabel()->content(fn (?Dispute $record): HtmlString => self::chatHtml($record))->columnSpanFull(),
             ]),
             Section::make('Decision (split percents of session price)')->schema([
-                TextInput::make('client_refund_percent')->label('Client refund %')->numeric()->default(80),
-                TextInput::make('vendor_payout_percent')->label('Vendor %')->numeric()->default(10),
-                TextInput::make('platform_fee_percent')->label('Platform %')->numeric()->default(10),
+                TextInput::make('client_refund_percent')->label('Client refund %')->numeric()->default(80)
+                    ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow')),
+                TextInput::make('vendor_payout_percent')->label('Vendor %')->numeric()->default(10)
+                    ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow')),
+                TextInput::make('platform_fee_percent')->label('Platform %')->numeric()->default(10)
+                    ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow')),
                 Textarea::make('admin_notes')->label('Admin notes')->columnSpanFull(),
             ])->columns(3),
         ]);
@@ -124,9 +130,20 @@ class DisputeResource extends Resource
                 ]),
             ])
             ->recordActions([
-                EditAction::make()->label('Review case'),
+                EditAction::make()->label('Review case')
+                    ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'resolve_disputes')),
             ])
             ->defaultSort('id', 'desc');
+    }
+
+    public static function canCreate(): bool
+    {
+        return Roles::staffCan(auth()->user(), 'view_operations');
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return Roles::staffCan(auth()->user(), 'view_operations');
     }
 
     /**
@@ -135,6 +152,12 @@ class DisputeResource extends Resource
     public static function decisionActions(): array
     {
         $run = function (Dispute $record, string $method, string $success, ?string $notes = null): void {
+            if (in_array($method, ['refundClient', 'payVendor', 'split'], true)) {
+                abort_unless(Roles::staffCan(auth()->user(), 'manage_escrow'), 403, 'You cannot move escrow funds.');
+            } else {
+                abort_unless(Roles::staffCan(auth()->user(), 'resolve_disputes'), 403, 'You cannot manage disputes.');
+            }
+
             try {
                 app(DisputeService::class)->{$method}($record, $notes);
                 Notification::make()->title($success)->success()->send();
@@ -147,13 +170,15 @@ class DisputeResource extends Resource
             Action::make('startReview')
                 ->label('Start review')
                 ->icon(Heroicon::OutlinedEye)
-                ->visible(fn (Dispute $record): bool => $record->status === 'open')
+                ->visible(fn (Dispute $record): bool => $record->status === 'open'
+                    && Roles::staffCan(auth()->user(), 'resolve_disputes'))
                 ->action(fn (Dispute $record) => $run($record, 'markReviewing', 'Case marked in review')),
             Action::make('refundClient')
                 ->label('Refund client')
                 ->icon(Heroicon::OutlinedBanknotes)
                 ->color('danger')
-                ->visible(fn (Dispute $record): bool => $record->isOpen())
+                ->visible(fn (Dispute $record): bool => $record->isOpen()
+                    && Roles::staffCan(auth()->user(), 'manage_escrow'))
                 ->requiresConfirmation()
                 ->modalDescription('Returns the session (and travel if held) to the client wallet. Vendor gets nothing.')
                 ->action(fn (Dispute $record) => $run($record, 'refundClient', 'Refund sent to the client wallet')),
@@ -161,7 +186,8 @@ class DisputeResource extends Resource
                 ->label('Pay vendor')
                 ->icon(Heroicon::OutlinedCheck)
                 ->color('success')
-                ->visible(fn (Dispute $record): bool => $record->isOpen())
+                ->visible(fn (Dispute $record): bool => $record->isOpen()
+                    && Roles::staffCan(auth()->user(), 'manage_escrow'))
                 ->requiresConfirmation()
                 ->modalDescription('Releases escrow to the vendor (session minus commission). Files unlock.')
                 ->action(fn (Dispute $record) => $run($record, 'payVendor', 'Funds released to the vendor wallet')),
@@ -169,7 +195,8 @@ class DisputeResource extends Resource
                 ->label('Apply split')
                 ->icon(Heroicon::OutlinedScale)
                 ->color('warning')
-                ->visible(fn (Dispute $record): bool => $record->isOpen())
+                ->visible(fn (Dispute $record): bool => $record->isOpen()
+                    && Roles::staffCan(auth()->user(), 'manage_escrow'))
                 ->requiresConfirmation()
                 ->modalDescription('Uses the percents saved on this case (default 80/10/10). Save the form first if you changed them.')
                 ->action(fn (Dispute $record) => $run($record, 'split', 'Split applied and session marked failed')),
@@ -177,7 +204,8 @@ class DisputeResource extends Resource
                 ->label('Close dispute')
                 ->icon(Heroicon::OutlinedXMark)
                 ->color('gray')
-                ->visible(fn (Dispute $record): bool => $record->isOpen())
+                ->visible(fn (Dispute $record): bool => $record->isOpen()
+                    && Roles::staffCan(auth()->user(), 'resolve_disputes'))
                 ->requiresConfirmation()
                 ->modalDescription('Closes without moving money. Escrow stay held so the session can continue.')
                 ->schema([
@@ -196,6 +224,10 @@ class DisputeResource extends Resource
     {
         if (! $dispute->isOpen()) {
             return null;
+        }
+
+        if (in_array($decision, ['refund', 'payout', 'split'], true)) {
+            abort_unless(Roles::staffCan(auth()->user(), 'manage_escrow'), 403, 'You cannot move escrow funds.');
         }
 
         $service = app(DisputeService::class);

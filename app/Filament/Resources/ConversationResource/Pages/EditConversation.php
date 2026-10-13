@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ConversationResource\Pages;
 use App\Filament\Resources\ConversationResource;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Support\Roles;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Textarea;
@@ -20,6 +21,7 @@ class EditConversation extends EditRecord
         return [
             Action::make('reply')
                 ->label('Send message')
+                ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'view_chat'))
                 ->schema([
                     Textarea::make('body')->label('Message')->required()->rows(4),
                 ])
@@ -36,7 +38,25 @@ class EditConversation extends EditRecord
                     Notification::make()->title('Message sent to the chat')->success()->send();
                     $this->redirect(static::getUrl(['record' => $conversation]));
                 }),
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'view_operations')),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (! Roles::staffCan(auth()->user(), 'view_operations')) {
+            /** @var Conversation $conversation */
+            $conversation = $this->getRecord();
+            $data['client_id'] = $conversation->client_id;
+            $data['vendor_id'] = $conversation->vendor_id;
+            $data['booking_id'] = $conversation->booking_id;
+        }
+
+        return $data;
     }
 }

@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\VendorResource;
 use App\Models\Vendor;
+use App\Support\Roles;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -17,7 +18,7 @@ class PendingVerifications extends TableWidget
 
     public static function canView(): bool
     {
-        return (bool) auth()->user()?->isStaff();
+        return Roles::staffCan(auth()->user(), 'verify_vendors');
     }
 
     public function table(Table $table): Table
