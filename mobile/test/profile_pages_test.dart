@@ -20,8 +20,15 @@ void main() {
 
   HomeData home() => HomeData.fromJson(DemoBootstrap.payload());
 
-  testWidgets('payment methods lists saved cards and add actions', (tester) async {
-    await tester.pumpWidget(MaterialApp(theme: LensTheme.dark(), home: PaymentMethodsPage(home: home())));
+  testWidgets('payment methods lists saved cards and add actions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: PaymentMethodsPage(home: home()),
+      ),
+    );
     expect(find.text('Payment Methods'), findsOneWidget);
     expect(find.textContaining('Visa'), findsOneWidget);
     expect(find.text('Add bank card'), findsOneWidget);
@@ -30,7 +37,9 @@ void main() {
   });
 
   testWidgets('addresses can add a pin from the map picker', (tester) async {
-    await tester.pumpWidget(MaterialApp(theme: LensTheme.dark(), home: const AddressesPage()));
+    await tester.pumpWidget(
+      MaterialApp(theme: LensTheme.dark(), home: const AddressesPage()),
+    );
     expect(find.text('Addresses'), findsOneWidget);
     expect(find.text('Zamalek, Cairo'), findsOneWidget);
     await tester.tap(find.text('Add address from map'));
@@ -38,8 +47,15 @@ void main() {
     expect(find.text('Pin on Google Maps'), findsOneWidget);
   });
 
-  testWidgets('messages picks a project then shows contact actions', (tester) async {
-    await tester.pumpWidget(MaterialApp(theme: LensTheme.dark(), home: MessagesPage(home: home())));
+  testWidgets('messages picks a project then shows contact actions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: MessagesPage(home: home()),
+      ),
+    );
     expect(find.text('Messages'), findsOneWidget);
     expect(find.text('Yasmin Hall wedding'), findsOneWidget);
     expect(find.text('Call Now'), findsOneWidget);
@@ -50,10 +66,20 @@ void main() {
     expect(find.text('Type a message...'), findsOneWidget);
   });
 
-  testWidgets('app settings exposes alerts, privacy, and about the app', (tester) async {
-    await tester.pumpWidget(MaterialApp(theme: LensTheme.dark(), home: AppSettingsPage(home: home())));
+  testWidgets('app settings exposes alerts, display, and about the app', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: AppSettingsPage(home: home()),
+      ),
+    );
     expect(find.text('App Settings'), findsOneWidget);
     expect(find.text('Push notifications'), findsOneWidget);
+    expect(find.text('Privacy'), findsNothing);
+    expect(find.text('Read receipts'), findsNothing);
+    expect(find.text('Hide activity'), findsNothing);
     expect(find.text('Checkout'), findsNothing);
     expect(find.text('Available in this build'), findsNothing);
     expect(find.text('App language'), findsNothing);
@@ -70,9 +96,19 @@ void main() {
     expect(find.textContaining('find, book, and chat'), findsOneWidget);
   });
 
-  testWidgets('edit profile shows admin account fields and saves them', (tester) async {
-    await SessionStore.instance.login(email: 'client@lens.app', password: 'password');
-    await tester.pumpWidget(MaterialApp(theme: LensTheme.dark(), home: EditProfilePage(home: home())));
+  testWidgets('edit profile shows admin account fields and saves them', (
+    tester,
+  ) async {
+    await SessionStore.instance.login(
+      email: 'client@lens.app',
+      password: 'password',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: EditProfilePage(home: home()),
+      ),
+    );
     expect(find.text('Edit Profile'), findsOneWidget);
     expect(find.text('Sarah Bennett'), findsWidgets);
     expect(find.textContaining('Cairo'), findsWidgets);
@@ -87,8 +123,13 @@ void main() {
   });
 
   testWidgets('report an issue sends a ticket to support', (tester) async {
-    await SessionStore.instance.login(email: 'client@lens.app', password: 'password');
-    await tester.pumpWidget(MaterialApp(theme: LensTheme.dark(), home: const ReportIssuePage()));
+    await SessionStore.instance.login(
+      email: 'client@lens.app',
+      password: 'password',
+    );
+    await tester.pumpWidget(
+      MaterialApp(theme: LensTheme.dark(), home: const ReportIssuePage()),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Report an issue'), findsOneWidget);
     expect(find.text('Lens support'), findsOneWidget);

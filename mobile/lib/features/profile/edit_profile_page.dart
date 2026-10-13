@@ -387,7 +387,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           const SizedBox(height: 10),
           _link(Icons.credit_card_outlined, 'Payment methods', '$_payments saved', () => _open(PaymentMethodsPage(home: home))),
           _link(Icons.location_on_outlined, 'Addresses', '$_addresses saved', () => _open(const AddressesPage())),
-          _link(Icons.settings_outlined, 'App Settings', 'Alerts, privacy, and about', () => _open(AppSettingsPage(home: home))),
+          _link(Icons.settings_outlined, 'App Settings', 'Alerts, display, and about', () => _open(AppSettingsPage(home: home))),
           if (_error != null) ...[
             const SizedBox(height: 14),
             Text(_error!, style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.w600)),

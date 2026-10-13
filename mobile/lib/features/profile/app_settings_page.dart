@@ -35,8 +35,6 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       'message_preview': true,
       'vibration': true,
       'review_prompts': home.on('reviews'),
-      'read_receipts': home.on('chat'),
-      'hide_activity': false,
       'haptic_feedback': true,
       'reduce_motion': false,
       'language': 'en',
@@ -90,10 +88,6 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
             if (home.on('reviews')) _toggle(Icons.star_outline_rounded, 'review_prompts', 'Review prompts', 'Ask me to rate after a session is approved'),
             if (home.on('coupons')) _toggle(Icons.local_offer_outlined, 'email_offers', 'Offers & deals', 'Seasonal codes and first-order emails'),
             _toggle(Icons.vibration_rounded, 'vibration', 'Vibration', 'Vibrate with alerts on this device'),
-          ]),
-          _group('Privacy', [
-            if (home.on('chat')) _toggle(Icons.done_all_rounded, 'read_receipts', 'Read receipts', 'Let creators see when you opened a chat'),
-            _toggle(Icons.visibility_off_outlined, 'hide_activity', 'Hide activity', 'Do not show last seen on creator chats'),
           ]),
           _group('Display & feel', [
             _toggle(Icons.touch_app_outlined, 'haptic_feedback', 'Haptic feedback', 'Light tap on buttons and switches'),
