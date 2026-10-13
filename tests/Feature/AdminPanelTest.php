@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\VendorResource\Pages\ListVendors;
+use App\Models\Booking;
 use App\Models\User;
+use App\Models\Vendor;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AdminPanelTest extends TestCase
@@ -140,12 +144,71 @@ class AdminPanelTest extends TestCase
         }
     }
 
+    public function test_vendor_status_tabs_filter_and_global_search_covers_vendor_fields(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $verified = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();
+        $pending = Vendor::query()->where('display_name', 'Noor Cyclorama')->firstOrFail();
+        $rejected = $verified->replicate();
+        $rejected->user_id = User::factory()->create(['email' => 'rejected-vendor@lens.app'])->id;
+        $rejected->display_name = 'Rejected Vendor';
+        $rejected->verification_status = 'rejected';
+        $rejected->save();
+
+        $this->actingAs($admin);
+
+        Livewire::test(ListVendors::class)
+            ->assertSee('Vendor Verified')
+            ->assertSee('Vendor Pending')
+            ->assertSee('Vendor Rejected')
+            ->set('activeTab', 'verified')
+            ->assertCanSeeTableRecords([$verified])
+            ->assertCanNotSeeTableRecords([$pending, $rejected])
+            ->set('activeTab', 'pending')
+            ->assertCanSeeTableRecords([$pending])
+            ->assertCanNotSeeTableRecords([$verified, $rejected])
+            ->set('activeTab', 'rejected')
+            ->assertCanSeeTableRecords([$rejected])
+            ->assertCanNotSeeTableRecords([$verified, $pending]);
+
+        foreach ([
+            ['name' => $verified->display_name],
+            ['vendor_type_id' => (string) $verified->vendor_type_id],
+            ['city_id' => (string) $verified->city_id],
+            ['rating_avg' => (string) $verified->rating_avg],
+            ['completed_sessions' => (string) $verified->completed_sessions],
+            ['failed_sessions' => (string) $verified->failed_sessions],
+            ['date' => $verified->created_at->format('Y-m-d')],
+        ] as $search) {
+            $component = Livewire::test(ListVendors::class)
+                ->callAction('searchVendors', $search)
+                ->assertSet('vendorSearch', $search);
+
+            $this->assertTrue(
+                $component->instance()->getTableRecords()->contains('id', $verified->id),
+                'The modal search did not match '.array_key_first($search).'.',
+            );
+        }
+
+        Livewire::test(ListVendors::class)
+            ->callAction('searchVendors', ['name' => $verified->display_name])
+            ->mountAction('searchVendors')
+            ->assertActionMounted('searchVendors')
+            ->assertActionDataSet(['name' => $verified->display_name])
+            ->unmountAction()
+            ->assertActionVisible('clearVendorSearch')
+            ->callAction('clearVendorSearch')
+            ->assertSet('vendorSearch', [])
+            ->assertCountTableRecords(Vendor::query()->count())
+            ->assertActionHidden('clearVendorSearch');
+    }
+
     public function test_marketplace_loop_is_editable_from_admin(): void
     {
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
         $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
-        $vendor = \App\Models\Vendor::query()->firstOrFail();
-        $booking = \App\Models\Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+        $vendor = Vendor::query()->firstOrFail();
+        $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
 
         $this->actingAs($admin)->get('/admin/users/'.$client->id.'/edit')
             ->assertOk()

@@ -185,7 +185,7 @@ class VendorResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('display_name')->label('Name')->searchable()->sortable(),
+                TextColumn::make('display_name')->label('Name')->sortable(),
                 TextColumn::make('vendorType.name_en')->label('Type')->badge()->color('primary'),
                 TextColumn::make('city.name_en')->label('Governorate'),
                 TextColumn::make('verification_status')->label('Verification')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
@@ -200,6 +200,7 @@ class VendorResource extends Resource
                 TextColumn::make('rating_avg')->label('Rating')->suffix(' ★'),
                 TextColumn::make('completed_sessions')->label('Completed'),
                 TextColumn::make('failed_sessions')->label('Failed'),
+                TextColumn::make('created_at')->label('Date')->dateTime('Y-m-d')->sortable(),
                 TextColumn::make('penalty_total')->label('Penalties')->toggleable(),
                 IconColumn::make('is_featured')->label('Featured')->boolean(),
                 IconColumn::make('is_active')->label('Active')->boolean(),
