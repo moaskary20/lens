@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\HasOptionalFeature;
 use App\Filament\Resources\NotificationResource\Pages;
+use App\Models\User;
 use App\Support\LensNotifier;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -11,6 +12,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\DatabaseNotification;
 use UnitEnum;
@@ -55,6 +57,12 @@ class NotificationResource extends Resource
             ->columns([
                 TextColumn::make('created_at')->label('Sent')->since()->sortable(),
                 TextColumn::make('notifiable.email')->label('User')->searchable(),
+                TextColumn::make('notifiable.phone')->label('Phone')->placeholder('—')
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHasMorph(
+                        'notifiable',
+                        [User::class],
+                        fn (Builder $userQuery): Builder => $userQuery->where('phone', 'like', '%'.$search.'%'),
+                    )),
                 TextColumn::make('data.event')->label('Event')->badge()
                     ->formatStateUsing(fn (?string $state): string => LensNotifier::labels()[$state] ?? ($state ?: '—')),
                 TextColumn::make('data.title')->label('Title')->wrap(),

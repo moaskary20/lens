@@ -94,11 +94,11 @@ class DisputeResource extends Resource
                 Placeholder::make('chat_case')->hiddenLabel()->content(fn (?Dispute $record): HtmlString => self::chatHtml($record))->columnSpanFull(),
             ]),
             Section::make('Decision (split percents of session price)')->schema([
-                TextInput::make('client_refund_percent')->label('Client refund %')->numeric()->default(80)
+                TextInput::make('client_refund_percent')->label('Client refund %')->numeric()->minValue(0)->maxValue(100)->default(80)
                     ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow')),
-                TextInput::make('vendor_payout_percent')->label('Vendor %')->numeric()->default(10)
+                TextInput::make('vendor_payout_percent')->label('Vendor %')->numeric()->minValue(0)->maxValue(100)->default(10)
                     ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow')),
-                TextInput::make('platform_fee_percent')->label('Platform %')->numeric()->default(10)
+                TextInput::make('platform_fee_percent')->label('Platform %')->numeric()->minValue(0)->maxValue(100)->default(10)
                     ->visible(fn (): bool => Roles::staffCan(auth()->user(), 'manage_escrow')),
                 Textarea::make('admin_notes')->label('Admin notes')->columnSpanFull(),
             ])->columns(3),
@@ -252,6 +252,12 @@ class DisputeResource extends Resource
             $service->markReviewing($dispute, $notes);
 
             return 'Case marked in review';
+        }
+
+        if ($status === 'open' && $dispute->status === 'reviewing') {
+            $service->reopen($dispute);
+
+            return 'Case returned to open';
         }
 
         if ($status === 'closed') {

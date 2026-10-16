@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Filament\Auth\VendorLogin;
 use App\Filament\Pages\RoleSettings;
 use App\Filament\Resources\DisputeResource;
+use App\Filament\Resources\UserResource;
+use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Models\Dispute;
 use App\Models\User;
 use App\Models\VendorAvailability;
@@ -13,6 +15,7 @@ use App\Support\Roles;
 use Database\Seeders\LensSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -221,6 +224,64 @@ class RoleAccessTest extends TestCase
         $this->actingAs($admin)->get('/admin/role-settings')->assertOk();
         $this->actingAs($admin)->get('/admin/users/create')->assertOk()->assertSee('Support');
         $this->actingAs($admin)->get('/admin/vendor-availabilities')->assertOk();
+    }
+
+    public function test_admin_can_create_employee_and_marketplace_users_from_separate_role_groups(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $this->actingAs($admin);
+
+        Livewire::test(CreateUser::class)
+            ->assertSeeInOrder(['Profile', 'Choose account type'])
+            ->assertSee('Employee')
+            ->assertSee('Vendor / Client')
+            ->assertSee('Platform admin')
+            ->assertSee('Supervisor')
+            ->assertSee('Support')
+            ->assertSee('Vendor')
+            ->assertSee('Client (Customer)')
+            ->assertDontSee('App settings')
+            ->fillForm([
+                'name' => 'New Support Employee',
+                'email' => 'new-support@lens.app',
+                'password' => 'password',
+                'employee_role' => Roles::SUPPORT,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'new-support@lens.app',
+            'role' => Roles::SUPPORT,
+        ]);
+
+        Livewire::test(CreateUser::class)
+            ->fillForm([
+                'name' => 'New Marketplace Client',
+                'email' => 'new-client@lens.app',
+                'password' => 'password',
+                'account_role' => Roles::CLIENT,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'new-client@lens.app',
+            'role' => Roles::CLIENT,
+        ]);
+    }
+
+    public function test_marketplace_user_cannot_create_employee_role(): void
+    {
+        $supervisor = User::query()->where('email', 'supervisor@lens.app')->firstOrFail();
+
+        $this->actingAs($supervisor);
+
+        $this->expectException(ValidationException::class);
+        UserResource::normalizeCreateData([
+            'employee_role' => Roles::SUPPORT,
+            'account_role' => null,
+        ]);
     }
 
     public function test_role_settings_cover_app_and_support_capabilities(): void

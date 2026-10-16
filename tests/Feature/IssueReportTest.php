@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\IssueReportResource\Pages\EditIssueReport;
+use App\Filament\Resources\IssueReportResource\Pages\ListIssueReports;
 use App\Models\IssueReport;
 use App\Models\User;
 use App\Support\LensNotifier;
@@ -79,6 +80,44 @@ class IssueReportTest extends TestCase
         $this->assertNull($issue->user_id);
         $this->assertSame('Guest Client', $issue->name);
         $this->assertSame('guest.issue@lens.app', $issue->email);
+    }
+
+    public function test_issue_list_tabs_filter_every_status(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $issues = collect(IssueReport::STATUSES)
+            ->mapWithKeys(fn (string $label, string $status): array => [
+                $status => IssueReport::query()->create([
+                    'user_id' => $client->id,
+                    'name' => $client->name,
+                    'email' => $client->email,
+                    'topic' => 'app',
+                    'subject' => 'Test issue '.$label,
+                    'body' => 'Test issue details.',
+                    'status' => $status,
+                ]),
+            ]);
+
+        $this->actingAs($admin);
+
+        $tabs = Livewire::test(ListIssueReports::class)
+            ->assertSee('All issues');
+
+        foreach (IssueReport::STATUSES as $status => $label) {
+            $tabs->assertSee($label);
+        }
+
+        foreach (IssueReport::STATUSES as $status => $label) {
+            Livewire::test(ListIssueReports::class)
+                ->set('activeTab', $status)
+                ->assertCanSeeTableRecords([$issues[$status]])
+                ->assertCanNotSeeTableRecords($issues->except($status)->values()->all());
+        }
+
+        Livewire::test(ListIssueReports::class)
+            ->set('activeTab', 'all')
+            ->assertCanSeeTableRecords($issues->values()->all());
     }
 
     public function test_admin_reply_notifies_the_reporter(): void

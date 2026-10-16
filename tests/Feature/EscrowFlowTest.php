@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\EscrowTransactionResource;
+use App\Filament\Resources\EscrowTransactionResource\Pages\ListEscrowTransactions;
 use App\Models\Booking;
 use App\Models\Deliverable;
+use App\Models\EscrowTransaction;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\Vendor;
@@ -13,6 +16,7 @@ use App\Services\EscrowService;
 use App\Support\Finance;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use LogicException;
 use Tests\TestCase;
 
@@ -38,6 +42,35 @@ class EscrowFlowTest extends TestCase
         $this->assertEquals(360.0, $quote['vendor_commission']);
         $this->assertEquals(1440.0, $quote['vendor_net']);
         $this->assertSame('EGP', Finance::currency());
+    }
+
+    public function test_escrow_transactions_page_filters_every_status(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $booking = Booking::query()->firstOrFail();
+        $transactions = collect(['pending', 'completed', 'failed'])
+            ->mapWithKeys(fn (string $status): array => [
+                $status => EscrowTransaction::query()->create([
+                    'booking_id' => $booking->id,
+                    'type' => 'hold',
+                    'amount' => 100,
+                    'status' => $status,
+                ]),
+            ]);
+
+        $this->actingAs($admin);
+
+        $tabs = Livewire::test(ListEscrowTransactions::class)
+            ->assertSee('All transactions')
+            ->assertSee('Pending')
+            ->assertSee('Completed')
+            ->assertSee('Failed');
+
+        foreach (array_keys(EscrowTransactionResource::statuses()) as $status) {
+            $tabs->set('activeTab', $status)
+                ->assertCanSeeTableRecords([$transactions[$status]])
+                ->assertCanNotSeeTableRecords($transactions->except($status)->values()->all());
+        }
     }
 
     public function test_checkout_holds_one_hundred_percent(): void

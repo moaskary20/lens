@@ -2,6 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\BookingResource;
+use App\Filament\Resources\BookingResource\Pages\ListBookings;
+use App\Filament\Resources\ClientResource\Pages\CreateClient;
+use App\Filament\Resources\ClientResource\Pages\ListClients;
+use App\Filament\Resources\UserResource;
+use App\Filament\Resources\UserResource\Pages\ListUsers;
 use App\Filament\Resources\VendorResource\Pages\ListVendors;
 use App\Models\Booking;
 use App\Models\User;
@@ -104,6 +110,7 @@ class AdminPanelTest extends TestCase
 
         foreach ([
             '/admin/users',
+            '/admin/clients',
             '/admin/vendors',
             '/admin/bookings',
             '/admin/vendor-types',
@@ -141,6 +148,39 @@ class AdminPanelTest extends TestCase
             '/admin/platform-settings',
         ] as $url) {
             $this->actingAs($admin)->get($url)->assertOk();
+        }
+    }
+
+    public function test_user_list_tabs_filter_every_role(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $users = collect(UserResource::roleOptions())
+            ->mapWithKeys(fn (string $label, string $role): array => [
+                $role => User::factory()->create([
+                    'name' => $label.' filter test',
+                    'role' => $role,
+                ]),
+            ]);
+
+        $this->actingAs($admin);
+
+        $tabs = Livewire::test(ListUsers::class)
+            ->assertSee('All users');
+
+        foreach (UserResource::roleOptions() as $label) {
+            $tabs->assertSee($label);
+        }
+
+        Livewire::test(ListUsers::class)
+            ->set('activeTab', 'all')
+            ->assertCountTableRecords(User::query()->count());
+
+        foreach (UserResource::roleOptions() as $role => $_label) {
+            $component = Livewire::test(ListUsers::class)->set('activeTab', $role);
+            $query = $component->instance()->getFilteredTableQuery();
+
+            $this->assertSame([$role], $query->pluck('role')->unique()->all());
+            $this->assertTrue($query->whereKey($users[$role]->id)->exists());
         }
     }
 
@@ -201,6 +241,106 @@ class AdminPanelTest extends TestCase
             ->assertSet('vendorSearch', [])
             ->assertCountTableRecords(Vendor::query()->count())
             ->assertActionHidden('clearVendorSearch');
+    }
+
+    public function test_client_page_lists_only_clients_and_filters_by_active_status(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $activeClient = User::factory()->create([
+            'name' => 'Active Test Client',
+            'role' => 'client',
+            'is_active' => true,
+        ]);
+        $inactiveClient = User::factory()->create([
+            'name' => 'Inactive Test Client',
+            'role' => 'client',
+            'is_active' => false,
+        ]);
+        $vendor = User::factory()->create([
+            'name' => 'Not A Client',
+            'role' => 'vendor',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/admin/clients')
+            ->assertOk()
+            ->assertSee('Add client');
+
+        Livewire::test(ListClients::class)
+            ->assertSee('Active')
+            ->assertSee('Not Active')
+            ->set('activeTab', 'active')
+            ->assertCanSeeTableRecords([$activeClient])
+            ->assertCanNotSeeTableRecords([$inactiveClient, $vendor])
+            ->set('activeTab', 'not_active')
+            ->assertCanSeeTableRecords([$inactiveClient])
+            ->assertCanNotSeeTableRecords([$activeClient, $vendor]);
+    }
+
+    public function test_bookings_page_has_a_filter_tab_for_every_status(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $this->actingAs($admin);
+
+        $tabs = Livewire::test(ListBookings::class)
+            ->assertSee('All bookings')
+            ->assertSee('Pending acceptance')
+            ->assertSee('Accepted')
+            ->assertSee('Rejected')
+            ->assertSee('Checked in')
+            ->assertSee('In progress')
+            ->assertSee('Delivered')
+            ->assertSee('In revision')
+            ->assertSee('Approved')
+            ->assertSee('Completed')
+            ->assertSee('Cancelled')
+            ->assertSee('Disputed')
+            ->assertSee('Failed')
+            ->assertSee('Refunded');
+
+        foreach (array_keys(BookingResource::statuses()) as $status) {
+            $tabs->set('activeTab', $status);
+        }
+
+        $pending = Booking::query()->where('status', 'pending')->firstOrFail();
+        $delivered = Booking::query()->where('status', 'delivered')->firstOrFail();
+        $disputed = Booking::query()->where('status', 'disputed')->firstOrFail();
+
+        Livewire::test(ListBookings::class)
+            ->set('activeTab', 'pending')
+            ->assertCanSeeTableRecords([$pending])
+            ->assertCanNotSeeTableRecords([$delivered, $disputed])
+            ->set('activeTab', 'delivered')
+            ->assertCanSeeTableRecords([$delivered])
+            ->assertCanNotSeeTableRecords([$pending, $disputed])
+            ->set('activeTab', 'disputed')
+            ->assertCanSeeTableRecords([$disputed])
+            ->assertCanNotSeeTableRecords([$pending, $delivered]);
+    }
+
+    public function test_admin_can_add_a_client_from_the_client_page(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $this->actingAs($admin);
+
+        Livewire::test(CreateClient::class)
+            ->fillForm([
+                'name' => 'New Client',
+                'email' => 'new-client@lens.app',
+                'phone' => fake()->unique()->numerify('010########'),
+                'password' => 'password',
+                'locale' => 'en',
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('users', [
+            'name' => 'New Client',
+            'email' => 'new-client@lens.app',
+            'role' => 'client',
+            'is_active' => true,
+        ]);
     }
 
     public function test_marketplace_loop_is_editable_from_admin(): void

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\Quality\VendorMetricsTable;
 use App\Models\Booking;
 use App\Models\User;
 use App\Models\Vendor;
@@ -15,6 +16,7 @@ use App\Support\SearchQuery;
 use App\Support\VendorMetrics;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use LogicException;
 use Tests\TestCase;
 
@@ -35,6 +37,35 @@ class QualityEngineTest extends TestCase
         $this->get('/admin/reviews')->assertOk()->assertSee('Star ratings', false);
         $this->get('/admin/badges')->assertOk()->assertSee('Incentive badges', false);
         $this->get('/admin')->assertOk()->assertSee('Marketplace rating', false);
+    }
+
+    public function test_session_metrics_type_buttons_filter_vendors(): void
+    {
+        $photographerType = VendorType::query()->where('slug', 'photographer')->firstOrFail();
+        $studioType = VendorType::query()->where('slug', 'studio')->firstOrFail();
+        $photographer = Vendor::query()->where('vendor_type_id', $photographerType->id)->firstOrFail();
+        $studio = Vendor::query()->where('vendor_type_id', $studioType->id)->firstOrFail();
+
+        $component = Livewire::test(VendorMetricsTable::class)
+            ->assertTableActionExists('filterAllTypes');
+
+        foreach (VendorType::query()->pluck('id') as $typeId) {
+            $component->assertTableActionExists('filterType'.$typeId);
+        }
+
+        $component
+            ->assertCanSeeTableRecords([$photographer, $studio])
+            ->callTableAction('filterType'.$photographerType->id)
+            ->assertSet('vendorTypeFilter', $photographerType->id)
+            ->assertCanSeeTableRecords([$photographer])
+            ->assertCanNotSeeTableRecords([$studio])
+            ->callTableAction('filterType'.$studioType->id)
+            ->assertSet('vendorTypeFilter', $studioType->id)
+            ->assertCanSeeTableRecords([$studio])
+            ->assertCanNotSeeTableRecords([$photographer])
+            ->callTableAction('filterAllTypes')
+            ->assertSet('vendorTypeFilter', null)
+            ->assertCanSeeTableRecords([$photographer, $studio]);
     }
 
     public function test_review_is_blocked_until_session_approval(): void

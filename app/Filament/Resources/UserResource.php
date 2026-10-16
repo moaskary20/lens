@@ -15,6 +15,8 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -30,6 +32,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 use UnitEnum;
 
 class UserResource extends Resource
@@ -50,7 +53,7 @@ class UserResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->columns(['default' => 1, 'lg' => 2])->components([
             Section::make('Profile')->schema([
                 TextInput::make('name')->label('Name')->required()->maxLength(255),
                 TextInput::make('email')->label('Email')->email()->required()->unique(ignoreRecord: true),
@@ -61,6 +64,9 @@ class UserResource extends Resource
                 TextInput::make('password')->label('Password')->password()->revealable()
                     ->required(fn (string $operation): bool => $operation === 'create')
                     ->dehydrated(fn (?string $state): bool => filled($state)),
+                Hidden::make('role')
+                    ->required()
+                    ->visible(fn (string $operation): bool => $operation === 'create'),
                 Select::make('role')->label('Role')->required()->live()
                     ->options(fn (): array => (auth()->user()?->isAdmin() ?? false)
                         ? [
@@ -76,16 +82,70 @@ class UserResource extends Resource
                         ])
                     ->disabled(fn (?User $record): bool => (bool) $record && $record->isStaff() && ! (auth()->user()?->isAdmin() ?? false))
                     ->helperText('Clients browse and book. Vendors onboard under a type. Supervisors handle operations. Support handles app issues, chat, and dispute follow-up. Admins own settings.')
-                    ->native(false),
+                    ->native(false)
+                    ->visible(fn (string $operation): bool => $operation !== 'create'),
                 Select::make('city_id')->label('Governorate')->relationship('city', 'name_en')->searchable()->preload(),
                 Select::make('locale')->label('Language')->options(ClientPreferences::languages())->default('en')->live()
                     ->afterStateUpdated(fn (Set $set, ?string $state) => $set('app_settings.language', $state)),
                 Toggle::make('is_active')->label('Active account')->default(true),
                 FileUpload::make('avatar')->label('Avatar')->image()->directory('avatars')->avatar(),
-            ])->columns(2),
+            ])->columns(2)
+                ->columnSpan(fn (string $operation): int|string => $operation === 'create' ? 1 : 'full'),
+            Section::make('Choose account type')
+                ->description('Choose whether this account is an employee or a marketplace user.')
+                ->schema([
+                    Section::make('Employee')
+                        ->description('Platform admin, supervisor, or support.')
+                        ->schema([
+                            Radio::make('employee_role')
+                                ->label('Employee role')
+                                ->options([
+                                    Roles::ADMIN => 'Platform admin',
+                                    Roles::SUPERVISOR => 'Supervisor',
+                                    Roles::SUPPORT => 'Support',
+                                ])
+                                ->live()
+                                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                                    if (filled($state)) {
+                                        $set('account_role', null);
+                                        $set('role', $state);
+                                    }
+                                })
+                                ->visible(fn (string $operation): bool => $operation === 'create'
+                                    && (auth()->user()?->isAdmin() ?? false)),
+                        ])
+                        ->columnSpan(1)
+                        ->visible(fn (string $operation): bool => $operation === 'create'
+                            && (auth()->user()?->isAdmin() ?? false)),
+                    Section::make('Vendor / Client')
+                        ->description('Marketplace accounts for creators and customers.')
+                        ->schema([
+                            Radio::make('account_role')
+                                ->label('Role')
+                                ->options([
+                                    Roles::VENDOR => 'Vendor',
+                                    Roles::CLIENT => 'Client (Customer)',
+                                ])
+                                ->live()
+                                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                                    if (filled($state)) {
+                                        $set('employee_role', null);
+                                        $set('role', $state);
+                                    }
+                                })
+                                ->visible(fn (string $operation): bool => $operation === 'create'),
+                        ])
+                        ->columnSpan(1)
+                        ->visible(fn (string $operation): bool => $operation === 'create'),
+                ])
+                ->columns(2)
+                ->columnSpan(1)
+                ->visible(fn (string $operation): bool => $operation === 'create'),
             Section::make('App settings')
                 ->description('Client preferences applied in the mobile app after the next refresh.')
-                ->visible(fn (Get $get): bool => $get('role') === Roles::CLIENT)
+                ->visible(fn (Get $get, string $operation): bool => $operation !== 'create'
+                    && $get('role') === Roles::CLIENT)
+                ->columnSpan('full')
                 ->schema([
                     Section::make('Alerts')->schema([
                         self::preferenceSelect('push_notifications'),
@@ -162,6 +222,48 @@ class UserResource extends Resource
         return $data;
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public static function roleOptions(): array
+    {
+        return [
+            Roles::ADMIN => 'Admin',
+            Roles::SUPERVISOR => 'Supervisor',
+            Roles::SUPPORT => 'Support',
+            Roles::CLIENT => 'Client',
+            Roles::VENDOR => 'Vendor',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function normalizeCreateData(array $data): array
+    {
+        $employeeRole = $data['employee_role'] ?? null;
+        $accountRole = $data['account_role'] ?? null;
+        $role = filled($employeeRole) ? $employeeRole : $accountRole;
+
+        $allowedRoles = filled($employeeRole)
+            ? ((auth()->user()?->isAdmin() ?? false)
+                ? [Roles::ADMIN, Roles::SUPERVISOR, Roles::SUPPORT]
+                : [])
+            : [Roles::VENDOR, Roles::CLIENT];
+
+        if (! is_string($role) || ! in_array($role, $allowedRoles, true)) {
+            throw ValidationException::withMessages([
+                'data.account_role' => 'Choose a valid account role.',
+            ]);
+        }
+
+        unset($data['employee_role'], $data['account_role']);
+        $data['role'] = $role;
+
+        return self::normalizePreferenceData($data);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -190,13 +292,7 @@ class UserResource extends Resource
                 TextColumn::make('created_at')->label('Joined')->dateTime('Y-m-d')->sortable(),
             ])
             ->filters([
-                SelectFilter::make('role')->label('Role')->options([
-                    'admin' => 'Admin',
-                    'supervisor' => 'Supervisor',
-                    'support' => 'Support',
-                    'client' => 'Client',
-                    'vendor' => 'Vendor',
-                ]),
+                SelectFilter::make('role')->label('Role')->options(self::roleOptions()),
             ])
             ->recordActions([
                 EditAction::make()->visible(fn (): bool => static::canManageAccounts()),

@@ -2,24 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\NotificationSettings;
+use App\Filament\Resources\NotificationResource\Pages\ListNotifications;
 use App\Models\Booking;
 use App\Models\Coupon;
 use App\Models\Message;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Notifications\LensAlert;
 use App\Services\BookingWorkflow;
 use App\Services\CancellationService;
 use App\Services\DeliveryService;
 use App\Services\EscrowService;
 use App\Services\ReviewService;
 use App\Services\WalletService;
-use App\Filament\Pages\NotificationSettings;
-use App\Models\Setting;
-use App\Notifications\LensAlert;
 use App\Support\LensNotifier;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -46,6 +48,31 @@ class NotificationFlowTest extends TestCase
             ->assertSee('Include message preview');
 
         $this->get('/admin/notification-log')->assertOk();
+    }
+
+    public function test_notification_log_shows_and_searches_by_user_phone(): void
+    {
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $client->update(['phone' => '01012345678']);
+        $notification = $client->notifications()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'test',
+            'data' => ['title' => 'Phone search test'],
+        ]);
+        $otherClient = User::factory()->create(['phone' => '01187654321']);
+        $otherNotification = $otherClient->notifications()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'test',
+            'data' => ['title' => 'Other phone notification'],
+        ]);
+
+        $this->actingAs(User::query()->where('email', 'admin@lens.app')->firstOrFail());
+
+        Livewire::test(ListNotifications::class)
+            ->assertSee('01012345678')
+            ->set('tableSearch', '01012345678')
+            ->assertCanSeeTableRecords([$notification])
+            ->assertCanNotSeeTableRecords([$otherNotification]);
     }
 
     public function test_registration_and_verification_notify_staff_and_vendor(): void

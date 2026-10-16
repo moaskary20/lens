@@ -506,16 +506,6 @@ textarea {
     overflow: hidden;
 }
 
-.fi-btn-primary::after,
-.lens-pulse-btn::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(110deg, transparent 20%, rgba(242, 239, 233, 0.28) 50%, transparent 80%);
-    transform: translateX(-120%);
-    animation: lensShimmer 2.8s ease-in-out infinite;
-}
-
 .fi-simple-layout {
     background:
         radial-gradient(circle at 85% 10%, rgba(255, 90, 31, 0.22), transparent 28%),
@@ -909,16 +899,6 @@ body:has(.lens-login) .lens-orb {
     }
     50% {
         text-shadow: 0 0 18px rgba(255, 90, 31, 0.45);
-    }
-}
-
-@keyframes lensShimmer {
-    0% {
-        transform: translateX(-120%);
-    }
-    55%,
-    100% {
-        transform: translateX(120%);
     }
 }
 

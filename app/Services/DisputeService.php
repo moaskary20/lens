@@ -8,6 +8,7 @@ use App\Models\EscrowTransaction;
 use App\Models\Payout;
 use App\Support\Feature;
 use App\Support\Finance;
+use App\Support\LensNotifier;
 use App\Support\VendorNotifier;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -68,13 +69,30 @@ class DisputeService
 
     public function markReviewing(Dispute $dispute, ?string $notes = null): Dispute
     {
-        $this->assertOpen($dispute);
-        $dispute->update([
-            'status' => 'reviewing',
-            'admin_notes' => $notes ?: $dispute->admin_notes,
-        ]);
+        return DB::transaction(function () use ($dispute, $notes): Dispute {
+            $dispute = Dispute::query()->lockForUpdate()->findOrFail($dispute->id);
+            $this->assertOpen($dispute);
+            $dispute->update([
+                'status' => 'reviewing',
+                'admin_notes' => $notes ?: $dispute->admin_notes,
+            ]);
 
-        return $dispute->fresh();
+            return $dispute->fresh();
+        });
+    }
+
+    public function reopen(Dispute $dispute): Dispute
+    {
+        return DB::transaction(function () use ($dispute): Dispute {
+            $dispute = Dispute::query()->lockForUpdate()->findOrFail($dispute->id);
+            $this->assertOpen($dispute);
+
+            if ($dispute->status === 'reviewing') {
+                $dispute->update(['status' => 'open']);
+            }
+
+            return $dispute->fresh();
+        });
     }
 
     /**
@@ -82,20 +100,42 @@ class DisputeService
      */
     public function split(Dispute $dispute, ?string $notes = null): Dispute
     {
-        $finance = Finance::settings();
+        return DB::transaction(function () use ($dispute, $notes): Dispute {
+            $dispute = Dispute::query()->lockForUpdate()->findOrFail($dispute->id);
+            $this->assertOpen($dispute);
 
-        return $this->settle(
-            $dispute,
-            self::DECISION_SPLIT,
-            (float) ($dispute->client_refund_percent ?: $finance['dispute_client_percent']),
-            (float) ($dispute->vendor_payout_percent ?: $finance['dispute_vendor_percent']),
-            (float) ($dispute->platform_fee_percent ?: $finance['dispute_platform_percent']),
-            $notes ?: 'Settled using platform rejection split (80/10/10).',
-            travelToVendor: true,
-            bookingStatus: 'failed',
-            escrowStatus: 'split',
-            bumpFailed: true,
-        );
+            $finance = Finance::settings();
+            $clientShare = $dispute->client_refund_percent !== null
+                ? (float) $dispute->client_refund_percent
+                : (float) $finance['dispute_client_percent'];
+            $vendorShare = $dispute->vendor_payout_percent !== null
+                ? (float) $dispute->vendor_payout_percent
+                : (float) $finance['dispute_vendor_percent'];
+            $platformShare = $dispute->platform_fee_percent !== null
+                ? (float) $dispute->platform_fee_percent
+                : (float) $finance['dispute_platform_percent'];
+
+            if (
+                min($clientShare, $vendorShare, $platformShare) < 0
+                || max($clientShare, $vendorShare, $platformShare) > 100
+                || abs(($clientShare + $vendorShare + $platformShare) - 100) > 0.01
+            ) {
+                throw new LogicException('Split percentages must be between 0 and 100 and total 100%.');
+            }
+
+            return $this->settle(
+                $dispute,
+                self::DECISION_SPLIT,
+                $clientShare,
+                $vendorShare,
+                $platformShare,
+                $notes ?: 'Settled using platform rejection split (80/10/10).',
+                travelToVendor: true,
+                bookingStatus: 'failed',
+                escrowStatus: 'split',
+                bumpFailed: true,
+            );
+        });
     }
 
     public function refundClient(Dispute $dispute, ?string $notes = null): Dispute
@@ -116,9 +156,9 @@ class DisputeService
 
     public function payVendor(Dispute $dispute, ?string $notes = null): Dispute
     {
-        $this->assertOpen($dispute);
-
         return DB::transaction(function () use ($dispute, $notes): Dispute {
+            $dispute = Dispute::query()->lockForUpdate()->findOrFail($dispute->id);
+            $this->assertOpen($dispute);
             $booking = $dispute->booking()->with(['vendor.vendorType', 'deliverables'])->firstOrFail();
             $note = $notes ?: 'Admin awarded the held funds to the vendor.';
 
@@ -156,25 +196,44 @@ class DisputeService
 
     public function close(Dispute $dispute, ?string $notes = null): Dispute
     {
-        $this->assertOpen($dispute);
+        return DB::transaction(function () use ($dispute, $notes): Dispute {
+            $dispute = Dispute::query()->lockForUpdate()->findOrFail($dispute->id);
+            $this->assertOpen($dispute);
 
-        $booking = $dispute->booking;
-        $restore = $booking->deliverables()->exists() ? 'delivered' : 'accepted';
-        if (in_array($booking->status, ['disputed'], true) && in_array($booking->escrow_status, ['held', 'none'], true)) {
-            $booking->update(['status' => $restore]);
-        }
+            $booking = $dispute->booking;
+            $restore = $booking->deliverables()->exists() ? 'delivered' : 'accepted';
+            if (in_array($booking->status, ['disputed'], true) && in_array($booking->escrow_status, ['held', 'none'], true)) {
+                $booking->update(['status' => $restore]);
+            }
 
-        $dispute->update([
-            'status' => 'closed',
-            'decision' => self::DECISION_CLOSED,
-            'admin_notes' => $notes ?: 'Closed without moving funds. Escrow stays as it was.',
-            'resolved_at' => now(),
-            'resolved_by' => auth()->id(),
-        ]);
+            $dispute->update([
+                'status' => 'closed',
+                'decision' => self::DECISION_CLOSED,
+                'admin_notes' => $notes ?: 'Closed without moving funds. Escrow stays as it was.',
+                'resolved_at' => now(),
+                'resolved_by' => auth()->id(),
+            ]);
 
-        $this->notifyResolved($dispute->fresh(['booking.vendor.user']), 'The dispute on '.$booking->reference.' was closed without a payout change.');
+            $this->notifyResolved($dispute->fresh(['booking.vendor.user']), 'The dispute on '.$booking->reference.' was closed without a payout change.');
 
-        return $dispute->fresh();
+            return $dispute->fresh();
+        });
+    }
+
+    public function delete(Dispute $dispute): bool
+    {
+        return DB::transaction(function () use ($dispute): bool {
+            $dispute = Dispute::query()->lockForUpdate()->findOrFail($dispute->id);
+            $this->assertOpen($dispute);
+
+            $booking = $dispute->booking;
+            $restore = $booking->deliverables()->exists() ? 'delivered' : 'accepted';
+            if ($booking->status === 'disputed' && in_array($booking->escrow_status, ['held', 'none'], true)) {
+                $booking->update(['status' => $restore]);
+            }
+
+            return (bool) $dispute->delete();
+        });
     }
 
     public function syncOpened(Dispute $dispute): void
@@ -209,12 +268,12 @@ class DisputeService
         string $escrowStatus,
         bool $bumpFailed,
     ): Dispute {
-        $this->assertOpen($dispute);
-
         return DB::transaction(function () use (
             $dispute, $decision, $clientShare, $vendorShare, $platformShare,
             $notes, $travelToVendor, $bookingStatus, $escrowStatus, $bumpFailed
         ): Dispute {
+            $dispute = Dispute::query()->lockForUpdate()->findOrFail($dispute->id);
+            $this->assertOpen($dispute);
             $booking = $dispute->booking()->with('vendor')->firstOrFail();
             $alreadySettled = in_array($booking->escrow_status, ['split', 'refunded', 'released'], true)
                 && in_array($booking->status, ['failed', 'refunded', 'approved'], true);
@@ -330,17 +389,17 @@ class DisputeService
         $label = $dispute->kind === self::KIND_COMPLAINT ? 'complaint' : 'dispute';
         $body = ($dispute->opener?->name ?: 'A client').' opened a '.$label.' on '.($booking?->reference ?: 'a session').'.';
 
-        \App\Support\LensNotifier::staff(
-            \App\Support\LensNotifier::BOOKING_STATUS,
+        LensNotifier::staff(
+            LensNotifier::BOOKING_STATUS,
             'New '.$label,
             $body,
             $openerId ?: null,
         );
 
         if ($dispute->opener) {
-            \App\Support\LensNotifier::toUser(
+            LensNotifier::toUser(
                 $dispute->opener,
-                \App\Support\LensNotifier::BOOKING_STATUS,
+                LensNotifier::BOOKING_STATUS,
                 ucfirst($label).' opened',
                 ($booking?->reference ?: 'Your session').' is with Lens support. Escrow stays held until a decision.',
             );
@@ -352,13 +411,13 @@ class DisputeService
                 $booking?->vendor,
                 'Dispute opened',
                 $body,
-                \App\Support\LensNotifier::BOOKING_STATUS,
+                LensNotifier::BOOKING_STATUS,
             );
         }
     }
 
     protected function notifyResolved(Dispute $dispute, string $body): void
     {
-        VendorNotifier::send($dispute->booking?->vendor, 'Dispute updated', $body, \App\Support\LensNotifier::BOOKING_STATUS);
+        VendorNotifier::send($dispute->booking?->vendor, 'Dispute updated', $body, LensNotifier::BOOKING_STATUS);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\CouponResource\Pages\ListCoupons;
 use App\Models\Booking;
 use App\Models\Coupon;
 use App\Models\User;
@@ -10,6 +11,7 @@ use App\Services\EscrowService;
 use App\Services\PromoService;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class PromoOfferTest extends TestCase
@@ -43,6 +45,25 @@ class PromoOfferTest extends TestCase
             ->assertSee('Service type')
             ->assertSee('First order')
             ->assertSee('Loyal clients');
+    }
+
+    public function test_coupon_list_tabs_filter_active_and_inactive_offers(): void
+    {
+        $active = Coupon::query()->where('is_active', true)->firstOrFail();
+        $inactive = $active->replicate();
+        $inactive->code = 'INACTIVE-TEST';
+        $inactive->is_active = false;
+        $inactive->save();
+
+        Livewire::test(ListCoupons::class)
+            ->assertSee('Active')
+            ->assertSee('Inactive')
+            ->set('activeTab', 'active')
+            ->assertCanSeeTableRecords([$active])
+            ->assertCanNotSeeTableRecords([$inactive])
+            ->set('activeTab', 'inactive')
+            ->assertCanSeeTableRecords([$inactive])
+            ->assertCanNotSeeTableRecords([$active]);
     }
 
     public function test_plain_checkout_does_not_auto_apply_coded_seasonal_or_service_offers(): void

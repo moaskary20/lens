@@ -20,9 +20,6 @@
         mark('.fi-wi-widget, .fi-section, .fi-ta-ctn, .fi-fo-component-ctn', 'fade-up', 60);
         mark('.fi-ta-row', 'fade-up', 28);
         mark('.fi-simple-card', 'zoom-in', 0);
-        document.querySelectorAll('.fi-btn-primary, .fi-ac-btn-action').forEach((el) => {
-            el.classList.add('lens-pulse-btn');
-        });
     };
 
     const initAos = () => {

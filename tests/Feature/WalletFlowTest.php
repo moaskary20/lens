@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\PayoutResource;
+use App\Filament\Resources\PayoutResource\Pages\ListPayouts;
+use App\Filament\Resources\WalletResource\Pages\ListWallets;
 use App\Models\Booking;
 use App\Models\Coupon;
 use App\Models\Payout;
@@ -13,6 +16,7 @@ use App\Services\EscrowService;
 use App\Services\WalletService;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class WalletFlowTest extends TestCase
@@ -33,6 +37,29 @@ class WalletFlowTest extends TestCase
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
         $this->actingAs($admin)->get('/admin/wallets')->assertOk()->assertSee('Available / balance');
         $this->actingAs($admin)->get('/admin/coupons')->assertOk()->assertSee('WELCOME200');
+    }
+
+    public function test_wallet_list_tabs_filter_vendor_and_client_wallets(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $vendorWallet = User::query()->where('email', 'vendor@lens.app')->firstOrFail()->wallet;
+        $clientWallet = User::query()->where('email', 'client@lens.app')->firstOrFail()->wallet;
+        $adminWallet = $admin->wallet;
+
+        $this->actingAs($admin);
+
+        Livewire::test(ListWallets::class)
+            ->assertSee('All')
+            ->assertSee('Vendor')
+            ->assertSee('Client')
+            ->set('activeTab', 'all')
+            ->assertCanSeeTableRecords([$vendorWallet, $clientWallet, $adminWallet])
+            ->set('activeTab', 'vendor')
+            ->assertCanSeeTableRecords([$vendorWallet])
+            ->assertCanNotSeeTableRecords([$clientWallet, $adminWallet])
+            ->set('activeTab', 'client')
+            ->assertCanSeeTableRecords([$clientWallet])
+            ->assertCanNotSeeTableRecords([$vendorWallet, $adminWallet]);
     }
 
     public function test_checkout_holds_vendor_pending_and_records_client_payment(): void
@@ -112,6 +139,35 @@ class WalletFlowTest extends TestCase
         $wallet = $booking->vendor->user->fresh()->wallet;
         $this->assertEquals(0.0, (float) $wallet->available);
         $this->assertEquals(1440.0, (float) $wallet->lifetime_withdrawn);
+    }
+
+    public function test_payout_list_tabs_filter_every_status(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $vendor = Vendor::query()->whereHas('user', fn ($query) => $query->where('email', 'vendor@lens.app'))->firstOrFail();
+        $payouts = collect(['pending', 'processing', 'paid', 'failed'])
+            ->mapWithKeys(fn (string $status): array => [
+                $status => Payout::query()->create([
+                    'vendor_id' => $vendor->id,
+                    'amount' => 100,
+                    'status' => $status,
+                ]),
+            ]);
+
+        $this->actingAs($admin);
+
+        $tabs = Livewire::test(ListPayouts::class)
+            ->assertSee('All payouts')
+            ->assertSee('Pending')
+            ->assertSee('Processing')
+            ->assertSee('Paid')
+            ->assertSee('Failed');
+
+        foreach (array_keys(PayoutResource::statuses()) as $status) {
+            $tabs->set('activeTab', $status)
+                ->assertCanSeeTableRecords([$payouts[$status]])
+                ->assertCanNotSeeTableRecords($payouts->except($status)->values()->all());
+        }
     }
 
     public function test_cancellation_refunds_the_client_wallet_and_clears_vendor_hold(): void

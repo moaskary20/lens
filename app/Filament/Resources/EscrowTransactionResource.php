@@ -54,13 +54,21 @@ class EscrowTransactionResource extends Resource
                 'fee' => 'Platform fee',
             ])->required(),
             TextInput::make('amount')->label('Amount')->numeric()->prefix(Finance::currency())->required(),
-            Select::make('status')->label('Status')->options([
-                'pending' => 'Pending',
-                'completed' => 'Completed',
-                'failed' => 'Failed',
-            ])->default('pending'),
+            Select::make('status')->label('Status')->options(self::statuses())->default('pending'),
             Textarea::make('notes')->label('Notes'),
         ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function statuses(): array
+    {
+        return [
+            'pending' => 'Pending',
+            'completed' => 'Completed',
+            'failed' => 'Failed',
+        ];
     }
 
     public static function table(Table $table): Table
@@ -75,7 +83,7 @@ class EscrowTransactionResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('type')->label('Type'),
-                SelectFilter::make('status')->label('Status'),
+                SelectFilter::make('status')->label('Status')->options(self::statuses()),
             ])
             ->recordActions([EditAction::make()]);
     }

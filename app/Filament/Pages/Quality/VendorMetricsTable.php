@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Quality;
 
 use App\Filament\Resources\VendorResource;
 use App\Models\Vendor;
+use App\Models\VendorType;
 use App\Support\Finance;
 use App\Support\VendorMetrics;
 use Filament\Actions\Action;
@@ -20,12 +21,18 @@ class VendorMetricsTable extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    public ?int $vendorTypeFilter = null;
+
     public function table(Table $table): Table
     {
         return $table
             ->heading('Per-vendor session metrics')
             ->description('Completion and acceptance rates feed Top Rated / Popular badges and featured placement.')
-            ->query(Vendor::query()->with(['vendorType', 'badges'])->orderByDesc('completed_sessions'))
+            ->query(fn () => Vendor::query()
+                ->with(['vendorType', 'badges'])
+                ->when($this->vendorTypeFilter, fn ($query, int $typeId) => $query->where('vendor_type_id', $typeId))
+                ->orderByDesc('completed_sessions'))
+            ->headerActions($this->typeFilterActions())
             ->columns([
                 TextColumn::make('display_name')->label('Vendor')->searchable()->sortable(),
                 TextColumn::make('vendorType.name_en')->label('Type')->badge(),
@@ -48,5 +55,40 @@ class VendorMetricsTable extends TableWidget
                 Action::make('open')->label('Open vendor')
                     ->url(fn (Vendor $record): string => VendorResource::getUrl('edit', ['record' => $record])),
             ]);
+    }
+
+    /**
+     * @return array<Action>
+     */
+    protected function typeFilterActions(): array
+    {
+        $actions = [
+            Action::make('filterAllTypes')
+                ->label('All')
+                ->color(fn (): string => $this->vendorTypeFilter === null ? 'primary' : 'gray')
+                ->button()
+                ->outlined(fn (): bool => $this->vendorTypeFilter !== null)
+                ->action(fn () => $this->filterByVendorType(null)),
+        ];
+
+        foreach (VendorType::query()->orderBy('sort_order')->orderBy('name_en')->get() as $type) {
+            $typeId = (int) $type->id;
+
+            $actions[] = Action::make('filterType'.$typeId)
+                ->label($type->name_en)
+                ->color(fn (): string => $this->vendorTypeFilter === $typeId ? 'primary' : 'gray')
+                ->button()
+                ->outlined(fn (): bool => $this->vendorTypeFilter !== $typeId)
+                ->action(fn () => $this->filterByVendorType($typeId));
+        }
+
+        return $actions;
+    }
+
+    public function filterByVendorType(?int $typeId): void
+    {
+        $this->vendorTypeFilter = $typeId;
+        $this->resetPage();
+        $this->flushCachedTableRecords();
     }
 }

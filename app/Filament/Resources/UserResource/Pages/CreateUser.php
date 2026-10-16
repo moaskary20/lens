@@ -15,6 +15,6 @@ class CreateUser extends CreateRecord
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        return UserResource::normalizePreferenceData($data);
+        return UserResource::normalizeCreateData($data);
     }
 }

@@ -50,12 +50,7 @@ class PayoutResource extends Resource
             Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name')->searchable()->preload()->required(),
             Select::make('booking_id')->label('Booking')->relationship('booking', 'reference')->searchable()->preload(),
             TextInput::make('amount')->label('Amount')->numeric()->prefix(Finance::currency())->required(),
-            Select::make('status')->label('Status')->options([
-                'pending' => 'Pending',
-                'processing' => 'Processing',
-                'paid' => 'Paid',
-                'failed' => 'Failed',
-            ])->default('pending'),
+            Select::make('status')->label('Status')->options(self::statuses())->default('pending'),
             Select::make('method')->label('Method')->options([
                 'bank' => 'Bank transfer',
                 'wallet' => 'Wallet',
@@ -65,6 +60,19 @@ class PayoutResource extends Resource
             DateTimePicker::make('paid_at')->label('Paid at'),
             Textarea::make('notes')->label('Notes'),
         ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function statuses(): array
+    {
+        return [
+            'pending' => 'Pending',
+            'processing' => 'Processing',
+            'paid' => 'Paid',
+            'failed' => 'Failed',
+        ];
     }
 
     public static function table(Table $table): Table
@@ -83,7 +91,7 @@ class PayoutResource extends Resource
                 TextColumn::make('paid_at')->label('Paid')->dateTime('Y-m-d'),
             ])
             ->filters([
-                SelectFilter::make('status')->label('Status'),
+                SelectFilter::make('status')->label('Status')->options(self::statuses()),
             ])
             ->recordActions([
                 Action::make('markPaid')
