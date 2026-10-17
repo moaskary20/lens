@@ -25,14 +25,17 @@ class VendorMetricsTable extends TableWidget
 
     public function table(Table $table): Table
     {
+        $filterActions = $this->typeFilterActions();
+
         return $table
-            ->heading('Per-vendor session metrics')
-            ->description('Completion and acceptance rates feed Top Rated / Popular badges and featured placement.')
+            ->headerActions($filterActions)
+            ->header(view('filament.pages.quality.vendor-metrics-header', [
+                'actions' => $filterActions,
+            ]))
             ->query(fn () => Vendor::query()
                 ->with(['user', 'vendorType', 'badges'])
                 ->when($this->vendorTypeFilter, fn ($query, int $typeId) => $query->where('vendor_type_id', $typeId))
                 ->orderByDesc('completed_sessions'))
-            ->headerActions($this->typeFilterActions())
             ->columns([
                 TextColumn::make('user.name')->label('Vendor')->searchable()->sortable()->wrap(),
                 TextColumn::make('vendorType.name_en')->label('Type')->badge(),

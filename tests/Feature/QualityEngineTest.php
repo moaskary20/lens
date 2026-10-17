@@ -68,6 +68,21 @@ class QualityEngineTest extends TestCase
             ->assertCanSeeTableRecords([$photographer, $studio]);
     }
 
+    public function test_session_metrics_heading_and_description_are_below_type_filters(): void
+    {
+        $html = Livewire::test(VendorMetricsTable::class)->html();
+
+        $filterPosition = strpos($html, 'filterAllTypes');
+        $headingPosition = strpos($html, 'Per-vendor session metrics');
+        $descriptionPosition = strpos($html, 'Completion and acceptance rates feed');
+
+        $this->assertNotFalse($filterPosition);
+        $this->assertNotFalse($headingPosition);
+        $this->assertNotFalse($descriptionPosition);
+        $this->assertLessThan($headingPosition, $filterPosition);
+        $this->assertLessThan($descriptionPosition, $headingPosition);
+    }
+
     public function test_session_metrics_shows_the_full_vendor_account_name_separately_from_stars(): void
     {
         $vendor = Vendor::query()->firstOrFail();
