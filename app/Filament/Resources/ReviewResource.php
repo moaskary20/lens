@@ -98,7 +98,7 @@ class ReviewResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->sortable(),
+                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->sortable()->wrap(),
                 TextColumn::make('client.name')->label('Client')->searchable(),
                 TextColumn::make('booking.reference')->label('Session')->searchable(),
                 TextColumn::make('booking.status')->label('Session status')->badge(),

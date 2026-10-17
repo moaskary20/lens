@@ -79,7 +79,7 @@ class PayoutResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable(),
+                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->wrap(),
                 TextColumn::make('booking.reference')->label('Booking'),
                 TextColumn::make('amount')->label('Amount')->money(Finance::currency()),
                 TextColumn::make('status')->label('Status')->badge()->color(fn (string $state): string => match ($state) {

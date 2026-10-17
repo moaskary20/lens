@@ -68,6 +68,18 @@ class QualityEngineTest extends TestCase
             ->assertCanSeeTableRecords([$photographer, $studio]);
     }
 
+    public function test_session_metrics_shows_the_full_vendor_name_separately_from_stars(): void
+    {
+        $vendor = Vendor::query()->firstOrFail();
+        $vendorName = 'A Very Long Vendor Name That Should Be Fully Visible';
+        $vendor->update(['display_name' => $vendorName]);
+
+        Livewire::test(VendorMetricsTable::class)
+            ->assertCanSeeTableRecords([$vendor])
+            ->assertSee($vendorName, false)
+            ->assertSee('Stars');
+    }
+
     public function test_review_is_blocked_until_session_approval(): void
     {
         $booking = Booking::query()->where('reference', 'LN-1003')->firstOrFail();

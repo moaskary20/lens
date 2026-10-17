@@ -6,10 +6,16 @@ use App\Filament\Resources\BookingResource;
 use App\Filament\Resources\BookingResource\Pages\ListBookings;
 use App\Filament\Resources\ClientResource\Pages\CreateClient;
 use App\Filament\Resources\ClientResource\Pages\ListClients;
+use App\Filament\Resources\ConversationResource\Pages\ListConversations;
+use App\Filament\Resources\PayoutResource\Pages\ListPayouts;
+use App\Filament\Resources\ReviewResource\Pages\ListReviews;
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\ListUsers;
 use App\Filament\Resources\VendorResource\Pages\ListVendors;
 use App\Models\Booking;
+use App\Models\Conversation;
+use App\Models\Payout;
+use App\Models\Review;
 use App\Models\User;
 use App\Models\Vendor;
 use Database\Seeders\LensSeeder;
@@ -334,6 +340,31 @@ class AdminPanelTest extends TestCase
             ->assertCanSeeTableRecords([$booking])
             ->assertSee($vendorName, false)
             ->assertDontSee('★', false);
+    }
+
+    public function test_payouts_conversations_and_reviews_show_the_full_vendor_name(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $payout = Payout::query()->firstOrFail();
+        $vendor = $payout->vendor;
+        $vendorName = 'A Very Long Vendor Name That Should Be Fully Visible';
+        $vendor->update(['display_name' => $vendorName]);
+        $conversation = Conversation::query()->where('vendor_id', $vendor->id)->firstOrFail();
+        $review = Review::query()->where('vendor_id', $vendor->id)->firstOrFail();
+
+        $this->actingAs($admin);
+
+        Livewire::test(ListPayouts::class)
+            ->assertCanSeeTableRecords([$payout])
+            ->assertSee($vendorName, false);
+
+        Livewire::test(ListConversations::class)
+            ->assertCanSeeTableRecords([$conversation])
+            ->assertSee($vendorName, false);
+
+        Livewire::test(ListReviews::class)
+            ->assertCanSeeTableRecords([$review])
+            ->assertSee($vendorName, false);
     }
 
     public function test_admin_can_add_a_client_from_the_client_page(): void

@@ -73,7 +73,7 @@ class ConversationResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('client.name')->label('Client')->searchable(),
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable(),
+                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->wrap(),
                 TextColumn::make('booking.reference')->label('Booking'),
                 TextColumn::make('messages_count')->counts('messages')->label('Messages'),
                 TextColumn::make('last_message_at')->label('Last message')->since(),

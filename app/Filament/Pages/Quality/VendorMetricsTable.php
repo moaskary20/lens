@@ -34,7 +34,7 @@ class VendorMetricsTable extends TableWidget
                 ->orderByDesc('completed_sessions'))
             ->headerActions($this->typeFilterActions())
             ->columns([
-                TextColumn::make('display_name')->label('Vendor')->searchable()->sortable(),
+                TextColumn::make('display_name')->label('Vendor')->searchable()->sortable()->wrap(),
                 TextColumn::make('vendorType.name_en')->label('Type')->badge(),
                 TextColumn::make('booked_sessions')->label('Booked')->sortable(),
                 TextColumn::make('completed_sessions')->label('Completed')->sortable(),
