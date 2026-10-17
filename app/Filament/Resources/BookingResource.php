@@ -214,7 +214,7 @@ class BookingResource extends Resource
             ->columns([
                 TextColumn::make('reference')->label('Reference')->searchable()->copyable(),
                 TextColumn::make('client.name')->label('Client')->searchable(),
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable(),
+                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->wrap(),
                 TextColumn::make('vendor.vendorType.name_en')->label('Type'),
                 TextColumn::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state): string => self::statuses()[$state] ?? $state)
                     ->color(fn (string $state): string => match ($state) {

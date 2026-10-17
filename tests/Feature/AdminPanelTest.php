@@ -318,6 +318,24 @@ class AdminPanelTest extends TestCase
             ->assertCanNotSeeTableRecords([$pending, $delivered]);
     }
 
+    public function test_bookings_table_shows_full_vendor_name_without_rating_stars(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $booking = Booking::query()->firstOrFail();
+        $vendorName = 'A Very Long Vendor Name That Should Be Fully Visible';
+        $booking->vendor->update([
+            'display_name' => $vendorName,
+            'rating_avg' => 4.9,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(ListBookings::class)
+            ->assertCanSeeTableRecords([$booking])
+            ->assertSee($vendorName, false)
+            ->assertDontSee('★', false);
+    }
+
     public function test_admin_can_add_a_client_from_the_client_page(): void
     {
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
