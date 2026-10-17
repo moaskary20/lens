@@ -57,11 +57,11 @@ class VendorResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $recordTitleAttribute = 'display_name';
+    protected static ?string $recordTitleAttribute = 'user.name';
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()->with('user');
         $user = auth()->user();
 
         if ($user?->isVendor()) {
@@ -185,7 +185,7 @@ class VendorResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('display_name')->label('Name')->sortable(),
+                TextColumn::make('user.name')->label('Name')->searchable()->sortable()->wrap(),
                 TextColumn::make('vendorType.name_en')->label('Type')->badge()->color('primary'),
                 TextColumn::make('city.name_en')->label('Governorate'),
                 TextColumn::make('verification_status')->label('Verification')->badge()->formatStateUsing(fn (string $state): string => match ($state) {

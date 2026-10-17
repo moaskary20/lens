@@ -249,6 +249,22 @@ class AdminPanelTest extends TestCase
             ->assertActionHidden('clearVendorSearch');
     }
 
+    public function test_vendor_list_shows_full_account_name_instead_of_masked_display_name(): void
+    {
+        $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
+        $vendor = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();
+        $accountName = 'Fahad Photography';
+        $vendor->update(['display_name' => 'F**** S***** L****']);
+        $vendor->user->update(['name' => $accountName]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(ListVendors::class)
+            ->assertCanSeeTableRecords([$vendor])
+            ->assertSee($accountName, false)
+            ->assertDontSee('F****', false);
+    }
+
     public function test_client_page_lists_only_clients_and_filters_by_active_status(): void
     {
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
