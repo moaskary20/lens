@@ -68,15 +68,17 @@ class QualityEngineTest extends TestCase
             ->assertCanSeeTableRecords([$photographer, $studio]);
     }
 
-    public function test_session_metrics_shows_the_full_vendor_name_separately_from_stars(): void
+    public function test_session_metrics_shows_the_full_vendor_account_name_separately_from_stars(): void
     {
         $vendor = Vendor::query()->firstOrFail();
-        $vendorName = 'A Very Long Vendor Name That Should Be Fully Visible';
-        $vendor->update(['display_name' => $vendorName]);
+        $vendorName = 'Fahad Photography Full Account Name';
+        $vendor->update(['display_name' => 'F**** S***** L****']);
+        $vendor->user->update(['name' => $vendorName]);
 
         Livewire::test(VendorMetricsTable::class)
             ->assertCanSeeTableRecords([$vendor])
             ->assertSee($vendorName, false)
+            ->assertDontSee('F****', false)
             ->assertSee('Stars');
     }
 

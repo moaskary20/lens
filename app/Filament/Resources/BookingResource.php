@@ -77,7 +77,9 @@ class BookingResource extends Resource
                 Select::make('client_id')->label('Client')->relationship('client', 'name')->searchable()->preload()->required()
                     ->live()
                     ->afterStateUpdated(fn (Get $get, Set $set) => self::recalculateTravel($get, $set)),
-                Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name')->searchable()->preload()->required()
+                Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name', modifyQueryUsing: fn ($query) => $query->with('user'))
+                    ->getOptionLabelFromRecordUsing(fn (Vendor $record): string => $record->user?->name ?? $record->display_name)
+                    ->searchable()->preload()->required()
                     ->live()
                     ->afterStateUpdated(function (Get $get, Set $set): void {
                         $set('availability_id', null);
@@ -214,7 +216,7 @@ class BookingResource extends Resource
             ->columns([
                 TextColumn::make('reference')->label('Reference')->searchable()->copyable(),
                 TextColumn::make('client.name')->label('Client')->searchable(),
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->wrap(),
+                TextColumn::make('vendor.user.name')->label('Vendor')->searchable()->wrap(),
                 TextColumn::make('vendor.vendorType.name_en')->label('Type'),
                 TextColumn::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state): string => self::statuses()[$state] ?? $state)
                     ->color(fn (string $state): string => match ($state) {

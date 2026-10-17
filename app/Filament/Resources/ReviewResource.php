@@ -6,6 +6,7 @@ use App\Filament\Concerns\HasOptionalFeature;
 use App\Filament\Resources\ReviewResource\Pages;
 use App\Models\Booking;
 use App\Models\Review;
+use App\Models\Vendor;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -86,7 +87,9 @@ class ReviewResource extends Resource
                             $set('vendor_id', $booking?->vendor_id);
                         }),
                     Select::make('client_id')->label('Client')->relationship('client', 'name')->searchable()->preload()->required(),
-                    Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name')->searchable()->preload()->required(),
+                    Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name', modifyQueryUsing: fn ($query) => $query->with('user'))
+                        ->getOptionLabelFromRecordUsing(fn (Vendor $record): string => $record->user?->name ?? $record->display_name)
+                        ->searchable()->preload()->required(),
                     Select::make('rating')->label('Stars')->options(self::starOptions())->required()->native(false),
                     Toggle::make('is_visible')->label('Visible in marketplace & ranking')->default(true),
                     Textarea::make('comment')->label('Written review')->rows(4)->columnSpanFull(),
@@ -98,7 +101,7 @@ class ReviewResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->sortable()->wrap(),
+                TextColumn::make('vendor.user.name')->label('Vendor')->searchable()->sortable()->wrap(),
                 TextColumn::make('client.name')->label('Client')->searchable(),
                 TextColumn::make('booking.reference')->label('Session')->searchable(),
                 TextColumn::make('booking.status')->label('Session status')->badge(),
@@ -111,7 +114,12 @@ class ReviewResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('rating')->label('Stars')->options(self::starOptions()),
-                SelectFilter::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name'),
+                SelectFilter::make('vendor_id')->label('Vendor')->options(fn (): array => Vendor::query()
+                    ->with('user')
+                    ->get()
+                    ->mapWithKeys(fn (Vendor $vendor): array => [$vendor->id => $vendor->user?->name ?? '—'])
+                    ->all())
+                    ->searchable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->recordActions([EditAction::make(), DeleteAction::make()]);

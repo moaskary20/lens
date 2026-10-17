@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasOptionalFeature;
 use App\Filament\Resources\ConversationResource\Pages;
 use App\Models\Conversation;
+use App\Models\Vendor;
 use App\Support\ChatThread;
 use App\Support\Roles;
 use BackedEnum;
@@ -49,7 +50,9 @@ class ConversationResource extends Resource
                 ->schema([
                     Select::make('client_id')->label('Client')->relationship('client', 'name')->searchable()->preload()->required()
                         ->disabled(fn (): bool => ! Roles::staffCan(auth()->user(), 'view_operations')),
-                    Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name')->searchable()->preload()->required()
+                    Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name', modifyQueryUsing: fn ($query) => $query->with('user'))
+                        ->getOptionLabelFromRecordUsing(fn (Vendor $record): string => $record->user?->name ?? $record->display_name)
+                        ->searchable()->preload()->required()
                         ->disabled(fn (): bool => ! Roles::staffCan(auth()->user(), 'view_operations')),
                     Select::make('booking_id')->label('Booking')->relationship('booking', 'reference')->searchable()->preload()
                         ->disabled(fn (): bool => ! Roles::staffCan(auth()->user(), 'view_operations')),
@@ -73,7 +76,7 @@ class ConversationResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('client.name')->label('Client')->searchable(),
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->wrap(),
+                TextColumn::make('vendor.user.name')->label('Vendor')->searchable()->wrap(),
                 TextColumn::make('booking.reference')->label('Booking'),
                 TextColumn::make('messages_count')->counts('messages')->label('Messages'),
                 TextColumn::make('last_message_at')->label('Last message')->since(),

@@ -328,27 +328,30 @@ class AdminPanelTest extends TestCase
     {
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
         $booking = Booking::query()->firstOrFail();
-        $vendorName = 'A Very Long Vendor Name That Should Be Fully Visible';
+        $vendorName = 'Fahad Photography Full Account Name';
         $booking->vendor->update([
-            'display_name' => $vendorName,
+            'display_name' => 'F**** S***** L****',
             'rating_avg' => 4.9,
         ]);
+        $booking->vendor->user->update(['name' => $vendorName]);
 
         $this->actingAs($admin);
 
         Livewire::test(ListBookings::class)
             ->assertCanSeeTableRecords([$booking])
             ->assertSee($vendorName, false)
+            ->assertDontSee('F****', false)
             ->assertDontSee('★', false);
     }
 
-    public function test_payouts_conversations_and_reviews_show_the_full_vendor_name(): void
+    public function test_payouts_conversations_and_reviews_show_the_full_vendor_account_name(): void
     {
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
         $payout = Payout::query()->firstOrFail();
         $vendor = $payout->vendor;
-        $vendorName = 'A Very Long Vendor Name That Should Be Fully Visible';
-        $vendor->update(['display_name' => $vendorName]);
+        $vendorName = 'Fahad Photography Full Account Name';
+        $vendor->update(['display_name' => 'F**** S***** L****']);
+        $vendor->user->update(['name' => $vendorName]);
         $conversation = Conversation::query()->where('vendor_id', $vendor->id)->firstOrFail();
         $review = Review::query()->where('vendor_id', $vendor->id)->firstOrFail();
 
@@ -356,15 +359,18 @@ class AdminPanelTest extends TestCase
 
         Livewire::test(ListPayouts::class)
             ->assertCanSeeTableRecords([$payout])
-            ->assertSee($vendorName, false);
+            ->assertSee($vendorName, false)
+            ->assertDontSee('F****', false);
 
         Livewire::test(ListConversations::class)
             ->assertCanSeeTableRecords([$conversation])
-            ->assertSee($vendorName, false);
+            ->assertSee($vendorName, false)
+            ->assertDontSee('F****', false);
 
         Livewire::test(ListReviews::class)
             ->assertCanSeeTableRecords([$review])
-            ->assertSee($vendorName, false);
+            ->assertSee($vendorName, false)
+            ->assertDontSee('F****', false);
     }
 
     public function test_admin_can_add_a_client_from_the_client_page(): void

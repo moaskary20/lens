@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasOptionalFeature;
 use App\Filament\Resources\PayoutResource\Pages;
 use App\Models\Payout;
+use App\Models\Vendor;
 use App\Support\Finance;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -47,7 +48,9 @@ class PayoutResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name')->searchable()->preload()->required(),
+            Select::make('vendor_id')->label('Vendor')->relationship('vendor', 'display_name', modifyQueryUsing: fn ($query) => $query->with('user'))
+                ->getOptionLabelFromRecordUsing(fn (Vendor $record): string => $record->user?->name ?? $record->display_name)
+                ->searchable()->preload()->required(),
             Select::make('booking_id')->label('Booking')->relationship('booking', 'reference')->searchable()->preload(),
             TextInput::make('amount')->label('Amount')->numeric()->prefix(Finance::currency())->required(),
             Select::make('status')->label('Status')->options(self::statuses())->default('pending'),
@@ -79,7 +82,7 @@ class PayoutResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('vendor.display_name')->label('Vendor')->searchable()->wrap(),
+                TextColumn::make('vendor.user.name')->label('Vendor')->searchable()->wrap(),
                 TextColumn::make('booking.reference')->label('Booking'),
                 TextColumn::make('amount')->label('Amount')->money(Finance::currency()),
                 TextColumn::make('status')->label('Status')->badge()->color(fn (string $state): string => match ($state) {
