@@ -498,7 +498,27 @@ class VendorProfile
             TextInput::make('whatsapp')->label('WhatsApp')->tel()
                 ->rule(Egypt::mobileRule())
                 ->validationMessages(['regex' => Egypt::mobileMessage()]),
-            TextInput::make('instagram')->label('Instagram')->placeholder('@studio'),
+            Section::make('Instagram')
+                ->schema([
+                    TextInput::make('instagram')->label('Link')->placeholder('https://instagram.com/studio'),
+                    TextInput::make('instagram_followers')->label('Followers')->numeric()->minValue(0)->integer(),
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
+            Section::make('TikTok')
+                ->schema([
+                    TextInput::make('tiktok_url')->label('Link')->placeholder('https://tiktok.com/@studio'),
+                    TextInput::make('tiktok_followers')->label('Followers')->numeric()->minValue(0)->integer(),
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
+            Section::make('Facebook')
+                ->schema([
+                    TextInput::make('facebook_url')->label('Link')->placeholder('https://facebook.com/studio'),
+                    TextInput::make('facebook_followers')->label('Followers')->numeric()->minValue(0)->integer(),
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
         ];
     }
 

@@ -25,7 +25,7 @@ class ListUsers extends ListRecords
         ];
 
         foreach (UserResource::roleOptions() as $role => $label) {
-            if (in_array($role, [Roles::ADMIN, Roles::VENDOR], true)) {
+            if (in_array($role, [Roles::CLIENT, Roles::VENDOR], true)) {
                 continue;
             }
 

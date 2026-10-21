@@ -16,6 +16,7 @@ class Vendor extends Model
         'is_active', 'is_featured', 'accepts_out_of_governorate', 'default_travel_fee',
         'profile_photo', 'national_id_image', 'date_of_birth', 'profession',
         'contact_phone', 'contact_email', 'whatsapp', 'instagram',
+        'instagram_followers', 'tiktok_url', 'tiktok_followers', 'facebook_url', 'facebook_followers',
         'bank_name', 'bank_account_holder', 'bank_account_number', 'bank_iban', 'instapay', 'transfer_notes',
         'payout_method', 'bank_swift', 'bank_branch', 'bank_branch_code', 'bank_account_type',
         'wallet_network_type', 'wallet_telecom', 'wallet_bank_name', 'wallet_phone',
@@ -47,6 +48,9 @@ class Vendor extends Model
             'rating_avg' => 'decimal:2',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
+            'instagram_followers' => 'integer',
+            'tiktok_followers' => 'integer',
+            'facebook_followers' => 'integer',
         ];
     }
 

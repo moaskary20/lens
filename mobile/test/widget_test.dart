@@ -1067,6 +1067,11 @@ void main() {
     await tester.pump();
     await tester.ensureVisible(find.text('National ID card'));
     expect(find.text('National ID card'), findsOneWidget);
+    await tester.ensureVisible(find.text('Instagram'));
+    expect(find.text('Instagram link'), findsOneWidget);
+    expect(find.text('TikTok link'), findsOneWidget);
+    expect(find.text('Facebook link'), findsOneWidget);
+    expect(find.text('Followers'), findsNWidgets(3));
     await tester.ensureVisible(find.text('Cover image'));
     expect(find.text('Cover image'), findsOneWidget);
     expect(find.text('Pin address on Google Maps'), findsOneWidget);

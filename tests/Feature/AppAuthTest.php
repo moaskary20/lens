@@ -106,6 +106,12 @@ class AppAuthTest extends TestCase
             'vendor_type' => 'photographer',
             'display_name' => 'Yasmin Studio',
             'profession' => 'Wedding photographer',
+            'instagram' => 'https://instagram.com/yasminstudio',
+            'instagram_followers' => 128000,
+            'tiktok_url' => 'https://tiktok.com/@yasminstudio',
+            'tiktok_followers' => 86000,
+            'facebook_url' => 'https://facebook.com/yasminstudio',
+            'facebook_followers' => 24000,
             'specialties' => ['wedding', 'editorial'],
             'filter_tags' => ['full-frame', 'portrait-lenses'],
             'extras' => [
@@ -135,6 +141,12 @@ class AppAuthTest extends TestCase
         $this->assertSame('wallet', $vendor->payout_method);
         $this->assertSame('vodafone', $vendor->wallet_telecom);
         $this->assertSame('01588887766', $vendor->wallet_phone);
+        $this->assertSame('https://instagram.com/yasminstudio', $vendor->instagram);
+        $this->assertSame(128000, $vendor->instagram_followers);
+        $this->assertSame('https://tiktok.com/@yasminstudio', $vendor->tiktok_url);
+        $this->assertSame(86000, $vendor->tiktok_followers);
+        $this->assertSame('https://facebook.com/yasminstudio', $vendor->facebook_url);
+        $this->assertSame(24000, $vendor->facebook_followers);
         $this->assertEqualsCanonicalizing(['wedding', 'editorial'], $vendor->specialties);
         $this->assertEqualsCanonicalizing(['full-frame', 'portrait-lenses'], $vendor->filterTags()->pluck('slug')->all());
         $this->assertSame(['Sony A7 IV'], $vendor->extras['cameras']);

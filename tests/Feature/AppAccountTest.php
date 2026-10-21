@@ -220,6 +220,12 @@ class AppAccountTest extends TestCase
                 'display_name' => 'Fahad Light Desk',
                 'vendor_type' => 'photographer',
                 'profession' => 'Editorial photographer',
+                'instagram' => 'https://instagram.com/fahadlight',
+                'instagram_followers' => 150000,
+                'tiktok_url' => 'https://tiktok.com/@fahadlight',
+                'tiktok_followers' => 90000,
+                'facebook_url' => 'https://facebook.com/fahadlight',
+                'facebook_followers' => 30000,
                 'address' => 'Zamalek, Cairo',
                 'latitude' => 30.0626,
                 'longitude' => 31.2197,
@@ -244,6 +250,12 @@ class AppAccountTest extends TestCase
             ->assertJsonPath('vendor.payout_method', 'paypal')
             ->assertJsonPath('vendor.half_day_price', 2100)
             ->assertJsonPath('vendor.address', 'Zamalek, Cairo')
+            ->assertJsonPath('vendor.instagram', 'https://instagram.com/fahadlight')
+            ->assertJsonPath('vendor.instagram_followers', 150000)
+            ->assertJsonPath('vendor.tiktok_url', 'https://tiktok.com/@fahadlight')
+            ->assertJsonPath('vendor.tiktok_followers', 90000)
+            ->assertJsonPath('vendor.facebook_url', 'https://facebook.com/fahadlight')
+            ->assertJsonPath('vendor.facebook_followers', 30000)
             ->assertJsonPath('vendor.latitude', 30.0626);
 
         Storage::fake('public');
@@ -286,6 +298,9 @@ class AppAccountTest extends TestCase
             ->assertSee('Gouna editorial')
             ->assertSee('National ID card')
             ->assertSee('Cover image')
-            ->assertSee('Zamalek, Cairo');
+            ->assertSee('Zamalek, Cairo')
+            ->assertSee('Instagram')
+            ->assertSee('TikTok')
+            ->assertSee('Facebook');
     }
 }

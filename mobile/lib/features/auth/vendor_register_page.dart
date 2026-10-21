@@ -50,6 +50,11 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   final _contactEmail = TextEditingController();
   final _whatsapp = TextEditingController();
   final _instagram = TextEditingController();
+  final _instagramFollowers = TextEditingController();
+  final _tiktok = TextEditingController();
+  final _tiktokFollowers = TextEditingController();
+  final _facebook = TextEditingController();
+  final _facebookFollowers = TextEditingController();
   final _address = TextEditingController();
   final _holder = TextEditingController();
   final _accountNumber = TextEditingController();
@@ -118,7 +123,8 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   @override
   void dispose() {
     for (final controller in [
-      _name, _email, _password, _phone, _displayName, _profession, _bio, _contactEmail, _whatsapp, _instagram,
+      _name, _email, _password, _phone, _displayName, _profession, _bio, _contactEmail, _whatsapp,
+      _instagram, _instagramFollowers, _tiktok, _tiktokFollowers, _facebook, _facebookFollowers,
       _address, _holder, _accountNumber, _iban, _swift, _branch, _branchCode, _walletPhone,
       _paypalEmail, _paypalName, _transferNotes,
     ]) {
@@ -179,7 +185,12 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     _bio.text = 'Product and wedding photography with portrait lenses and strobe lighting.';
     _whatsapp.text = _phone.text;
     _contactEmail.text = _email.text;
-    _instagram.text = '@fahadstudiolight';
+    _instagram.text = 'https://instagram.com/fahadstudiolight';
+    _instagramFollowers.text = '128000';
+    _tiktok.text = 'https://tiktok.com/@fahadstudiolight';
+    _tiktokFollowers.text = '86000';
+    _facebook.text = 'https://facebook.com/fahadstudiolight';
+    _facebookFollowers.text = '24000';
     _address.text = 'Zamalek, Cairo';
     _latitude = 30.0626;
     _longitude = 31.2197;
@@ -221,6 +232,11 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     _contactEmail.text = vendor['contact_email']?.toString() ?? _email.text;
     _whatsapp.text = vendor['whatsapp']?.toString() ?? '';
     _instagram.text = vendor['instagram']?.toString() ?? '';
+    _instagramFollowers.text = vendor['instagram_followers']?.toString() ?? '';
+    _tiktok.text = vendor['tiktok_url']?.toString() ?? '';
+    _tiktokFollowers.text = vendor['tiktok_followers']?.toString() ?? '';
+    _facebook.text = vendor['facebook_url']?.toString() ?? '';
+    _facebookFollowers.text = vendor['facebook_followers']?.toString() ?? '';
     _address.text = vendor['address']?.toString() ?? '';
     _latitude = _asDouble(vendor['latitude']);
     _longitude = _asDouble(vendor['longitude']);
@@ -481,6 +497,11 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
       'contact_email': (_contactEmail.text.trim().isEmpty ? _email.text : _contactEmail.text).trim(),
       'whatsapp': EgyptPhone.digits(_whatsapp.text),
       'instagram': _instagram.text.trim(),
+      'instagram_followers': _followers(_instagramFollowers),
+      'tiktok_url': _tiktok.text.trim(),
+      'tiktok_followers': _followers(_tiktokFollowers),
+      'facebook_url': _facebook.text.trim(),
+      'facebook_followers': _followers(_facebookFollowers),
       'address': _address.text.trim(),
       if (_latitude != null) 'latitude': _latitude,
       if (_longitude != null) 'longitude': _longitude,
@@ -694,6 +715,40 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     );
   }
 
+  int? _followers(TextEditingController controller) {
+    final digits = controller.text.trim();
+    if (digits.isEmpty) {
+      return null;
+    }
+    return int.tryParse(digits);
+  }
+
+  Widget _socialAccount({
+    required String title,
+    required TextEditingController link,
+    required TextEditingController followers,
+    required IconData icon,
+    required String linkHint,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        RegisterField(controller: link, hint: linkHint, icon: icon, keyboard: TextInputType.url),
+        const SizedBox(height: 8),
+        RegisterField(
+          controller: followers,
+          hint: 'Followers',
+          icon: Icons.groups_outlined,
+          keyboard: TextInputType.number,
+          digitsOnly: true,
+          maxLength: 12,
+        ),
+      ],
+    );
+  }
+
   Widget _identity() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -783,8 +838,30 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           digitsOnly: true,
           maxLength: 11,
         ),
-        const SizedBox(height: 12),
-        RegisterField(controller: _instagram, hint: 'Instagram', icon: Icons.camera_alt_outlined),
+        const SizedBox(height: 18),
+        _socialAccount(
+          title: 'Instagram',
+          link: _instagram,
+          followers: _instagramFollowers,
+          icon: Icons.camera_alt_outlined,
+          linkHint: 'Instagram link',
+        ),
+        const SizedBox(height: 14),
+        _socialAccount(
+          title: 'TikTok',
+          link: _tiktok,
+          followers: _tiktokFollowers,
+          icon: Icons.music_note_outlined,
+          linkHint: 'TikTok link',
+        ),
+        const SizedBox(height: 14),
+        _socialAccount(
+          title: 'Facebook',
+          link: _facebook,
+          followers: _facebookFollowers,
+          icon: Icons.facebook_outlined,
+          linkHint: 'Facebook link',
+        ),
         const SizedBox(height: 12),
         RegisterDropdown(
           value: _cityId,

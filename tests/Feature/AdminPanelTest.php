@@ -175,7 +175,7 @@ class AdminPanelTest extends TestCase
         $this->actingAs($admin);
 
         $visibleRoles = collect(UserResource::roleOptions())
-            ->except(['admin', 'vendor']);
+            ->except(['client', 'vendor']);
 
         $tabs = Livewire::test(ListUsers::class)
             ->assertSee('All users');
