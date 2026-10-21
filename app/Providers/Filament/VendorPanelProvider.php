@@ -31,7 +31,7 @@ class VendorPanelProvider extends PanelProvider
             ->path('vendor')
             ->login(VendorLogin::class)
             ->brandName('Lens Vendor')
-            ->brandLogo(asset('storage/lenslogo.png'))
+            ->brandLogo(asset('branding/lenslogo.png'))
             ->brandLogoHeight('2.4rem')
             ->favicon(asset('favicon.svg'))
             ->font('Inter')

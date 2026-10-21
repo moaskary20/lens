@@ -26,7 +26,7 @@
         <aside class="lens-login-stage">
             <video
                 class="lens-login-video"
-                src="{{ asset('storage/logo.mp4') }}"
+                src="{{ asset('branding/logo.mp4') }}"
                 autoplay
                 muted
                 loop

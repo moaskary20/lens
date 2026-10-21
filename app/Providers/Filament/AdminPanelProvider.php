@@ -33,7 +33,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login(AdminLogin::class)
             ->brandName('Lens')
-            ->brandLogo(asset('storage/lenslogo.png'))
+            ->brandLogo(asset('branding/lenslogo.png'))
             ->brandLogoHeight('2.4rem')
             ->favicon(asset('favicon.svg'))
             ->font('Inter')

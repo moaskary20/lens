@@ -42,8 +42,8 @@ class AdminPanelTest extends TestCase
         $response->assertSee('Sign in', false);
         $response->assertSee('Operations console', false);
         $response->assertSee('lens-login', false);
-        $response->assertSee('storage/logo.mp4', false);
-        $response->assertSee('storage/lenslogo.png', false);
+        $response->assertSee('branding/logo.mp4', false);
+        $response->assertSee('branding/lenslogo.png', false);
         $response->assertDontSee('Verified talent', false);
         $response->assertDontSee('The marketplace for photographers', false);
         $response->assertSee('lang="en"', false);
