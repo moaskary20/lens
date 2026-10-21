@@ -18,8 +18,6 @@ class ProfileScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LensColors.charcoal,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: AppShell.profileIndex),
       body: SafeArea(
         child: Column(

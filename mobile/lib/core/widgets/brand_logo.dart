@@ -4,14 +4,16 @@ import 'package:lens/core/theme/lens_colors.dart';
 class BrandLogo extends StatelessWidget {
   const BrandLogo({
     super.key,
-    required this.name,
-    required this.logoUrl,
-    required this.width,
-    required this.height,
+    this.name = 'Lens',
+    this.logoUrl,
+    this.width = 132,
+    this.height = 36,
     this.fontSize = 30,
     this.color = LensColors.primary,
     this.alignment = Alignment.centerLeft,
   });
+
+  static const assetPath = 'lib/assits/lenslogo_mark.png';
 
   final String name;
   final String? logoUrl;
@@ -23,17 +25,13 @@ class BrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = logoUrl;
-    if (url == null || url.isEmpty) {
-      return _fallback();
-    }
-
-    return Image.network(
-      url,
+    return Image.asset(
+      assetPath,
       width: width,
       height: height,
       fit: BoxFit.contain,
       alignment: alignment,
+      semanticLabel: name,
       errorBuilder: (context, error, stackTrace) => _fallback(),
     );
   }
@@ -53,9 +51,24 @@ class BrandLogo extends StatelessWidget {
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
             height: 1,
+            decoration: TextDecoration.none,
           ),
         ),
       ),
     ),
   );
+}
+
+class BrandHeader extends StatelessWidget {
+  const BrandHeader({
+    super.key,
+    this.height = 34,
+  });
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return BrandLogo(width: height * 3.6, height: height);
+  }
 }

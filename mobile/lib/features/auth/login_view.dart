@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/auth/role_choice_page.dart';
 import 'package:lens/features/auth/user_register_page.dart';
 import 'package:lens/features/auth/vendor_register_page.dart';
@@ -135,9 +136,7 @@ class _LoginViewState extends State<LoginView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Lens', style: TextStyle(color: LensColors.primary, fontSize: 34, fontWeight: FontWeight.w800, height: 1)),
-                const SizedBox(height: 4),
-                const Text('Find. Book. Create.', style: TextStyle(color: Color(0xFFB8B3AB), fontSize: 13, fontWeight: FontWeight.w600)),
+                const BrandHeader(height: 42),
                 const SizedBox(height: 18),
                 const Text(
                   'CREATIVE PEOPLE          CREATE · BOOK · BELONG',

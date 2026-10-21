@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/config.dart';
+import 'package:lens/core/device_location.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/home/ai_search_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
@@ -11,28 +13,51 @@ import 'package:lens/features/home/map_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key, required this.data, this.autofocus = false});
+  const SearchPage({
+    super.key,
+    required this.data,
+    this.autofocus = false,
+    this.currentGovernorateResolver,
+  });
 
   final HomeData data;
   final bool autofocus;
+  final Future<String?> Function()? currentGovernorateResolver;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
 }
 
 class _SearchPageState extends State<SearchPage> {
-  static const _cities = ['Alexandria', 'Cairo', 'Giza'];
-  static const _chipOrder = ['photographer', 'videographer', 'reels', 'studio', 'model', 'ugc', 'food_stylist'];
+  static const _fallbackCities = ['Alexandria', 'Cairo', 'Giza'];
+  static const _chipOrder = [
+    'photographer',
+    'videographer',
+    'reels',
+    'studio',
+    'model',
+    'ugc',
+    'food_stylist',
+  ];
 
   final _query = TextEditingController();
   final _focus = FocusNode();
-  String _city = 'Cairo';
+  String _city = 'Getting location...';
+  bool _locating = false;
+  bool _manualCitySelection = false;
   String? _typeSlug;
 
   @override
   void initState() {
     super.initState();
     _typeSlug = _types.isEmpty ? null : _types.first.slug;
+    if (widget.currentGovernorateResolver != null || LensConfig.useNetwork) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _detectGovernorate();
+      });
+    } else {
+      _city = 'Select location';
+    }
     if (widget.autofocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focus.requestFocus();
@@ -54,6 +79,73 @@ class _SearchPageState extends State<SearchPage> {
     _focus.dispose();
     super.dispose();
   }
+
+  List<String> get _cities {
+    final configuredCities = widget.data.cities
+        .map((city) => city['name'] ?? city['name_en'] ?? city['label'])
+        .whereType<Object>()
+        .map((city) => city.toString().trim())
+        .where((city) => city.isNotEmpty)
+        .toSet()
+        .toList();
+    return configuredCities.isEmpty ? _fallbackCities : configuredCities;
+  }
+
+  Future<void> _detectGovernorate({bool force = false}) async {
+    if (_locating) return;
+    if (force) {
+      _manualCitySelection = false;
+    }
+    setState(() {
+      _locating = true;
+      if (_city == 'Select location') {
+        _city = 'Getting location...';
+      }
+    });
+
+    try {
+      final governorate =
+          await (widget.currentGovernorateResolver?.call() ??
+              DeviceLocation.currentGovernorate());
+      if (!mounted) return;
+      if (governorate == null || governorate.trim().isEmpty) {
+        throw const DeviceLocationException(
+          'Could not determine a governorate for your location.',
+        );
+      }
+      if (!_manualCitySelection) {
+        setState(() => _city = _matchConfiguredCity(governorate.trim()));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      if (!_manualCitySelection) {
+        setState(() => _city = 'Select location');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not detect your location: $error')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _locating = false);
+      }
+    }
+  }
+
+  String _matchConfiguredCity(String governorate) {
+    final normalized = _normalizeCity(governorate);
+    for (final city in _cities) {
+      if (_normalizeCity(city) == normalized) {
+        return city;
+      }
+    }
+    return governorate;
+  }
+
+  String _normalizeCity(String city) => city
+      .replaceAll(RegExp(r'\s+Governorate$', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\s+Province$', caseSensitive: false), '')
+      .trim()
+      .toLowerCase();
 
   List<VendorTypeItem> get _types {
     final types = [...widget.data.vendorTypes];
@@ -104,7 +196,9 @@ class _SearchPageState extends State<SearchPage> {
         return type;
       }
     }
-    return _types.isNotEmpty ? _types.first : const VendorTypeItem(slug: 'photographer', label: 'Photographers');
+    return _types.isNotEmpty
+        ? _types.first
+        : const VendorTypeItem(slug: 'photographer', label: 'Photographers');
   }
 
   VendorTypeItem get _studioType {
@@ -119,7 +213,8 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final recommended = _filtered(type: _typeSlug);
-    final topRated = [..._filtered()]..sort((a, b) => b.ratingAvg.compareTo(a.ratingAvg));
+    final topRated = [..._filtered()]
+      ..sort((a, b) => b.ratingAvg.compareTo(a.ratingAvg));
     final studios = _filtered(type: 'studio');
 
     return SafeArea(
@@ -129,7 +224,12 @@ class _SearchPageState extends State<SearchPage> {
           SliverToBoxAdapter(child: _header(context)),
           SliverToBoxAdapter(child: _searchField()),
           if (_types.isNotEmpty) SliverToBoxAdapter(child: _chips()),
-          SliverToBoxAdapter(child: _exploreCard(context, recommended.isEmpty ? _allVendors : recommended)),
+          SliverToBoxAdapter(
+            child: _exploreCard(
+              context,
+              recommended.isEmpty ? _allVendors : recommended,
+            ),
+          ),
           SliverToBoxAdapter(
             child: _creatorRow(
               title: 'Recommended for you',
@@ -162,42 +262,61 @@ class _SearchPageState extends State<SearchPage> {
       padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
       child: Row(
         children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Lens.',
-                  style: TextStyle(color: LensColors.primary, fontSize: 32, fontWeight: FontWeight.w800, height: 1),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'FIND. BOOK. CREATE.',
-                  style: TextStyle(color: LensColors.primary, fontSize: 9, letterSpacing: 1.5, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
+          const Expanded(child: BrandHeader()),
           PopupMenuButton<String>(
             initialValue: _city,
             color: const Color(0xFF161518),
-            onSelected: (value) => setState(() => _city = value),
+            onSelected: (value) {
+              if (value == '__current_location__') {
+                _detectGovernorate(force: true);
+              } else {
+                setState(() {
+                  _manualCitySelection = true;
+                  _city = value;
+                });
+              }
+            },
             itemBuilder: (context) => [
-              for (final city in _cities) PopupMenuItem(value: city, child: Text(city)),
+              const PopupMenuItem(
+                value: '__current_location__',
+                child: Text('Use current location'),
+              ),
+              for (final city in {..._cities, _city})
+                if (city != 'Getting location...' && city != 'Select location')
+                  PopupMenuItem(value: city, child: Text(city)),
             ],
             child: Row(
               children: [
-                const Icon(Icons.location_on, color: LensColors.primary, size: 16),
+                Icon(
+                  _locating ? Icons.my_location_rounded : Icons.location_on,
+                  color: LensColors.primary,
+                  size: 16,
+                ),
                 const SizedBox(width: 4),
-                Text(_city, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
+                Text(
+                  _city,
+                  key: const Key('search-current-governorate'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ],
             ),
           ),
           if (widget.data.on('notifications'))
             IconButton(
               onPressed: () => openNotifications(context, widget.data),
-              icon: const Icon(Icons.notifications_none_rounded, color: LensColors.cream),
+              icon: const Icon(
+                Icons.notifications_none_rounded,
+                color: LensColors.cream,
+              ),
             ),
         ],
       ),
@@ -231,13 +350,20 @@ class _SearchPageState extends State<SearchPage> {
                       cursorColor: LensColors.primary,
                       decoration: const InputDecoration(
                         hintText: 'What are you looking to create?',
-                        hintStyle: TextStyle(color: Color(0xFF7A7D84), fontSize: 14),
+                        hintStyle: TextStyle(
+                          color: Color(0xFF7A7D84),
+                          fontSize: 14,
+                        ),
                         border: InputBorder.none,
                         isCollapsed: true,
                       ),
                     ),
                   ),
-                  const Icon(Icons.mic_none_rounded, color: Color(0xFF9A9AA0), size: 20),
+                  const Icon(
+                    Icons.mic_none_rounded,
+                    color: Color(0xFF9A9AA0),
+                    size: 20,
+                  ),
                 ],
               ),
             ),
@@ -253,7 +379,11 @@ class _SearchPageState extends State<SearchPage> {
                 child: const SizedBox(
                   width: 50,
                   height: 50,
-                  child: Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+                  child: Icon(
+                    Icons.auto_awesome,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
@@ -281,19 +411,33 @@ class _SearchPageState extends State<SearchPage> {
               decoration: BoxDecoration(
                 color: const Color(0xFF141210),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: selected ? LensColors.primary : const Color(0xFF2A2A2E), width: selected ? 1.4 : 1),
+                border: Border.all(
+                  color: selected
+                      ? LensColors.primary
+                      : const Color(0xFF2A2A2E),
+                  width: selected ? 1.4 : 1,
+                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(_iconFor(type.slug), color: LensColors.primary, size: 22),
+                  Icon(
+                    _iconFor(type.slug),
+                    color: LensColors.primary,
+                    size: 22,
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     type.slug == 'ugc' ? 'UGC' : type.label,
                     maxLines: 1,
                     softWrap: false,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.1),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
                   ),
                 ],
               ),
@@ -322,7 +466,12 @@ class _SearchPageState extends State<SearchPage> {
                   gradient: LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
-                    colors: [Color(0xF214100C), Color(0xCC14100C), Color(0x6614100C), Color(0x0014100C)],
+                    colors: [
+                      Color(0xF214100C),
+                      Color(0xCC14100C),
+                      Color(0x6614100C),
+                      Color(0x0014100C),
+                    ],
                     stops: [0, 0.28, 0.46, 0.68],
                   ),
                 ),
@@ -332,21 +481,39 @@ class _SearchPageState extends State<SearchPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Explore near you', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                    const Text(
+                      'Explore near you',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       'Discover amazing creatives in $_city.',
-                      style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 12.5),
+                      style: const TextStyle(
+                        color: Color(0xFFD0CBC3),
+                        fontSize: 12.5,
+                      ),
                     ),
                     const Spacer(),
                     GestureDetector(
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => MapPage(type: _activeType, home: widget.data, vendors: vendors, city: _city),
+                          builder: (_) => MapPage(
+                            type: _activeType,
+                            home: widget.data,
+                            vendors: vendors,
+                            city: _city,
+                          ),
                         ),
                       ),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
                           border: Border.all(color: LensColors.primary),
@@ -355,9 +522,20 @@ class _SearchPageState extends State<SearchPage> {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('View Map', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                            Text(
+                              'View Map',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
                             SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                            Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ],
                         ),
                       ),
@@ -365,30 +543,37 @@ class _SearchPageState extends State<SearchPage> {
                   ],
                 ),
               ),
-              const Positioned(
-                right: 14,
-                top: 14,
-                child: _CompassButton(),
-              ),
+              const Positioned(right: 14, top: 14, child: _CompassButton()),
               const _ExplorePin(
                 left: 0.46,
                 top: 0.34,
-                url: 'https://images.unsplash.com/photo-1587595431973-160d0d94add1?auto=format&fit=crop&w=240&h=240&q=80',
+                url:
+                    'https://images.unsplash.com/photo-1587595431973-160d0d94add1?auto=format&fit=crop&w=240&h=240&q=80',
               ),
               const _ExplorePin(
                 left: 0.64,
                 top: 0.10,
-                url: 'https://images.unsplash.com/photo-1533929736458-a45524c0bc6d?auto=format&fit=crop&w=240&h=240&q=80',
+                url:
+                    'https://images.unsplash.com/photo-1533929736458-a45524c0bc6d?auto=format&fit=crop&w=240&h=240&q=80',
               ),
               const _ExplorePin(
                 left: 0.82,
                 top: 0.38,
-                url: 'https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=240&h=240&q=80',
+                url:
+                    'https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=240&h=240&q=80',
               ),
               Positioned(
                 right: 86,
                 bottom: 46,
-                child: Text(_city, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12, fontWeight: FontWeight.w700, shadows: [Shadow(color: Colors.black, blurRadius: 8)])),
+                child: Text(
+                  _city,
+                  style: const TextStyle(
+                    color: Color(0xCCFFFFFF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 8)],
+                  ),
+                ),
               ),
             ],
           ),
@@ -397,7 +582,11 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _creatorRow({required String title, required List<VendorCard> vendors, required VendorTypeItem type}) {
+  Widget _creatorRow({
+    required String title,
+    required List<VendorCard> vendors,
+    required VendorTypeItem type,
+  }) {
     if (vendors.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -411,15 +600,32 @@ class _SearchPageState extends State<SearchPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
                 GestureDetector(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => CategoryListPage(type: type, home: widget.data, vendors: vendors),
+                      builder: (_) => CategoryListPage(
+                        type: type,
+                        home: widget.data,
+                        vendors: vendors,
+                      ),
                     ),
                   ),
-                  child: const Text('View all', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    'View all',
+                    style: TextStyle(
+                      color: LensColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -432,7 +638,10 @@ class _SearchPageState extends State<SearchPage> {
               itemCount: vendors.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                return _SearchVendorCard(vendor: vendors[index], home: widget.data);
+                return _SearchVendorCard(
+                  vendor: vendors[index],
+                  home: widget.data,
+                );
               },
             ),
           ),
@@ -473,7 +682,11 @@ class _SearchVendorCard extends StatelessWidget {
                   Positioned(
                     right: 8,
                     top: 8,
-                    child: FavoriteHeart(vendor: vendor, size: 15, circle: true),
+                    child: FavoriteHeart(
+                      vendor: vendor,
+                      size: 15,
+                      circle: true,
+                    ),
                   ),
                 ],
               ),
@@ -490,32 +703,60 @@ class _SearchVendorCard extends StatelessWidget {
                           vendor.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                          ),
                         ),
                       ),
                       if (vendor.verified || vendor.badges.contains('verified'))
-                        const Icon(Icons.verified, color: Color(0xFF3B9BFF), size: 14),
+                        const Icon(
+                          Icons.verified,
+                          color: Color(0xFF3B9BFF),
+                          size: 14,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(vendor.vendorTypeName, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 11.5)),
+                  Text(
+                    vendor.vendorTypeName,
+                    style: const TextStyle(
+                      color: Color(0xFF8E8B84),
+                      fontSize: 11.5,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded, color: Color(0xFFF5C451), size: 13),
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFFF5C451),
+                        size: 13,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           '${vendor.ratingAvg.toStringAsFixed(1)} (${vendor.ratingCount})  ·  ${vendor.city.isEmpty ? vendor.location : vendor.city}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 11),
+                          style: const TextStyle(
+                            color: Color(0xFFD0CBC3),
+                            fontSize: 11,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(_egp(vendor.startingFrom), style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                  Text(
+                    _egp(vendor.startingFrom),
+                    style: const TextStyle(
+                      color: LensColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -543,7 +784,8 @@ class _Cover extends StatelessWidget {
       errorBuilder: (_, __, ___) => Image.network(
         VendorPhotos.cover(vendor.vendorType, vendor.id),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite),
+        errorBuilder: (_, __, ___) =>
+            const ColoredBox(color: LensColors.graphite),
       ),
     );
   }
@@ -552,7 +794,8 @@ class _Cover extends StatelessWidget {
 class _ExploreMapPhoto extends StatelessWidget {
   const _ExploreMapPhoto();
 
-  static const _url = 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?auto=format&fit=crop&w=1600&h=800&q=80';
+  static const _url =
+      'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?auto=format&fit=crop&w=1600&h=800&q=80';
 
   @override
   Widget build(BuildContext context) {
@@ -560,7 +803,10 @@ class _ExploreMapPhoto extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return ColorFiltered(
-      colorFilter: const ColorFilter.mode(Color(0xAA1B2734), BlendMode.multiply),
+      colorFilter: const ColorFilter.mode(
+        Color(0xAA1B2734),
+        BlendMode.multiply,
+      ),
       child: Image.network(
         _url,
         fit: BoxFit.cover,
@@ -584,7 +830,11 @@ class _CompassButton extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: const Color(0x44FF5A1F)),
       ),
-      child: const Icon(Icons.near_me_rounded, color: LensColors.primary, size: 18),
+      child: const Icon(
+        Icons.near_me_rounded,
+        color: LensColors.primary,
+        size: 18,
+      ),
     );
   }
 }
@@ -609,7 +859,11 @@ class _ExplorePin extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
-                BoxShadow(color: LensColors.primary.withValues(alpha: 0.55), blurRadius: 10, spreadRadius: 0.5),
+                BoxShadow(
+                  color: LensColors.primary.withValues(alpha: 0.55),
+                  blurRadius: 10,
+                  spreadRadius: 0.5,
+                ),
               ],
             ),
             child: ClipRRect(
@@ -625,7 +879,10 @@ class _ExplorePin extends StatelessWidget {
               color: LensColors.primary,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: LensColors.primary.withValues(alpha: 0.7), blurRadius: 8),
+                BoxShadow(
+                  color: LensColors.primary.withValues(alpha: 0.7),
+                  blurRadius: 8,
+                ),
               ],
             ),
           ),
@@ -660,18 +917,49 @@ class _ExploreMapPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final coast = Path()
       ..moveTo(size.width * 0.40, 0)
-      ..quadraticBezierTo(size.width * 0.62, size.height * 0.18, size.width * 0.70, 0)
+      ..quadraticBezierTo(
+        size.width * 0.62,
+        size.height * 0.18,
+        size.width * 0.70,
+        0,
+      )
       ..lineTo(size.width, 0)
       ..lineTo(size.width, size.height * 0.42)
-      ..quadraticBezierTo(size.width * 0.82, size.height * 0.22, size.width * 0.58, size.height * 0.12)
+      ..quadraticBezierTo(
+        size.width * 0.82,
+        size.height * 0.22,
+        size.width * 0.58,
+        size.height * 0.12,
+      )
       ..close();
     canvas.drawPath(coast, Paint()..color = const Color(0x33222C38));
 
     final route = Path()
       ..moveTo(size.width * 0.40, size.height * 0.82)
-      ..cubicTo(size.width * 0.48, size.height * 0.62, size.width * 0.44, size.height * 0.50, size.width * 0.52, size.height * 0.56)
-      ..cubicTo(size.width * 0.62, size.height * 0.64, size.width * 0.66, size.height * 0.22, size.width * 0.72, size.height * 0.30)
-      ..cubicTo(size.width * 0.80, size.height * 0.40, size.width * 0.84, size.height * 0.62, size.width * 0.90, size.height * 0.58);
+      ..cubicTo(
+        size.width * 0.48,
+        size.height * 0.62,
+        size.width * 0.44,
+        size.height * 0.50,
+        size.width * 0.52,
+        size.height * 0.56,
+      )
+      ..cubicTo(
+        size.width * 0.62,
+        size.height * 0.64,
+        size.width * 0.66,
+        size.height * 0.22,
+        size.width * 0.72,
+        size.height * 0.30,
+      )
+      ..cubicTo(
+        size.width * 0.80,
+        size.height * 0.40,
+        size.width * 0.84,
+        size.height * 0.62,
+        size.width * 0.90,
+        size.height * 0.58,
+      );
 
     canvas.drawPath(
       route,
@@ -697,7 +985,11 @@ class _ExploreMapPainter extends CustomPainter {
         if (tangent == null) {
           continue;
         }
-        canvas.drawCircle(tangent.position, 1.5, Paint()..color = const Color(0xFFFF8A4C));
+        canvas.drawCircle(
+          tangent.position,
+          1.5,
+          Paint()..color = const Color(0xFFFF8A4C),
+        );
       }
     }
   }
@@ -721,6 +1013,9 @@ IconData _iconFor(String slug) {
 
 String _egp(double? value) {
   final amount = (value ?? 0).round().toString();
-  final withCommas = amount.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',');
+  final withCommas = amount.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
   return 'From EGP $withCommas';
 }

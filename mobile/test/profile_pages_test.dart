@@ -122,6 +122,62 @@ void main() {
     expect(SessionStore.instance.account?.name, 'Nora Adel');
   });
 
+  testWidgets('vendor edit profile shows the same admin vendor tabs', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await SessionStore.instance.login(
+      email: 'vendor@lens.app',
+      password: 'password',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: EditProfilePage(home: home()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Profile'), findsOneWidget);
+    expect(find.text('Identity'), findsWidgets);
+    expect(find.text('Type profile'), findsOneWidget);
+    expect(find.text('Previous projects'), findsOneWidget);
+    expect(find.text('Pricing'), findsOneWidget);
+    expect(find.text('Bank & payouts'), findsOneWidget);
+    expect(find.text('Fahad Photography'), findsWidgets);
+    expect(find.text('Vendor type *'), findsOneWidget);
+    await tester.ensureVisible(find.text('National ID card'));
+    expect(find.text('National ID card'), findsOneWidget);
+    await tester.ensureVisible(find.text('Cover image'));
+    expect(find.text('Cover image'), findsOneWidget);
+    expect(find.text('Pin address on Google Maps'), findsNothing);
+    expect(find.text('Zamalek, Cairo'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Display name'),
+      'Fahad Light Desk',
+    );
+    await tester.tap(find.text('Type profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Camera type'), findsOneWidget);
+    expect(find.text('Primary specialties'), findsOneWidget);
+    await tester.tap(find.text('Previous projects'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add previous project'), findsOneWidget);
+    await tester.tap(find.text('Pricing'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pricing model'), findsWidgets);
+    await tester.tap(find.text('Bank & payouts'));
+    await tester.pumpAndSettle();
+    expect(find.text('Payout method'), findsOneWidget);
+    expect(find.text('Bank account'), findsOneWidget);
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(SessionStore.instance.account?.vendorName, 'Fahad Light Desk');
+  });
+
   testWidgets('report an issue sends a ticket to support', (tester) async {
     await SessionStore.instance.login(
       email: 'client@lens.app',

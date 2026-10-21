@@ -1,17 +1,30 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/config.dart';
 import 'package:lens/core/egypt_phone.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/auth/register_catalog.dart';
 import 'package:lens/features/auth/register_scaffold.dart';
+import 'package:lens/features/home/book_draft.dart';
+import 'package:lens/features/home/book_map_picker_page.dart';
+import 'package:lens/features/profile/profile_scaffold.dart';
 
 class VendorRegisterPage extends StatefulWidget {
-  const VendorRegisterPage({super.key, required this.bootstrap, this.onSuccess});
+  const VendorRegisterPage({
+    super.key,
+    required this.bootstrap,
+    this.onSuccess,
+    this.editing = false,
+  });
 
   final Map<String, dynamic> bootstrap;
   final VoidCallback? onSuccess;
+  final bool editing;
 
   @override
   State<VendorRegisterPage> createState() => _VendorRegisterPageState();
@@ -34,6 +47,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   final _displayName = TextEditingController();
   final _profession = TextEditingController();
   final _bio = TextEditingController();
+  final _contactEmail = TextEditingController();
   final _whatsapp = TextEditingController();
   final _instagram = TextEditingController();
   final _address = TextEditingController();
@@ -51,8 +65,10 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   final Map<String, List<String>> _lists = {};
   final List<_ProjectDraft> _projects = [];
   late final RegisterCatalog _catalog;
+  final _api = ApiClient();
   int _step = 0;
   bool _busy = false;
+  bool _loading = false;
   bool _hidePassword = true;
   String? _error;
   String? _vendorType;
@@ -65,6 +81,14 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   String? _walletTelecom;
   String? _walletBank;
   String? _pricingModelId;
+  XFile? _profilePhoto;
+  XFile? _nationalId;
+  XFile? _coverImage;
+  String? _profilePhotoUrl;
+  String? _nationalIdUrl;
+  String? _coverImageUrl;
+  double? _latitude;
+  double? _longitude;
 
   VendorTypeSpec get _spec => _catalog.specFor(_vendorType);
 
@@ -79,16 +103,22 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     return _pricingModels.length == 1 ? _pricingModels.first : null;
   }
 
+  bool get _editing => widget.editing;
+
   @override
   void initState() {
     super.initState();
     _catalog = RegisterCatalog.fromBootstrap(widget.bootstrap);
+    if (_editing) {
+      _hydrateFromSession();
+      _loadProfile();
+    }
   }
 
   @override
   void dispose() {
     for (final controller in [
-      _name, _email, _password, _phone, _displayName, _profession, _bio, _whatsapp, _instagram,
+      _name, _email, _password, _phone, _displayName, _profession, _bio, _contactEmail, _whatsapp, _instagram,
       _address, _holder, _accountNumber, _iban, _swift, _branch, _branchCode, _walletPhone,
       _paypalEmail, _paypalName, _transferNotes,
     ]) {
@@ -107,8 +137,184 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
 
   List<String> _list(String key) => _lists.putIfAbsent(key, () => <String>[]);
 
+  bool get _live => LensConfig.useNetwork && SessionStore.instance.account != null;
+
+  void _hydrateFromSession() {
+    final account = SessionStore.instance.account;
+    if (account == null) {
+      return;
+    }
+    _name.text = account.name;
+    _email.text = account.email;
+    _phone.text = account.phone ?? '';
+    _displayName.text = account.vendorName ?? account.name;
+    _cityId = account.cityId?.toString();
+    _vendorType ??= 'photographer';
+  }
+
+  Future<void> _loadProfile() async {
+    if (!_live) {
+      _hydrateDemoVendor();
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final payload = await _api.getJson('/app/account/profile');
+      if (!mounted) {
+        return;
+      }
+      _applyProfile(payload);
+      setState(() => _loading = false);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  void _hydrateDemoVendor() {
+    _vendorType = 'photographer';
+    _displayName.text = SessionStore.instance.account?.vendorName ?? 'Fahad Studio Light';
+    _profession.text = 'Wedding & product photographer';
+    _bio.text = 'Product and wedding photography with portrait lenses and strobe lighting.';
+    _whatsapp.text = _phone.text;
+    _contactEmail.text = _email.text;
+    _instagram.text = '@fahadstudiolight';
+    _address.text = 'Zamalek, Cairo';
+    _latitude = 30.0626;
+    _longitude = 31.2197;
+    _coverImageUrl = 'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?auto=format&fit=crop&w=1400&h=900&q=80';
+    _nationalIdUrl = 'https://images.unsplash.com/photo-1589330694653-beb37556d8e1?auto=format&fit=crop&w=800&h=500&q=80';
+    _profilePhotoUrl = SessionStore.instance.account?.avatarUrl;
+    _dob = DateTime(1992, 4, 18);
+    _payoutMethod = 'bank';
+    _bankName = 'Banque Misr';
+    _accountType = 'current';
+    _holder.text = 'Fahad Photography';
+    _accountNumber.text = '2039485761';
+    _iban.text = 'EG380003000203948576100000000';
+    _swift.text = 'BMISEGCXXXX';
+    _branch.text = 'Zamalek';
+    _branchCode.text = '003';
+    _transferNotes.text = 'Use InstaPay for same-day payouts.';
+    _text('half_day_price').text = '1800';
+    _text('full_day_price').text = '3200';
+    _text('turnaround_hours').text = '48';
+    _lists['specialties'] = ['wedding', 'product', 'editorial'];
+    final models = _spec.resolvedModels;
+    _pricingModelId = models.length == 1 ? models.first.id : _pricingModelId;
+  }
+
+  void _applyProfile(Map<String, dynamic> payload) {
+    _name.text = payload['name']?.toString() ?? _name.text;
+    _email.text = payload['email']?.toString() ?? _email.text;
+    _phone.text = payload['phone']?.toString() ?? _phone.text;
+    _cityId = payload['city_id']?.toString() ?? _cityId;
+    final vendor = Map<String, dynamic>.from((payload['vendor'] as Map?) ?? const {});
+    if (vendor.isEmpty) {
+      return;
+    }
+    _vendorType = vendor['vendor_type']?.toString() ?? _vendorType;
+    _displayName.text = vendor['display_name']?.toString() ?? _displayName.text;
+    _profession.text = vendor['profession']?.toString() ?? '';
+    _bio.text = vendor['bio']?.toString() ?? '';
+    _contactEmail.text = vendor['contact_email']?.toString() ?? _email.text;
+    _whatsapp.text = vendor['whatsapp']?.toString() ?? '';
+    _instagram.text = vendor['instagram']?.toString() ?? '';
+    _address.text = vendor['address']?.toString() ?? '';
+    _latitude = _asDouble(vendor['latitude']);
+    _longitude = _asDouble(vendor['longitude']);
+    _profilePhotoUrl = vendor['profile_photo']?.toString();
+    _nationalIdUrl = vendor['national_id_image']?.toString();
+    _coverImageUrl = vendor['cover_image']?.toString();
+    _cityId = vendor['city_id']?.toString() ?? _cityId;
+    _dob = DateTime.tryParse(vendor['date_of_birth']?.toString() ?? '');
+    _payoutMethod = vendor['payout_method']?.toString();
+    _bankName = vendor['bank_name']?.toString();
+    _accountType = vendor['bank_account_type']?.toString();
+    _holder.text = vendor['bank_account_holder']?.toString() ?? '';
+    _accountNumber.text = vendor['bank_account_number']?.toString() ?? '';
+    _iban.text = vendor['bank_iban']?.toString() ?? '';
+    _swift.text = vendor['bank_swift']?.toString() ?? '';
+    _branch.text = vendor['bank_branch']?.toString() ?? '';
+    _branchCode.text = vendor['bank_branch_code']?.toString() ?? '';
+    _walletNetwork = vendor['wallet_network_type']?.toString();
+    _walletTelecom = vendor['wallet_telecom']?.toString();
+    _walletBank = vendor['wallet_bank_name']?.toString();
+    _walletPhone.text = vendor['wallet_phone']?.toString() ?? '';
+    _paypalEmail.text = vendor['paypal_email']?.toString() ?? '';
+    _paypalName.text = vendor['paypal_name']?.toString() ?? '';
+    _transferNotes.text = vendor['transfer_notes']?.toString() ?? '';
+    _pricingModelId = vendor['pricing_model_id']?.toString();
+    _lists['specialties'] = _stringList(vendor['specialties']);
+    _lists['delivery_formats'] = _stringList(vendor['delivery_formats']);
+    final extras = Map<String, dynamic>.from((vendor['extras'] as Map?) ?? const {});
+    extras.forEach((key, value) {
+      if (key == 'prices' && value is Map) {
+        value.forEach((priceKey, priceValue) {
+          _text('extras.prices.$priceKey').text = '${priceValue ?? ''}';
+        });
+        return;
+      }
+      if (value is List) {
+        _lists['extras.$key'] = _stringList(value);
+        return;
+      }
+      _text('extras.$key').text = value?.toString() ?? '';
+    });
+    for (final field in [..._spec.fields, ...?_selectedPricing?.fields]) {
+      if (field.key.startsWith('filter.') || field.isList) {
+        continue;
+      }
+      final raw = vendor[field.key];
+      if (raw != null) {
+        _text(field.key).text = '$raw';
+      }
+    }
+    _applyFilterTags(_stringList(vendor['filter_tags']));
+    for (final project in _projects) {
+      project.dispose();
+    }
+    _projects
+      ..clear()
+      ..addAll(
+        (vendor['projects'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((item) => _ProjectDraft.fromJson(Map<String, dynamic>.from(item))),
+      );
+    final models = _spec.resolvedModels;
+    if (_pricingModelId == null && models.length == 1) {
+      _pricingModelId = models.first.id;
+    }
+  }
+
+  void _applyFilterTags(List<String> tags) {
+    for (final field in _spec.fields) {
+      if (!field.key.startsWith('filter.')) {
+        continue;
+      }
+      final allowed = field.options.map((item) => item.id).toSet();
+      _lists[field.key] = tags.where(allowed.contains).toList();
+    }
+  }
+
+  List<String> _stringList(Object? raw) {
+    return (raw as List<dynamic>? ?? const []).map((item) => item.toString()).where((item) => item.isNotEmpty).toList();
+  }
+
+  double? _asDouble(Object? raw) {
+    if (raw is num) {
+      return raw.toDouble();
+    }
+    return double.tryParse(raw?.toString() ?? '');
+  }
+
   Future<void> _continue() async {
     setState(() => _error = null);
+    if (_editing) {
+      await _saveEdit();
+      return;
+    }
     if (_step == 0) {
       if (_name.text.trim().isEmpty || _email.text.trim().isEmpty || _password.text.length < 6) {
         setState(() => _error = 'Enter your name, email, and a password of at least 6 characters.');
@@ -163,11 +369,92 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         password: _password.text,
         role: 'vendor',
         extra: _payload(),
-        files: await _projectFiles(),
+        files: [...await _identityFiles(), ...await _projectFiles()],
       );
       if (widget.onSuccess != null) {
         widget.onSuccess!();
       } else if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      setState(() => _error = error.toString().replaceFirst('Exception: ', '').replaceFirst('ApiException: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _saveEdit() async {
+    if (_name.text.trim().isEmpty || _email.text.trim().isEmpty) {
+      setState(() => _error = 'Name and email are required.');
+      return;
+    }
+    if (!EgyptPhone.isValid(_phone.text, required: true) || !EgyptPhone.isValid(_whatsapp.text)) {
+      setState(() => _error = EgyptPhone.message);
+      return;
+    }
+    if ((_vendorType ?? '').isEmpty) {
+      setState(() => _error = 'Choose a vendor type to load the matching Type profile.');
+      return;
+    }
+    if (_displayName.text.trim().isEmpty) {
+      _displayName.text = _name.text.trim();
+    }
+    final model = _selectedPricing;
+    if (model != null) {
+      for (final field in model.fields) {
+        if (_text(field.key).text.trim().isEmpty) {
+          setState(() => _error = 'Fill every price field from ${model.name}.');
+          return;
+        }
+      }
+    }
+    if ((_payoutMethod ?? '').isEmpty) {
+      setState(() => _error = 'Choose a payout method.');
+      return;
+    }
+    if (_payoutMethod == 'wallet' && !EgyptPhone.isValid(_walletPhone.text, required: true)) {
+      setState(() => _error = EgyptPhone.message);
+      return;
+    }
+
+    setState(() => _busy = true);
+    final next = (SessionStore.instance.account ??
+            SessionAccount(name: _name.text.trim(), email: _email.text.trim(), role: 'vendor'))
+        .copyWith(
+      name: _name.text.trim(),
+      email: _email.text.trim(),
+      phone: EgyptPhone.digits(_phone.text),
+      vendorName: _displayName.text.trim(),
+      cityId: int.tryParse(_cityId ?? ''),
+    );
+    try {
+      if (_live) {
+        final body = {
+          'name': next.name,
+          'email': next.email,
+          'locale': next.locale,
+          ..._payload(),
+        };
+        final files = [...await _identityFiles(), ...await _projectFiles()];
+        final payload = files.isEmpty
+            ? await _api.postJson('/app/account/profile', body)
+            : await _api.postForm('/app/account/profile', body, files: files);
+        SessionStore.instance.applyAccount(SessionAccount.fromJson(payload).copyWith(
+          vendorId: next.vendorId,
+          vendorName: payload['vendor_name']?.toString() ?? next.vendorName,
+        ));
+      } else {
+        SessionStore.instance.applyAccount(next);
+      }
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated'), backgroundColor: Color(0xFF24140E)),
+      );
+      if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
     } catch (error) {
@@ -191,10 +478,12 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
       'profession': _profession.text.trim(),
       'bio': _bio.text.trim(),
       'contact_phone': EgyptPhone.digits(_phone.text),
-      'contact_email': _email.text.trim(),
+      'contact_email': (_contactEmail.text.trim().isEmpty ? _email.text : _contactEmail.text).trim(),
       'whatsapp': EgyptPhone.digits(_whatsapp.text),
       'instagram': _instagram.text.trim(),
       'address': _address.text.trim(),
+      if (_latitude != null) 'latitude': _latitude,
+      if (_longitude != null) 'longitude': _longitude,
       if (_cityId != null && int.tryParse(_cityId!) != null) 'city_id': int.parse(_cityId!),
       'payout_method': _payoutMethod,
       'bank_name': _bankName,
@@ -216,6 +505,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         for (final project in _projects)
           if (project.title.text.trim().isNotEmpty)
             {
+              'ids': project.ids,
               'type': project.type,
               'title': project.title.text.trim(),
               'completed_on': project.completedOn.text.trim(),
@@ -266,23 +556,112 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     return body;
   }
 
+  Future<List<http.MultipartFile>> _identityFiles() async {
+    final files = <http.MultipartFile>[];
+    Future<void> add(String field, XFile? file) async {
+      if (file == null) {
+        return;
+      }
+      files.add(await http.MultipartFile.fromPath(field, file.path, filename: file.name));
+    }
+
+    await add('profile_photo', _profilePhoto);
+    await add('national_id_image', _nationalId);
+    await add('cover_image', _coverImage);
+    return files;
+  }
+
   Future<List<http.MultipartFile>> _projectFiles() async {
     final files = <http.MultipartFile>[];
-    for (var index = 0; index < _projects.length; index++) {
-      for (var order = 0; order < _projects[index].files.length; order++) {
-        final file = _projects[index].files[order];
+    var payloadIndex = 0;
+    for (final project in _projects) {
+      if (project.title.text.trim().isEmpty) {
+        continue;
+      }
+      for (var order = 0; order < project.files.length; order++) {
+        final file = project.files[order];
         files.add(http.MultipartFile.fromBytes(
-          'projects[$index][files][$order]',
+          'projects[$payloadIndex][files][$order]',
           await file.readAsBytes(),
           filename: file.name,
         ));
       }
+      payloadIndex += 1;
     }
     return files;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_editing) {
+      return DefaultTabController(
+        length: _titles.length,
+        child: ProfileScaffold(
+          title: 'Edit Profile',
+          action: TextButton(
+            onPressed: _busy ? null : _continue,
+            child: Text(_busy ? 'Saving' : 'Save', style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w800)),
+          ),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  'Same Identity, Type profile, Previous projects, Pricing, and Bank & payouts tabs as the admin vendor page.',
+                  style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12.5, height: 1.35),
+                ),
+              ),
+              TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: LensColors.primary,
+                unselectedLabelColor: const Color(0xFF8E8B84),
+                indicatorColor: LensColors.primary,
+                dividerColor: const Color(0xFF2A2A2E),
+                tabs: [for (final title in _titles) Tab(text: title)],
+              ),
+              if (_loading) const LinearProgressIndicator(color: LensColors.primary, minHeight: 2),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _scroll(_identity()),
+                    _scroll(_typeProfile()),
+                    _scroll(_projectsStep()),
+                    _scroll(_pricing()),
+                    _scroll(_payout()),
+                  ],
+                ),
+              ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: Text(_error!, style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.w600)),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+                child: SizedBox(
+                  height: 54,
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _busy ? null : _continue,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: LensColors.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: LensColors.primary.withValues(alpha: 0.5),
+                      elevation: 0,
+                      shape: const StadiumBorder(),
+                    ),
+                    child: _busy
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Save changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return RegisterScaffold(
       title: _step == 1 ? _spec.profileTitle : _titles[_step],
       subtitle: _step == 1 ? _spec.profileDescription : _subtitles[_step],
@@ -308,6 +687,13 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     );
   }
 
+  Widget _scroll(Widget child) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: child,
+    );
+  }
+
   Widget _identity() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,17 +710,19 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           digitsOnly: true,
           maxLength: 11,
         ),
-        const SizedBox(height: 12),
-        RegisterField(
-          controller: _password,
-          hint: 'Password',
-          icon: Icons.lock_outline_rounded,
-          secret: _hidePassword,
-          suffix: IconButton(
-            onPressed: () => setState(() => _hidePassword = !_hidePassword),
-            icon: Icon(_hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: const Color(0xFF8E8B84)),
+        if (!_editing) ...[
+          const SizedBox(height: 12),
+          RegisterField(
+            controller: _password,
+            hint: 'Password',
+            icon: Icons.lock_outline_rounded,
+            secret: _hidePassword,
+            suffix: IconButton(
+              onPressed: () => setState(() => _hidePassword = !_hidePassword),
+              icon: Icon(_hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: const Color(0xFF8E8B84)),
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 18),
         const Text('Vendor type *', style: TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
@@ -354,12 +742,38 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         ),
         const SizedBox(height: 14),
         RegisterField(controller: _displayName, hint: 'Display name', icon: Icons.badge_outlined),
+        const SizedBox(height: 14),
+        _imageField(
+          label: 'Personal photo',
+          hint: 'Same avatar used on the admin Identity tab.',
+          icon: Icons.person_outline_rounded,
+          file: _profilePhoto,
+          url: _profilePhotoUrl,
+          height: 140,
+          onPick: (file) => setState(() => _profilePhoto = file),
+        ),
+        const SizedBox(height: 12),
+        _imageField(
+          label: 'National ID card',
+          hint: 'Front of the Egyptian national ID for verification.',
+          icon: Icons.badge_outlined,
+          file: _nationalId,
+          url: _nationalIdUrl,
+          height: 160,
+          onPick: (file) => setState(() => _nationalId = file),
+        ),
         const SizedBox(height: 12),
         _dateField(),
+        if (_dob != null) ...[
+          const SizedBox(height: 8),
+          Text('Age ${_ageYears()} years', style: const TextStyle(color: Color(0xFF8E8B84), fontWeight: FontWeight.w600)),
+        ],
         const SizedBox(height: 12),
         RegisterField(controller: _profession, hint: 'Profession / job title', icon: Icons.work_outline_rounded),
         const SizedBox(height: 12),
         RegisterField(controller: _bio, hint: 'About', maxLines: 4),
+        const SizedBox(height: 12),
+        RegisterField(controller: _contactEmail, hint: 'Contact email', icon: Icons.alternate_email_rounded, keyboard: TextInputType.emailAddress),
         const SizedBox(height: 12),
         RegisterField(
           controller: _whatsapp,
@@ -379,7 +793,17 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           onChanged: (value) => setState(() => _cityId = value),
         ),
         const SizedBox(height: 12),
-        RegisterField(controller: _address, hint: 'Address', icon: Icons.place_outlined, maxLines: 3),
+        _mapAddressTile(),
+        const SizedBox(height: 12),
+        _imageField(
+          label: 'Cover image',
+          hint: 'Marketplace cover used on the admin Identity tab.',
+          icon: Icons.photo_outlined,
+          file: _coverImage,
+          url: _coverImageUrl,
+          height: 170,
+          onPick: (file) => setState(() => _coverImage = file),
+        ),
       ],
     );
   }
@@ -501,12 +925,14 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
             const SizedBox(height: 12),
             RegisterField(controller: project.url, hint: 'Sample URL', keyboard: TextInputType.url),
           ],
-          if (project.files.isNotEmpty) ...[
+          if (project.existing.isNotEmpty || project.files.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
+                for (var fileIndex = 0; fileIndex < project.existing.length; fileIndex++)
+                  _existingChip(project, fileIndex),
                 for (var fileIndex = 0; fileIndex < project.files.length; fileIndex++)
                   _fileChip(project, fileIndex),
               ],
@@ -597,6 +1023,37 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 160),
               child: Text(project.files[index].name, overflow: TextOverflow.ellipsis, style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700, fontSize: 12)),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.close_rounded, color: LensColors.primary, size: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _existingChip(_ProjectDraft project, int index) {
+    final file = project.existing[index];
+    return GestureDetector(
+      onTap: () => setState(() {
+        project.existing.removeAt(index);
+        project.ids.remove(file.id);
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A120C),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: LensColors.primary),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(project.type == 'video' ? Icons.videocam_outlined : Icons.image_outlined, color: LensColors.primary, size: 16),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(file.name, overflow: TextOverflow.ellipsis, style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700, fontSize: 12)),
             ),
             const SizedBox(width: 6),
             const Icon(Icons.close_rounded, color: LensColors.primary, size: 14),
@@ -722,6 +1179,190 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     );
   }
 
+  int _ageYears() {
+    final dob = _dob;
+    if (dob == null) {
+      return 0;
+    }
+    final now = DateTime.now();
+    var years = now.year - dob.year;
+    if (DateTime(now.year, dob.month, dob.day).isAfter(now)) {
+      years -= 1;
+    }
+    return years;
+  }
+
+  Future<void> _pickMapAddress() async {
+    final pin = await Navigator.of(context).push<PickedMapLocation>(
+      MaterialPageRoute(
+        builder: (_) => BookMapPickerPage(
+          initial: _latitude != null && _longitude != null
+              ? PickedMapLocation(
+                  label: _address.text.trim().isEmpty ? 'Pinned location' : _address.text.trim(),
+                  latitude: _latitude!,
+                  longitude: _longitude!,
+                )
+              : null,
+        ),
+      ),
+    );
+    if (pin == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _address.text = pin.label;
+      _latitude = pin.latitude;
+      _longitude = pin.longitude;
+    });
+  }
+
+  Future<void> _pickIdentityImage(ValueChanged<XFile> onPicked) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: const Color(0xFF141416),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Add photo', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined, color: LensColors.primary),
+                title: const Text('Take a photo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined, color: LensColors.primary),
+                title: const Text('Choose from gallery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (source == null) {
+      return;
+    }
+    try {
+      final picked = await ImagePicker().pickImage(source: source, imageQuality: 85, maxWidth: 1600);
+      if (picked == null || !mounted) {
+        return;
+      }
+      onPicked(picked);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not open the photo picker on this device.');
+      }
+    }
+  }
+
+  Widget _mapAddressTile() {
+    final hasPin = _address.text.trim().isNotEmpty || _latitude != null;
+    return Material(
+      color: const Color(0xE6121214),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: _pickMapAddress,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Row(
+            children: [
+              const Icon(Icons.map_outlined, color: LensColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasPin ? _address.text.trim() : 'Pin address on Google Maps',
+                      style: TextStyle(
+                        color: hasPin ? Colors.white : const Color(0xFF8E8B84),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _latitude == null
+                          ? 'Same map pin stored as Address, Latitude, and Longitude in admin.'
+                          : '${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}',
+                      style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _imageField({
+    required String label,
+    required String hint,
+    required IconData icon,
+    required XFile? file,
+    required String? url,
+    required ValueChanged<XFile> onPick,
+    required double height,
+  }) {
+    ImageProvider? image;
+    if (file != null) {
+      image = FileImage(File(file.path));
+    } else if (url != null && url.isNotEmpty && LensConfig.useNetwork) {
+      image = NetworkImage(url);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Text(hint, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12.5, height: 1.35)),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _pickIdentityImage(onPick),
+          child: Container(
+            height: height,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xE6121214),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFF2A2A2E)),
+              image: image == null ? null : DecorationImage(image: image, fit: BoxFit.cover),
+            ),
+            child: image == null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: LensColors.primary),
+                      const SizedBox(height: 8),
+                      Text('Add $label', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    ],
+                  )
+                : Align(
+                    alignment: Alignment.bottomRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(color: const Color(0xCC121214), borderRadius: BorderRadius.circular(99)),
+                        child: const Text('Change', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _dateField() {
     final label = _dob == null ? 'Date of birth' : '${_dob!.day}/${_dob!.month}/${_dob!.year}';
     return GestureDetector(
@@ -756,14 +1397,47 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   }
 }
 
+class _ExistingFile {
+  const _ExistingFile({required this.id, required this.name});
+
+  final int id;
+  final String name;
+}
+
 class _ProjectDraft {
   _ProjectDraft();
+
+  factory _ProjectDraft.fromJson(Map<String, dynamic> json) {
+    final draft = _ProjectDraft()
+      ..type = json['type']?.toString() ?? 'image'
+      ..featured = json['is_featured'] == true;
+    draft.title.text = json['title']?.toString() ?? '';
+    draft.completedOn.text = json['completed_on']?.toString() ?? '';
+    draft.url.text = json['external_url']?.toString() ?? '';
+    draft.description.text = json['description']?.toString() ?? '';
+    draft.ids = (json['ids'] as List<dynamic>? ?? const [])
+        .map((item) => item is int ? item : int.tryParse('$item') ?? 0)
+        .where((id) => id > 0)
+        .toList();
+    draft.existing = (json['files'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) {
+          final map = Map<String, dynamic>.from(item);
+          final id = map['id'] is int ? map['id'] as int : int.tryParse('${map['id']}') ?? 0;
+          return _ExistingFile(id: id, name: map['name']?.toString() ?? 'File');
+        })
+        .where((item) => item.id > 0)
+        .toList();
+    return draft;
+  }
 
   final title = TextEditingController();
   final completedOn = TextEditingController();
   final url = TextEditingController();
   final description = TextEditingController();
   final files = <XFile>[];
+  List<int> ids = [];
+  List<_ExistingFile> existing = [];
   String type = 'image';
   bool featured = false;
 

@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:lens/core/favorites_store.dart';
@@ -55,6 +54,43 @@ class AppShell extends StatefulWidget {
     openTab(context, searchIndex);
   }
 
+  static void create(BuildContext context) {
+    if (SessionStore.instance.isClient) {
+      final home = currentHome;
+      if (home != null) {
+        openClientCreateFlow(context, home);
+        return;
+      }
+    }
+    if (!SessionStore.instance.isGuest) {
+      openCreate(context);
+      return;
+    }
+
+    final bootstrap = currentBootstrap ?? <String, dynamic>{};
+    final authenticatedBootstrap = Map<String, dynamic>.from(bootstrap);
+    final navigator = Navigator.of(context);
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: LensColors.charcoal,
+          body: LoginView(
+            bootstrap: bootstrap,
+            onSuccess: () => navigator.pushAndRemoveUntil(
+              MaterialPageRoute<void>(
+                builder: (_) => AppShell(
+                  bootstrap: authenticatedBootstrap,
+                  openClientCreateOnStart: SessionStore.instance.isClient,
+                ),
+              ),
+              (route) => false,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   static Widget navBar(
     BuildContext context, {
     required int index,
@@ -64,48 +100,8 @@ class AppShell extends StatefulWidget {
       bookingsOn: bookingsOn,
       index: index,
       withFab: withFab,
+      onCreate: () => create(context),
       onSelect: (value) => openTab(context, value),
-    );
-  }
-
-  static Widget navFab(BuildContext context) {
-    return LensNavBar.fab(
-      onPressed: () {
-        if (SessionStore.instance.isClient) {
-          final home = currentHome;
-          if (home != null) {
-            openClientCreateFlow(context, home);
-            return;
-          }
-        }
-        if (!SessionStore.instance.isGuest) {
-          openCreate(context);
-          return;
-        }
-
-        final bootstrap = currentBootstrap ?? <String, dynamic>{};
-        final authenticatedBootstrap = Map<String, dynamic>.from(bootstrap);
-        final navigator = Navigator.of(context);
-        navigator.push(
-          MaterialPageRoute<void>(
-            builder: (_) => Scaffold(
-              backgroundColor: LensColors.charcoal,
-              body: LoginView(
-                bootstrap: bootstrap,
-                onSuccess: () => navigator.pushAndRemoveUntil(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AppShell(
-                      bootstrap: authenticatedBootstrap,
-                      openClientCreateOnStart: SessionStore.instance.isClient,
-                    ),
-                  ),
-                  (route) => false,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -229,50 +225,37 @@ class AppShellState extends State<AppShell>
         return ColoredBox(
           color: const Color(0xFF07080A),
           child: Stack(
-            clipBehavior: Clip.none,
             children: [
-              Transform(
-                alignment: Alignment.centerLeft,
-                transform: _contentTransform(t),
-                child: GestureDetector(
-                  onTap: open ? _closeMenu : null,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28 * t),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5 * t),
-                          blurRadius: 36,
-                          offset: Offset(-10 * t, 14 * t),
-                        ),
-                        BoxShadow(
-                          color: LensColors.primary.withValues(alpha: 0.22 * t),
-                          blurRadius: 28,
-                          offset: Offset(10 * t, 0),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28 * t),
-                      child: IgnorePointer(ignoring: open, child: child),
+              IgnorePointer(ignoring: open, child: child),
+              if (open)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _closeMenu,
+                    child: ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.32),
                     ),
                   ),
                 ),
-              ),
               if (open)
                 Positioned(
                   top: 10,
                   bottom: 10,
                   right: 8,
                   width: menuWidth,
-                  child: _LensMenu(
-                    progress: t,
-                    selected: selected,
-                    home: home,
-                    bookingsOn: bookingsOn,
-                    onClose: _closeMenu,
-                    onOpen: (id) =>
-                        _openMenuItem(context, home, bookingsOn, id),
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(1, 0),
+                      end: Offset.zero,
+                    ).animate(_menuAnim),
+                    child: _LensMenu(
+                      selected: selected,
+                      home: home,
+                      bookingsOn: bookingsOn,
+                      onClose: _closeMenu,
+                      onOpen: (id) =>
+                          _openMenuItem(context, home, bookingsOn, id),
+                    ),
                   ),
                 ),
             ],
@@ -282,11 +265,10 @@ class AppShellState extends State<AppShell>
       child: Scaffold(
         backgroundColor: LensColors.charcoal,
         body: pages[visibleIndex],
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        floatingActionButton: AppShell.navFab(context),
         bottomNavigationBar: LensNavBar.bar(
           bookingsOn: bookingsOn,
           index: visibleIndex,
+          onCreate: () => AppShell.create(context),
           onSelect: (index) => setState(() {
             _index = index;
             if (index != 1) {
@@ -299,14 +281,6 @@ class AppShellState extends State<AppShell>
         ),
       ),
     );
-  }
-
-  Matrix4 _contentTransform(double t) {
-    return Matrix4.identity()
-      ..setEntry(3, 2, 0.0011)
-      ..translate(10.0 * t, 16.0 * t)
-      ..rotateY(0.9 * t)
-      ..scale(0.88 + 0.12 * (1 - t), 0.92 + 0.08 * (1 - t));
   }
 
   void _openMenuItem(
@@ -372,7 +346,6 @@ class AppShellState extends State<AppShell>
 
 class _LensMenu extends StatelessWidget {
   const _LensMenu({
-    required this.progress,
     required this.selected,
     required this.home,
     required this.bookingsOn,
@@ -380,7 +353,6 @@ class _LensMenu extends StatelessWidget {
     required this.onOpen,
   });
 
-  final double progress;
   final String selected;
   final HomeData home;
   final bool bookingsOn;
@@ -389,134 +361,109 @@ class _LensMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: progress.clamp(0, 1),
-      child: Transform.translate(
-        offset: Offset((1 - progress) * 36, 0),
-        child: ClipRRect(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                color: const Color(0xF0121216),
-                border: Border.all(color: const Color(0x88FF5A1F), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: LensColors.primary.withValues(alpha: 0.18),
-                    blurRadius: 28,
-                    offset: const Offset(-8, 0),
+          color: const Color(0xFF111216),
+          border: Border.all(color: LensColors.graphite, width: 1),
+        ),
+        child: SafeArea(
+          left: false,
+          child: ListenableBuilder(
+            listenable: Listenable.merge([
+              SessionStore.instance,
+              FavoritesStore.instance,
+              NotificationsStore.instance,
+            ]),
+            builder: (context, _) {
+              final signedIn = SessionStore.instance.account != null;
+              return ListView(
+                key: const Key('lens-side-menu'),
+                padding: const EdgeInsets.fromLTRB(16, 4, 12, 16),
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: BrandLogo(
+                          name: home.name,
+                          logoUrl: null,
+                          width: 180,
+                          height: 40,
+                          fontSize: 32,
+                          color: LensColors.cream,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: onClose,
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Divider(color: Color(0xFF2A2D34), height: 1),
+                  const SizedBox(height: 10),
+                  _item(id: 'home', icon: Icons.home_outlined, label: 'Home'),
+                  if (home.on('favorites'))
+                    _item(
+                      id: 'favorites',
+                      icon: Icons.favorite_border_rounded,
+                      label: 'Favorites',
+                      badge: FavoritesStore.instance.count,
+                    ),
+                  if (bookingsOn)
+                    _item(
+                      id: 'bookings',
+                      icon: Icons.calendar_month_outlined,
+                      label: 'Bookings',
+                    ),
+                  _item(id: 'search', icon: Icons.search, label: 'Search'),
+                  _item(
+                    id: 'profile',
+                    icon: Icons.person_outline,
+                    label: 'Profile',
+                  ),
+                  if (home.on('notifications'))
+                    _item(
+                      id: 'notifications',
+                      icon: Icons.notifications_none_rounded,
+                      label: 'Notifications',
+                      badge: NotificationsStore.instance.unread,
+                    ),
+                  const SizedBox(height: 8),
+                  const Divider(color: Color(0xFF2A2D34), height: 1),
+                  const SizedBox(height: 12),
+                  if (home.on('chat'))
+                    _item(
+                      id: 'messages',
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: 'Messages',
+                    ),
+                  if (home.on('issue_reports'))
+                    _item(
+                      id: 'report',
+                      icon: Icons.help_outline_rounded,
+                      label: 'Report an Issue',
+                    ),
+                  _item(
+                    id: 'settings',
+                    icon: Icons.settings_outlined,
+                    label: 'App Settings',
+                  ),
+                  _item(
+                    id: signedIn ? 'signout' : 'signin',
+                    icon: signedIn ? Icons.logout_rounded : Icons.login_rounded,
+                    label: signedIn ? 'Log Out' : 'Sign In',
                   ),
                 ],
-              ),
-              child: SafeArea(
-                left: false,
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    SessionStore.instance,
-                    FavoritesStore.instance,
-                    NotificationsStore.instance,
-                  ]),
-                  builder: (context, _) {
-                    final signedIn = SessionStore.instance.account != null;
-                    return ListView(
-                      key: const Key('lens-side-menu'),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 12, 16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: BrandLogo(
-                                name: home.name,
-                                logoUrl: home.logoUrl,
-                                width: 180,
-                                height: 40,
-                                fontSize: 32,
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Close',
-                              onPressed: onClose,
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                color: Colors.white,
-                                size: 26,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        const Divider(color: Color(0xFF2A2D34), height: 1),
-                        const SizedBox(height: 10),
-                        _item(
-                          id: 'home',
-                          icon: Icons.home_outlined,
-                          label: 'Home',
-                        ),
-                        if (home.on('favorites'))
-                          _item(
-                            id: 'favorites',
-                            icon: Icons.favorite_border_rounded,
-                            label: 'Favorites',
-                            badge: FavoritesStore.instance.count,
-                          ),
-                        if (bookingsOn)
-                          _item(
-                            id: 'bookings',
-                            icon: Icons.calendar_month_outlined,
-                            label: 'Bookings',
-                          ),
-                        _item(
-                          id: 'search',
-                          icon: Icons.search,
-                          label: 'Search',
-                        ),
-                        _item(
-                          id: 'profile',
-                          icon: Icons.person_outline,
-                          label: 'Profile',
-                        ),
-                        if (home.on('notifications'))
-                          _item(
-                            id: 'notifications',
-                            icon: Icons.notifications_none_rounded,
-                            label: 'Notifications',
-                            badge: NotificationsStore.instance.unread,
-                          ),
-                        const SizedBox(height: 8),
-                        const Divider(color: Color(0xFF2A2D34), height: 1),
-                        const SizedBox(height: 12),
-                        if (home.on('chat'))
-                          _item(
-                            id: 'messages',
-                            icon: Icons.chat_bubble_outline_rounded,
-                            label: 'Messages',
-                          ),
-                        if (home.on('issue_reports'))
-                          _item(
-                            id: 'report',
-                            icon: Icons.help_outline_rounded,
-                            label: 'Report an Issue',
-                          ),
-                        _item(
-                          id: 'settings',
-                          icon: Icons.settings_outlined,
-                          label: 'App Settings',
-                        ),
-                        _item(
-                          id: signedIn ? 'signout' : 'signin',
-                          icon: signedIn
-                              ? Icons.logout_rounded
-                              : Icons.login_rounded,
-                          label: signedIn ? 'Log Out' : 'Sign In',
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

@@ -24,6 +24,7 @@ class CategoryFilters {
     this.minRating,
     this.availability = 'any',
     this.verifiedOnly = false,
+    this.vendorSlug,
   });
 
   final String gender;
@@ -45,6 +46,7 @@ class CategoryFilters {
   final double? minRating;
   final String availability;
   final bool verifiedOnly;
+  final String? vendorSlug;
 
   static const genders = ['Men', 'Women', 'Kids'];
 
@@ -396,6 +398,7 @@ class CategoryFilters {
     bool clearRating = false,
     String? availability,
     bool? verifiedOnly,
+    String? vendorSlug,
   }) {
     return CategoryFilters(
       gender: gender ?? this.gender,
@@ -417,6 +420,7 @@ class CategoryFilters {
       minRating: clearRating ? null : (minRating ?? this.minRating),
       availability: availability ?? this.availability,
       verifiedOnly: verifiedOnly ?? this.verifiedOnly,
+      vendorSlug: vendorSlug ?? this.vendorSlug,
     );
   }
 
@@ -445,12 +449,14 @@ class FilterPage extends StatefulWidget {
     this.vendorTypeSlug,
     this.initial = const CategoryFilters(),
     this.catalog = const [],
+    this.types = const [],
   });
 
   final String title;
   final String? vendorTypeSlug;
   final CategoryFilters initial;
   final List<FilterGroupItem> catalog;
+  final List<VendorTypeItem> types;
 
   @override
   State<FilterPage> createState() => _FilterPageState();
@@ -458,6 +464,7 @@ class FilterPage extends StatefulWidget {
 
 class _FilterPageState extends State<FilterPage> {
   late CategoryFilters _filters;
+  late String? _slug;
   late final TextEditingController _cityQuery;
   final _open = <String>{
     'category',
@@ -482,18 +489,23 @@ class _FilterPageState extends State<FilterPage> {
     'language',
   };
 
-  bool get _isModel => (widget.vendorTypeSlug ?? '').toLowerCase() == 'model' || widget.title.toLowerCase().contains('model');
+  String get _activeSlug => (_slug ?? widget.vendorTypeSlug ?? '').toLowerCase();
 
-  bool get _isStudio => (widget.vendorTypeSlug ?? '').toLowerCase() == 'studio' || widget.title.toLowerCase().contains('studio');
+  bool get _hasTypePicker => widget.types.length > 1;
 
-  bool get _isUgc => (widget.vendorTypeSlug ?? '').toLowerCase() == 'ugc' || widget.title.toLowerCase().contains('ugc');
+  bool get _isModel => _activeSlug == 'model' || (!_hasTypePicker && widget.title.toLowerCase().contains('model'));
+
+  bool get _isStudio => _activeSlug == 'studio' || (!_hasTypePicker && widget.title.toLowerCase().contains('studio'));
+
+  bool get _isUgc => _activeSlug == 'ugc' || (!_hasTypePicker && widget.title.toLowerCase().contains('ugc'));
 
   bool get _isFood =>
-      (widget.vendorTypeSlug ?? '').toLowerCase() == 'food_stylist' || widget.title.toLowerCase().contains('food');
+      _activeSlug == 'food_stylist' || (!_hasTypePicker && widget.title.toLowerCase().contains('food'));
 
   @override
   void initState() {
     super.initState();
+    _slug = widget.initial.vendorSlug ?? widget.vendorTypeSlug;
     _filters = widget.initial.isEmpty ? _previewForType : widget.initial;
     _cityQuery = TextEditingController();
   }
@@ -543,60 +555,78 @@ class _FilterPageState extends State<FilterPage> {
     setState(() => apply(next));
   }
 
+  String get _currentTitle {
+    VendorTypeItem? type;
+    for (final item in widget.types) {
+      if (item.slug.toLowerCase() == _activeSlug) {
+        type = item;
+        break;
+      }
+    }
+    final name = type?.label ?? widget.title;
+    return _isModel ? 'Filter $name (${_filters.gender})' : 'Filter $name';
+  }
+
+  int get _activeCount {
+    var count = 0;
+    if (_filters.services.isNotEmpty) count += 1;
+    if (_filters.cities.isNotEmpty) count += 1;
+    if (_filters.tops.isNotEmpty || _filters.pants.isNotEmpty || _filters.shoes.isNotEmpty) count += 1;
+    if (_filters.equipment.isNotEmpty) count += 1;
+    if (_filters.contentTypes.isNotEmpty) count += 1;
+    if (_filters.accents.isNotEmpty) count += 1;
+    if (_filters.languages.isNotEmpty) count += 1;
+    if (_filters.ageGroups.isNotEmpty) count += 1;
+    if (_filters.minRating != null) count += 1;
+    if (_filters.availability != 'any') count += 1;
+    if (_filters.verifiedOnly) count += 1;
+    return count;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = _isModel ? 'Filter ${widget.title} (${_filters.gender})' : 'Filter ${widget.title}';
+    final title = _currentTitle;
 
     return Scaffold(
-      backgroundColor: LensColors.charcoal,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppShell.navFab(context),
+      backgroundColor: const Color(0xFF09090B),
       bottomNavigationBar: AppShell.navBar(context, index: AppShell.searchIndex),
-      body: SafeArea(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1A0E0A), Color(0xFF09090B), Color(0xFF09090B)],
+            stops: [0, 0.22, 1],
+          ),
+        ),
+        child: SafeArea(
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 6, 20, 0),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Lens',
-                            style: TextStyle(color: LensColors.primary, fontSize: 28, fontWeight: FontWeight.w800, height: 1),
-                          ),
-                          TextSpan(
-                            text: '.',
-                            style: TextStyle(color: LensColors.primary, fontSize: 28, fontWeight: FontWeight.w800, height: 1),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'FIND. BOOK. CREATE.',
-                      style: TextStyle(color: LensColors.slate, fontSize: 9, letterSpacing: 1.6, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.chevron_left_rounded, color: LensColors.cream, size: 30),
+                  _roundIconButton(
+                    icon: Icons.close_rounded,
+                    onTap: () => Navigator.of(context).pop(),
                   ),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _activeCount == 0 ? 'Refine results' : '$_activeCount filters selected',
+                          style: const TextStyle(color: Color(0xFFB0ABA3), fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
                   ),
                   TextButton(
@@ -612,8 +642,12 @@ class _FilterPageState extends State<FilterPage> {
             Expanded(
               child: ListView(
                 cacheExtent: 2000,
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 children: [
+                  if (_hasTypePicker) ...[
+                    _typePicker(),
+                    const SizedBox(height: 14),
+                  ],
                   if (_isFood) ..._foodSections() else if (_isUgc) ..._ugcSections() else if (_isStudio) ...[
                     _section(
                       id: 'type',
@@ -903,25 +937,30 @@ class _FilterPageState extends State<FilterPage> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+              decoration: const BoxDecoration(
+                color: Color(0xF00B0B0D),
+                border: Border(top: BorderSide(color: Color(0xFF22242A))),
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: _bottomButton(
                       label: 'Cancel',
-                      background: const Color(0xFF1A1B1F),
+                      background: const Color(0xFF17181C),
                       foreground: Colors.white,
                       onTap: () => Navigator.of(context).pop(),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
+                    flex: 2,
                     child: _bottomButton(
                       label: 'Apply Filters',
                       background: LensColors.primary,
                       foreground: Colors.white,
-                      onTap: () => Navigator.of(context).pop(_filters),
+                      onTap: () => Navigator.of(context).pop(_filters.copyWith(vendorSlug: _activeSlug.isEmpty ? null : _activeSlug)),
                     ),
                   ),
                 ],
@@ -930,6 +969,66 @@ class _FilterPageState extends State<FilterPage> {
           ],
         ),
       ),
+      ),
+    );
+  }
+
+  Widget _roundIconButton({required IconData icon, required VoidCallback onTap}) {
+    return Material(
+      color: const Color(0xFF17181C),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+
+  Widget _typePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Creator type', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('Choose who you want to book, then refine below.', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: widget.types.map((type) {
+            final selected = type.slug.toLowerCase() == _activeSlug;
+            return GestureDetector(
+              onTap: () => setState(() {
+                _slug = type.slug;
+                _filters = _previewForType;
+                _cityQuery.clear();
+              }),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected ? LensColors.primary : const Color(0xFF141518),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: selected ? LensColors.primary : const Color(0xFF2A2D34)),
+                ),
+                child: Text(
+                  type.label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : const Color(0xFFD0CBC3),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -1071,23 +1170,31 @@ class _FilterPageState extends State<FilterPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
         decoration: BoxDecoration(
           color: const Color(0xFF121316),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFF22242A)),
+          border: Border.all(color: _filters.verifiedOnly ? const Color(0x66FF5A1F) : const Color(0xFF22242A)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.verified_outlined, color: LensColors.cream, size: 20),
-            const SizedBox(width: 8),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A140E),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.verified_outlined, color: LensColors.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Verified Only', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
                   SizedBox(height: 2),
-                  Text('Show only verified studios', style: TextStyle(color: LensColors.slate, fontSize: 12)),
+                  Text('Show only verified studios', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
                 ],
               ),
             ),
@@ -1379,28 +1486,32 @@ class _FilterPageState extends State<FilterPage> {
 
   Widget _genderTabs() {
     final options = _labels('model_identity', CategoryFilters.genders);
-    return Row(
-      children: options.map((option) {
-        final selected = _filters.gender == option;
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: option == options.last ? 0 : 8),
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF121316),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF22242A)),
+      ),
+      child: Row(
+        children: options.map((option) {
+          final selected = _filters.gender == option;
+          return Expanded(
             child: GestureDetector(
               onTap: () => setState(() => _filters = _filters.copyWith(gender: option)),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
-                height: 48,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: selected ? const Color(0xFF2A140E) : const Color(0xFF141518),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: selected ? LensColors.primary : const Color(0xFF2A2D34)),
+                  color: selected ? LensColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       option == 'Kids' ? Icons.escalator_warning_rounded : Icons.person_outline,
-                      color: selected ? LensColors.primary : LensColors.cream,
+                      color: selected ? Colors.white : const Color(0xFFD0CBC3),
                       size: 18,
                     ),
                     const SizedBox(width: 6),
@@ -1415,9 +1526,9 @@ class _FilterPageState extends State<FilterPage> {
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -1518,22 +1629,30 @@ class _FilterPageState extends State<FilterPage> {
               onTap: () => setState(() => open ? _open.remove(id) : _open.add(id)),
               child: Row(
                 children: [
-                  Icon(icon, color: LensColors.cream, size: 20),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1D22),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: LensColors.primary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
                   if (trailing != null)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: Text(trailing, style: const TextStyle(color: LensColors.slate, fontSize: 12, fontWeight: FontWeight.w600)),
+                      child: Text(trailing, style: const TextStyle(color: Color(0xFFE8E4DC), fontSize: 12, fontWeight: FontWeight.w700)),
                     ),
                   Icon(open ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: LensColors.cream),
                 ],
               ),
             ),
             if (open) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               child,
             ],
           ],
@@ -1564,10 +1683,10 @@ class _FilterPageState extends State<FilterPage> {
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
             decoration: BoxDecoration(
-              color: isOn ? const Color(0xFF2A140E) : const Color(0xFF141518),
-              borderRadius: BorderRadius.circular(20),
+              color: isOn ? LensColors.primary : const Color(0xFF1A1B1F),
+              borderRadius: BorderRadius.circular(999),
               border: Border.all(color: isOn ? LensColors.primary : const Color(0xFF2A2D34)),
             ),
             child: Row(
@@ -1578,13 +1697,13 @@ class _FilterPageState extends State<FilterPage> {
                   style: TextStyle(
                     color: isOn ? Colors.white : const Color(0xFFD0CBC3),
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 if (isOn) ...[
                   const SizedBox(width: 4),
-                  const Icon(Icons.check, color: LensColors.primary, size: 14),
-                  if (showChevron) const Icon(Icons.expand_more_rounded, color: LensColors.primary, size: 16),
+                  const Icon(Icons.check, color: Colors.white, size: 14),
+                  if (showChevron) const Icon(Icons.expand_more_rounded, color: Colors.white, size: 16),
                 ],
               ],
             ),
@@ -1607,7 +1726,7 @@ class _FilterPageState extends State<FilterPage> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: SizedBox(
-          height: 52,
+          height: 54,
           child: Center(
             child: Text(label, style: TextStyle(color: foreground, fontWeight: FontWeight.w800, fontSize: 15)),
           ),

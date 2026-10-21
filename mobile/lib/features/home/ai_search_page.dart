@@ -223,8 +223,6 @@ class _AiSearchPageState extends State<AiSearchPage> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LensColors.charcoal,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: AppShell.searchIndex),
       body: Stack(
         children: [

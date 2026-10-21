@@ -7,11 +7,13 @@ use App\Models\Booking;
 use App\Models\User;
 use App\Models\UserAddress;
 use App\Models\UserPaymentMethod;
+use App\Models\VendorType;
 use App\Support\AppClient;
 use App\Support\ClientPayment;
 use App\Support\ClientPreferences;
 use App\Support\Egypt;
 use App\Support\Finance;
+use App\Support\VendorAppProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -122,7 +124,7 @@ class AccountController extends Controller
     public function updateProfile(Request $request): JsonResponse
     {
         $user = $this->member();
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'string', Egypt::mobileRule(), Rule::unique('users', 'phone')->ignore($user->id)],
@@ -131,9 +133,12 @@ class AccountController extends Controller
             'password' => ['nullable', 'string', 'min:6'],
             'current_password' => ['nullable', 'string'],
             'avatar' => ['nullable', 'image', 'max:4096'],
-        ], [
+        ], $user->isVendor() ? VendorAppProfile::rules() : []), [
             'phone.required' => Egypt::mobileMessage(),
             'phone.regex' => Egypt::mobileMessage(),
+            'contact_phone.regex' => Egypt::mobileMessage(),
+            'whatsapp.regex' => Egypt::mobileMessage(),
+            'wallet_phone.regex' => Egypt::mobileMessage(),
         ]);
 
         if (filled($data['password'] ?? null)) {
@@ -169,7 +174,22 @@ class AccountController extends Controller
         $settings['language'] = $user->locale ?: 'en';
         $user->update(['app_settings' => $settings]);
 
-        return response()->json($this->presentProfile($user->fresh()));
+        if ($user->isVendor()) {
+            $vendor = $user->vendor;
+            if (! $vendor) {
+                $typeId = VendorType::query()->where('slug', $data['vendor_type'] ?? 'photographer')->value('id')
+                    ?? VendorType::query()->orderBy('sort_order')->value('id');
+                $vendor = $user->vendor()->create([
+                    'vendor_type_id' => $typeId,
+                    'display_name' => $data['display_name'] ?? $user->name,
+                    'verification_status' => 'pending',
+                    'is_active' => true,
+                ]);
+            }
+            VendorAppProfile::apply($request, $vendor, $data);
+        }
+
+        return response()->json($this->presentProfile($user->fresh(['vendor.vendorType', 'vendor.filterTags', 'vendor.portfolios', 'city', 'wallet'])));
     }
 
     public function settings(): JsonResponse
@@ -243,7 +263,7 @@ class AccountController extends Controller
      */
     protected function presentProfile(User $user): array
     {
-        $user->loadMissing(['city', 'wallet']);
+        $user->loadMissing(['city', 'wallet', 'vendor.vendorType', 'vendor.filterTags', 'vendor.portfolios']);
 
         return [
             'id' => $user->id,
@@ -263,8 +283,13 @@ class AccountController extends Controller
             'wallet_pending' => (float) ($user->wallet?->pending ?? 0),
             'payment_methods_count' => $user->paymentMethods()->count(),
             'addresses_count' => $user->addresses()->count(),
-            'bookings_count' => $user->bookings()->count(),
+            'bookings_count' => $user->isVendor()
+                ? $user->vendor?->bookings()->count() ?? 0
+                : $user->bookings()->count(),
             'favorites_count' => $user->favorites()->count(),
+            'vendor_id' => $user->vendor?->id,
+            'vendor_name' => $user->vendor?->display_name,
+            'vendor' => VendorAppProfile::present($user->vendor),
         ];
     }
 

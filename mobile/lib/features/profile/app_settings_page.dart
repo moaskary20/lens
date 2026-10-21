@@ -4,6 +4,7 @@ import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/profile/profile_scaffold.dart';
 
 class AppSettingsPage extends StatefulWidget {
@@ -112,26 +113,9 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
         ),
         border: Border.all(color: const Color(0x55FF5A1F)),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(color: LensColors.primary, borderRadius: BorderRadius.circular(16)),
-            child: const Icon(Icons.camera_alt_rounded, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Lens', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text(home.tagline.toUpperCase(), style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
-        ],
+      child: const Align(
+        alignment: Alignment.centerLeft,
+        child: BrandLogo(width: 110, height: 32),
       ),
     );
   }

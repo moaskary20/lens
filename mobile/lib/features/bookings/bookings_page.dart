@@ -5,6 +5,7 @@ import 'package:lens/core/contact_launch.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/bookings/approve_delivery_sheet.dart';
@@ -123,16 +124,8 @@ class _BookingsPageState extends State<BookingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Lens.',
-                    style: TextStyle(
-                      color: LensColors.primary,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
-                  ),
-                  SizedBox(height: 6),
+                  BrandHeader(height: 34),
+                  SizedBox(height: 10),
                   Text(
                     'Incoming bookings',
                     style: TextStyle(
@@ -196,30 +189,7 @@ class _ClientBookings extends StatelessWidget {
             child: Row(
               children: [
                 const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Lens.',
-                        style: TextStyle(
-                          color: LensColors.primary,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          height: 1,
-                        ),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'FIND. BOOK. CREATE.',
-                        style: TextStyle(
-                          color: LensColors.slate,
-                          fontSize: 9,
-                          letterSpacing: 1.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: BrandHeader(),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).push(

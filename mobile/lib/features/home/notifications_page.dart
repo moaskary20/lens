@@ -24,8 +24,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LensColors.charcoal,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: 0),
       body: SafeArea(
         child: Column(

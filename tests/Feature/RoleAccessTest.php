@@ -45,8 +45,10 @@ class RoleAccessTest extends TestCase
         $this->get('/vendor/login')
             ->assertOk()
             ->assertSee('lens-login', false)
+            ->assertSee('storage/logo.mp4', false)
+            ->assertSee('storage/lenslogo.png', false)
             ->assertSee('Creator desk', false)
-            ->assertSee('Wallet payouts', false)
+            ->assertDontSee('Wallet payouts', false)
             ->assertSee('Creators', false)
             ->assertDontSee('Staff only', false);
         $this->get('/vendor')->assertRedirect();
@@ -226,20 +228,18 @@ class RoleAccessTest extends TestCase
         $this->actingAs($admin)->get('/admin/vendor-availabilities')->assertOk();
     }
 
-    public function test_admin_can_create_employee_and_marketplace_users_from_separate_role_groups(): void
+    public function test_admin_creates_employee_users_without_marketplace_roles(): void
     {
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
         $this->actingAs($admin);
 
         Livewire::test(CreateUser::class)
-            ->assertSeeInOrder(['Profile', 'Choose account type'])
-            ->assertSee('Employee')
-            ->assertSee('Vendor / Client')
+            ->assertSeeInOrder(['Profile', 'Employee'])
+            ->assertDontSee('Vendor / Client')
             ->assertSee('Platform admin')
             ->assertSee('Supervisor')
             ->assertSee('Support')
-            ->assertSee('Vendor')
-            ->assertSee('Client (Customer)')
+            ->assertDontSee('Client (Customer)')
             ->assertDontSee('App settings')
             ->fillForm([
                 'name' => 'New Support Employee',
@@ -253,21 +253,6 @@ class RoleAccessTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'new-support@lens.app',
             'role' => Roles::SUPPORT,
-        ]);
-
-        Livewire::test(CreateUser::class)
-            ->fillForm([
-                'name' => 'New Marketplace Client',
-                'email' => 'new-client@lens.app',
-                'password' => 'password',
-                'account_role' => Roles::CLIENT,
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'new-client@lens.app',
-            'role' => Roles::CLIENT,
         ]);
     }
 

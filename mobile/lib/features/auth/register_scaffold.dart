@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/auth/register_catalog.dart';
 
 class RegisterScaffold extends StatelessWidget {
@@ -43,7 +44,7 @@ class RegisterScaffold extends StatelessWidget {
                     icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
                   ),
                   const Expanded(
-                    child: Text('Lens', style: TextStyle(color: LensColors.primary, fontSize: 28, fontWeight: FontWeight.w800, height: 1)),
+                    child: BrandLogo(width: 120, height: 34),
                   ),
                 ],
               ),

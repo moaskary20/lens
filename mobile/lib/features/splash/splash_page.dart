@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/demo_bootstrap.dart';
-import 'package:lens/core/theme/lens_colors.dart';
-import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/onboarding/onboarding_page.dart';
+import 'package:video_player/video_player.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key, this.api});
@@ -19,18 +17,31 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   Timer? _hold;
-  late Map<String, dynamic> _payload;
+  late final VideoPlayerController _videoController;
+  late final Future<void> _videoReady;
+  late DateTime _videoStartedAt;
 
   @override
   void initState() {
     super.initState();
-    _payload = DemoBootstrap.payload();
+    _videoController = VideoPlayerController.asset('assit/splash.mp4');
+    _videoReady = _startVideo();
     _boot();
+  }
+
+  Future<void> _startVideo() async {
+    await _videoController.initialize();
+    await _videoController.play();
+    _videoStartedAt = DateTime.now();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
     _hold?.cancel();
+    _videoController.dispose();
     super.dispose();
   }
 
@@ -38,10 +49,14 @@ class _SplashPageState extends State<SplashPage> {
     final started = DateTime.now();
     Map<String, dynamic> payload = DemoBootstrap.payload();
     try {
-      final remote = await (widget.api ?? ApiClient()).getJson('/app/bootstrap');
+      final remote = await (widget.api ?? ApiClient()).getJson(
+        '/app/bootstrap',
+      );
       final types = remote['vendor_types'];
       final popular = remote['popular'];
-      final empty = (types is! List || types.isEmpty) && (popular is! List || popular.isEmpty);
+      final empty =
+          (types is! List || types.isEmpty) &&
+          (popular is! List || popular.isEmpty);
       if (empty) {
         payload = DemoBootstrap.payload();
         payload['name'] = remote['name']?.toString() ?? payload['name'];
@@ -52,11 +67,13 @@ class _SplashPageState extends State<SplashPage> {
     } catch (_) {
       payload = DemoBootstrap.payload();
     }
-    if (mounted) {
-      setState(() => _payload = payload);
-    }
-
-    final wait = const Duration(milliseconds: 1400) - DateTime.now().difference(started);
+    await _videoReady;
+    final videoDuration = _videoController.value.duration;
+    final elapsed = DateTime.now().difference(started);
+    final videoElapsed = DateTime.now().difference(_videoStartedAt);
+    final videoWait = videoDuration - videoElapsed;
+    final minimumWait = const Duration(milliseconds: 1400) - elapsed;
+    final wait = videoWait > minimumWait ? videoWait : minimumWait;
     if (wait > Duration.zero && mounted) {
       final done = Completer<void>();
       _hold = Timer(wait, done.complete);
@@ -66,176 +83,33 @@ class _SplashPageState extends State<SplashPage> {
       return;
     }
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => OnboardingPage(bootstrap: payload)),
+      MaterialPageRoute<void>(
+        builder: (_) => OnboardingPage(bootstrap: payload),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final logoUrl = _payload['logo'] is String ? _payload['logo'] as String : null;
-    final name = _payload['name']?.toString() ?? 'Lens';
-
     return Scaffold(
-      backgroundColor: LensColors.charcoal,
-      body: Stack(
-        children: [
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (logoUrl != null && logoUrl.isNotEmpty)
-                  BrandLogo(
-                    name: name,
-                    logoUrl: logoUrl,
-                    width: 240,
-                    height: 180,
-                    color: const Color(0xFFF3E6C8),
-                    alignment: Alignment.center,
-                  )
-                else
-                  SizedBox(
-                    width: 320,
-                    height: 260,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                Color(0x00000000),
-                                Color(0x33FF5A1F),
-                                Color(0x77FF5A1F),
-                                Color(0x22FF5A1F),
-                                Color(0x00000000),
-                              ],
-                              stops: [0.12, 0.38, 0.52, 0.68, 1],
-                            ),
-                          ),
-                          child: SizedBox.expand(),
-                        ),
-                        SizedBox(
-                          width: 108,
-                          height: 108,
-                          child: CustomPaint(painter: _AperturePainter()),
-                        ),
-                      ],
+      backgroundColor: Colors.black,
+      body: SizedBox.expand(
+        key: const Key('splash-black-background'),
+        child: ColoredBox(
+          color: Colors.black,
+          child: _videoController.value.isInitialized
+              ? Center(
+                  child: AspectRatio(
+                    aspectRatio: _videoController.value.aspectRatio,
+                    child: VideoPlayer(
+                      _videoController,
+                      key: const Key('splash-video'),
                     ),
                   ),
-                if (logoUrl != null && logoUrl.isNotEmpty)
-                  const SizedBox(height: 8)
-                else
-                  Transform.translate(
-                    offset: Offset(0, -18),
-                    child: Text(
-                      name,
-                      style: TextStyle(
-                        color: Color(0xFFF3E6C8),
-                        fontSize: 52,
-                        fontWeight: FontWeight.w600,
-                        height: 1,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 42,
-            child: Text(
-              'Create. Connect. Deliver.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF6B6560),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ),
-        ],
+                )
+              : const SizedBox.shrink(),
+        ),
       ),
     );
   }
-}
-
-class _AperturePainter extends CustomPainter {
-  const _AperturePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final bounds = Rect.fromCircle(center: center, radius: radius);
-
-    canvas.save();
-    canvas.clipPath(Path()..addOval(bounds));
-
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-0.38, -0.32),
-          radius: 1.15,
-          colors: [
-            Color(0xFFFFB06A),
-            Color(0xFFFF6A2B),
-            Color(0xFFFF4A12),
-            Color(0xFF8A2A0C),
-          ],
-          stops: [0, 0.32, 0.62, 1],
-        ).createShader(bounds),
-    );
-
-    for (var i = 0; i < 6; i++) {
-      final start = -0.55 + i * (math.pi / 3);
-      final path = Path()
-        ..moveTo(center.dx, center.dy)
-        ..arcTo(bounds, start, 0.42, false)
-        ..close();
-      canvas.drawPath(
-        path,
-        Paint()..color = Color.fromRGBO(0, 0, 0, i.isEven ? 0.16 : 0.08),
-      );
-    }
-
-    final blade = Paint()
-      ..color = LensColors.charcoal
-      ..strokeWidth = size.width * 0.055
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(
-      Offset(center.dx + radius * 0.62, center.dy - radius * 0.78),
-      Offset(center.dx + radius * 0.08, center.dy + radius * 0.08),
-      blade,
-    );
-
-    final house = Path()
-      ..moveTo(center.dx - radius * 0.46, center.dy + radius * 0.10)
-      ..lineTo(center.dx - radius * 0.04, center.dy - radius * 0.36)
-      ..lineTo(center.dx + radius * 0.40, center.dy + radius * 0.06)
-      ..lineTo(center.dx + radius * 0.40, center.dy + radius * 0.52)
-      ..lineTo(center.dx - radius * 0.46, center.dy + radius * 0.52)
-      ..close();
-    canvas.drawPath(house, Paint()..color = LensColors.charcoal);
-
-    canvas.restore();
-
-    canvas.drawCircle(
-      center,
-      radius - 0.6,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8
-        ..color = const Color(0x88FF8A4C),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

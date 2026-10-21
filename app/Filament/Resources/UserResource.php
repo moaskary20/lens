@@ -91,56 +91,28 @@ class UserResource extends Resource
                 FileUpload::make('avatar')->label('Avatar')->image()->directory('avatars')->avatar(),
             ])->columns(2)
                 ->columnSpan(fn (string $operation): int|string => $operation === 'create' ? 1 : 'full'),
-            Section::make('Choose account type')
-                ->description('Choose whether this account is an employee or a marketplace user.')
+            Section::make('Employee')
+                ->description('Platform admin, supervisor, or support.')
                 ->schema([
-                    Section::make('Employee')
-                        ->description('Platform admin, supervisor, or support.')
-                        ->schema([
-                            Radio::make('employee_role')
-                                ->label('Employee role')
-                                ->options([
-                                    Roles::ADMIN => 'Platform admin',
-                                    Roles::SUPERVISOR => 'Supervisor',
-                                    Roles::SUPPORT => 'Support',
-                                ])
-                                ->live()
-                                ->afterStateUpdated(function (Set $set, ?string $state): void {
-                                    if (filled($state)) {
-                                        $set('account_role', null);
-                                        $set('role', $state);
-                                    }
-                                })
-                                ->visible(fn (string $operation): bool => $operation === 'create'
-                                    && (auth()->user()?->isAdmin() ?? false)),
+                    Radio::make('employee_role')
+                        ->label('Employee role')
+                        ->options([
+                            Roles::ADMIN => 'Platform admin',
+                            Roles::SUPERVISOR => 'Supervisor',
+                            Roles::SUPPORT => 'Support',
                         ])
-                        ->columnSpan(1)
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, ?string $state): void {
+                            if (filled($state)) {
+                                $set('role', $state);
+                            }
+                        })
                         ->visible(fn (string $operation): bool => $operation === 'create'
                             && (auth()->user()?->isAdmin() ?? false)),
-                    Section::make('Vendor / Client')
-                        ->description('Marketplace accounts for creators and customers.')
-                        ->schema([
-                            Radio::make('account_role')
-                                ->label('Role')
-                                ->options([
-                                    Roles::VENDOR => 'Vendor',
-                                    Roles::CLIENT => 'Client (Customer)',
-                                ])
-                                ->live()
-                                ->afterStateUpdated(function (Set $set, ?string $state): void {
-                                    if (filled($state)) {
-                                        $set('employee_role', null);
-                                        $set('role', $state);
-                                    }
-                                })
-                                ->visible(fn (string $operation): bool => $operation === 'create'),
-                        ])
-                        ->columnSpan(1)
-                        ->visible(fn (string $operation): bool => $operation === 'create'),
                 ])
-                ->columns(2)
                 ->columnSpan(1)
-                ->visible(fn (string $operation): bool => $operation === 'create'),
+                ->visible(fn (string $operation): bool => $operation === 'create'
+                    && (auth()->user()?->isAdmin() ?? false)),
             Section::make('App settings')
                 ->description('Client preferences applied in the mobile app after the next refresh.')
                 ->visible(fn (Get $get, string $operation): bool => $operation !== 'create'
@@ -242,19 +214,15 @@ class UserResource extends Resource
      */
     public static function normalizeCreateData(array $data): array
     {
-        $employeeRole = $data['employee_role'] ?? null;
-        $accountRole = $data['account_role'] ?? null;
-        $role = filled($employeeRole) ? $employeeRole : $accountRole;
+        $role = $data['employee_role'] ?? null;
 
-        $allowedRoles = filled($employeeRole)
-            ? ((auth()->user()?->isAdmin() ?? false)
-                ? [Roles::ADMIN, Roles::SUPERVISOR, Roles::SUPPORT]
-                : [])
-            : [Roles::VENDOR, Roles::CLIENT];
+        $allowedRoles = (auth()->user()?->isAdmin() ?? false)
+            ? [Roles::ADMIN, Roles::SUPERVISOR, Roles::SUPPORT]
+            : [];
 
         if (! is_string($role) || ! in_array($role, $allowedRoles, true)) {
             throw ValidationException::withMessages([
-                'data.account_role' => 'Choose a valid account role.',
+                'data.employee_role' => 'Choose a valid employee role.',
             ]);
         }
 

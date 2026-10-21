@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/filter_page.dart';
 import 'package:lens/features/home/inbox.dart';
@@ -140,8 +141,6 @@ class _MapPageState extends State<MapPage> {
 
     return Scaffold(
       backgroundColor: LensColors.charcoal,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: AppShell.searchIndex),
       body: SafeArea(
         child: Column(
@@ -166,20 +165,7 @@ class _MapPageState extends State<MapPage> {
       child: Row(
         children: [
           const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Lens.',
-                  style: TextStyle(color: LensColors.primary, fontSize: 28, fontWeight: FontWeight.w800, height: 1),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'FIND. BOOK. CREATE.',
-                  style: TextStyle(color: LensColors.slate, fontSize: 9, letterSpacing: 1.6, fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
+            child: BrandHeader(),
           ),
           IconButton(
             onPressed: () => AppShell.openTab(context, AppShell.searchIndex),

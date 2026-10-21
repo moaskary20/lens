@@ -42,6 +42,10 @@ class AdminPanelTest extends TestCase
         $response->assertSee('Sign in', false);
         $response->assertSee('Operations console', false);
         $response->assertSee('lens-login', false);
+        $response->assertSee('storage/logo.mp4', false);
+        $response->assertSee('storage/lenslogo.png', false);
+        $response->assertDontSee('Verified talent', false);
+        $response->assertDontSee('The marketplace for photographers', false);
         $response->assertSee('lang="en"', false);
         $response->assertSee('css/lens-admin.css', false);
         $response->assertSee('lens/animate.min.css', false);
@@ -170,10 +174,18 @@ class AdminPanelTest extends TestCase
 
         $this->actingAs($admin);
 
+        $visibleRoles = collect(UserResource::roleOptions())
+            ->except(['admin', 'vendor']);
+
         $tabs = Livewire::test(ListUsers::class)
             ->assertSee('All users');
 
-        foreach (UserResource::roleOptions() as $label) {
+        $this->assertSame(
+            ['all', ...$visibleRoles->keys()->all()],
+            array_keys($tabs->instance()->getTabs()),
+        );
+
+        foreach ($visibleRoles as $label) {
             $tabs->assertSee($label);
         }
 
@@ -181,7 +193,7 @@ class AdminPanelTest extends TestCase
             ->set('activeTab', 'all')
             ->assertCountTableRecords(User::query()->count());
 
-        foreach (UserResource::roleOptions() as $role => $_label) {
+        foreach ($visibleRoles as $role => $_label) {
             $component = Livewire::test(ListUsers::class)->set('activeTab', $role);
             $query = $component->instance()->getFilteredTableQuery();
 

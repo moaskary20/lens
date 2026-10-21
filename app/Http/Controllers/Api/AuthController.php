@@ -12,6 +12,7 @@ use Illuminate\Http\UploadedFile;
 use App\Support\AppClient;
 use App\Support\Egypt;
 use App\Support\Roles;
+use App\Support\VendorAppProfile;
 use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -58,6 +59,11 @@ class AuthController extends Controller
             'whatsapp' => ['nullable', Egypt::mobileRule()],
             'instagram' => ['nullable', 'string', 'max:120'],
             'address' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'profile_photo' => ['nullable', 'image', 'max:4096'],
+            'national_id_image' => ['nullable', 'image', 'max:4096'],
+            'cover_image' => ['nullable', 'image', 'max:8192'],
             'payout_method' => ['nullable', Rule::in(['bank', 'wallet', 'paypal'])],
             'bank_name' => ['nullable', 'string', 'max:255'],
             'bank_account_holder' => ['nullable', 'string', 'max:255'],
@@ -132,6 +138,8 @@ class AuthController extends Controller
                 'whatsapp' => $data['whatsapp'] ?? null,
                 'instagram' => $data['instagram'] ?? null,
                 'address' => $data['address'] ?? null,
+                'latitude' => $data['latitude'] ?? null,
+                'longitude' => $data['longitude'] ?? null,
                 'specialties' => $data['specialties'] ?? null,
                 'delivery_formats' => $data['delivery_formats'] ?? null,
                 'extras' => $this->vendorExtras($data),
@@ -160,6 +168,8 @@ class AuthController extends Controller
                 'is_active' => true,
             ]);
 
+            VendorAppProfile::storeIdentityFiles($request, $vendor);
+            $vendor->save();
             $this->storeProjects($request, $vendor, $data['projects'] ?? []);
             $this->syncFilterTags($vendor, $data['filter_tags'] ?? []);
         }

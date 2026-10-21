@@ -4,6 +4,7 @@ namespace App\Filament\Resources\UserResource\Pages;
 
 use App\Filament\Resources\UserResource;
 use App\Models\User;
+use App\Support\Roles;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -24,6 +25,10 @@ class ListUsers extends ListRecords
         ];
 
         foreach (UserResource::roleOptions() as $role => $label) {
+            if (in_array($role, [Roles::ADMIN, Roles::VENDOR], true)) {
+                continue;
+            }
+
             $tabs[$role] = Tab::make($label)
                 ->badge(fn (): int => User::query()->where('role', $role)->count())
                 ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('role', $role));

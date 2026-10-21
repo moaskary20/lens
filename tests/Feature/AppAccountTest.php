@@ -195,4 +195,97 @@ class AppAccountTest extends TestCase
 
         $this->assertTrue(Hash::check('newpass', User::query()->where('email', 'client@lens.app')->firstOrFail()->password));
     }
+
+    public function test_vendor_updates_profile_and_admin_sees_it(): void
+    {
+        $vendor = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();
+        $headers = ['X-Lens-Client' => 'vendor@lens.app', 'Accept' => 'application/json'];
+
+        $profile = $this->withHeaders($headers)
+            ->getJson('/api/app/account/profile')
+            ->assertOk()
+            ->assertJsonPath('role', 'vendor')
+            ->assertJsonPath('vendor.display_name', 'Fahad Studio Light')
+            ->assertJsonPath('vendor.vendor_type', 'photographer')
+            ->assertJsonPath('vendor.payout_method', 'bank')
+            ->json();
+        $this->assertNotEmpty(data_get($profile, 'vendor.national_id_image'));
+        $this->assertNotEmpty(data_get($profile, 'vendor.cover_image'));
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/account/profile', [
+                'name' => 'Fahad Photography',
+                'email' => 'vendor@lens.app',
+                'phone' => '01022223344',
+                'display_name' => 'Fahad Light Desk',
+                'vendor_type' => 'photographer',
+                'profession' => 'Editorial photographer',
+                'address' => 'Zamalek, Cairo',
+                'latitude' => 30.0626,
+                'longitude' => 31.2197,
+                'half_day_price' => 2100,
+                'full_day_price' => 3600,
+                'payout_method' => 'paypal',
+                'paypal_email' => 'fahad@paypal.com',
+                'paypal_name' => 'Fahad',
+                'specialties' => ['wedding', 'editorial'],
+                'projects' => [
+                    [
+                        'type' => 'link',
+                        'title' => 'Gouna editorial',
+                        'external_url' => 'https://instagram.com/p/gouna',
+                        'description' => 'Summer lookbook.',
+                        'is_featured' => true,
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('vendor.display_name', 'Fahad Light Desk')
+            ->assertJsonPath('vendor.payout_method', 'paypal')
+            ->assertJsonPath('vendor.half_day_price', 2100)
+            ->assertJsonPath('vendor.address', 'Zamalek, Cairo')
+            ->assertJsonPath('vendor.latitude', 30.0626);
+
+        Storage::fake('public');
+        $this->withHeaders($headers)
+            ->post('/api/app/account/profile', [
+                'name' => 'Fahad Photography',
+                'email' => 'vendor@lens.app',
+                'phone' => '01022223344',
+                'display_name' => 'Fahad Light Desk',
+                'address' => 'Zamalek, Cairo',
+                'latitude' => 30.0626,
+                'longitude' => 31.2197,
+                'cover_image' => UploadedFile::fake()->image('cover.jpg'),
+                'national_id_image' => UploadedFile::fake()->image('nid.jpg'),
+                'profile_photo' => UploadedFile::fake()->image('photo.jpg'),
+            ])
+            ->assertOk();
+
+        $vendor->refresh();
+        $this->assertSame('Fahad Light Desk', $vendor->display_name);
+        $this->assertSame('paypal', $vendor->payout_method);
+        $this->assertEquals(2100.0, (float) $vendor->half_day_price);
+        $this->assertEqualsCanonicalizing(['wedding', 'editorial'], $vendor->specialties);
+        $this->assertTrue($vendor->portfolios()->where('title', 'Gouna editorial')->exists());
+        $this->assertSame('Zamalek, Cairo', $vendor->address);
+        $this->assertEquals(30.0626, (float) $vendor->latitude);
+        $this->assertEquals(31.2197, (float) $vendor->longitude);
+        $this->assertNotEmpty($vendor->cover_image);
+        $this->assertNotEmpty($vendor->national_id_image);
+        $this->assertNotEmpty($vendor->profile_photo);
+
+        $this->actingAs(User::query()->where('email', 'admin@lens.app')->firstOrFail())
+            ->get('/admin/vendors/'.$vendor->id.'/edit')
+            ->assertOk()
+            ->assertSee('Fahad Light Desk')
+            ->assertSee('Identity')
+            ->assertSee('Type profile')
+            ->assertSee('Previous projects')
+            ->assertSee('Bank & payouts')
+            ->assertSee('Gouna editorial')
+            ->assertSee('National ID card')
+            ->assertSee('Cover image')
+            ->assertSee('Zamalek, Cairo');
+    }
 }

@@ -93,14 +93,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       padding: EdgeInsets.fromLTRB(20, 8, 16, 0),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: BrandLogo(
-                              name: widget.bootstrap['name']?.toString() ?? 'Lens',
-                              logoUrl: widget.bootstrap['logo']?.toString(),
-                              width: 180,
-                              height: 40,
-                              fontSize: 32,
-                            ),
+                          const Expanded(
+                            child: BrandHeader(height: 40),
                           ),
                           _StepMarks(),
                         ],

@@ -3,6 +3,7 @@ import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/auth/role_choice_page.dart';
 import 'package:lens/features/auth/user_register_page.dart';
@@ -80,22 +81,7 @@ class ProfilePage extends StatelessWidget {
   Widget _header(BuildContext context) {
     return Row(
       children: [
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Lens.',
-                style: TextStyle(color: LensColors.primary, fontSize: 32, fontWeight: FontWeight.w800, height: 1),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'FIND. BOOK. CREATE.',
-                style: TextStyle(color: LensColors.primary, fontSize: 9, letterSpacing: 1.5, fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-        ),
+        const Expanded(child: BrandHeader()),
         IconButton(
           onPressed: () => _openPage(context, AppSettingsPage(home: data)),
           icon: const Icon(Icons.settings_outlined, color: LensColors.cream),

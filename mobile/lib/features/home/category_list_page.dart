@@ -5,6 +5,7 @@ import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/filter_page.dart';
@@ -21,6 +22,7 @@ class CategoryListPage extends StatefulWidget {
     required this.home,
     this.vendors = const [],
     this.initialFilters,
+    this.displayTitle,
     this.showRecommendations = false,
   });
 
@@ -28,6 +30,7 @@ class CategoryListPage extends StatefulWidget {
   final HomeData home;
   final List<VendorCard> vendors;
   final CategoryFilters? initialFilters;
+  final String? displayTitle;
   final bool showRecommendations;
 
   @override
@@ -165,7 +168,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
     final result = await Navigator.of(context).push<CategoryFilters>(
       MaterialPageRoute(
         builder: (_) => FilterPage(
-          title: widget.type.label,
+          title: widget.displayTitle ?? widget.type.label,
           vendorTypeSlug: widget.type.slug,
           initial: _filters,
           catalog: widget.home.filterCatalog,
@@ -203,8 +206,6 @@ class _CategoryListPageState extends State<CategoryListPage> {
     final count = _total ?? _vendors.length;
     return Scaffold(
       backgroundColor: LensColors.charcoal,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: 0),
       body: SafeArea(
         child: Column(
@@ -215,30 +216,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
               child: Row(
                 children: [
                   const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'Lens',
-                                style: TextStyle(color: LensColors.primary, fontSize: 28, fontWeight: FontWeight.w800, height: 1),
-                              ),
-                              TextSpan(
-                                text: '.',
-                                style: TextStyle(color: LensColors.primary, fontSize: 28, fontWeight: FontWeight.w800, height: 1),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'FIND. BOOK. CREATE.',
-                          style: TextStyle(color: LensColors.slate, fontSize: 9, letterSpacing: 1.6, fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
+                    child: BrandHeader(),
                   ),
                   IconButton(
                     onPressed: () => AppShell.openTab(context, AppShell.searchIndex),
@@ -262,7 +240,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
                   ),
                   Expanded(
                     child: Text(
-                      widget.type.label,
+                      widget.displayTitle ?? widget.type.label,
                       style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800),
                     ),
                   ),
@@ -294,7 +272,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
                             const Text('Recommended for you', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800)),
                             const SizedBox(height: 3),
                             Text(
-                              'Curated ${widget.type.label.toLowerCase()} based on your choices',
+                              'Curated ${(widget.displayTitle ?? widget.type.label).toLowerCase()} based on your choices',
                               style: const TextStyle(color: Color(0xFFB9AFA7), fontSize: 11, height: 1.3),
                             ),
                           ],
@@ -321,7 +299,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
               child: Row(
                 children: [
                   Text(
-                    '$count ${widget.type.label}',
+                    '$count ${widget.displayTitle ?? widget.type.label}',
                     style: const TextStyle(color: LensColors.slate, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),

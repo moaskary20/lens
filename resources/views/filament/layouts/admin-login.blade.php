@@ -23,34 +23,16 @@
     <div class="fi-simple-layout lens-login">
         {{ FilamentView::renderHook(PanelsRenderHook::SIMPLE_LAYOUT_START, scopes: $renderHookScopes) }}
 
-        <aside class="lens-login-stage" aria-hidden="true">
-            <div class="lens-login-grid"></div>
-            <div class="lens-login-glow"></div>
-            <div class="lens-login-aperture">
-                <span class="lens-login-ring lens-login-ring-a"></span>
-                <span class="lens-login-ring lens-login-ring-b"></span>
-                <span class="lens-login-ring lens-login-ring-c"></span>
-                <span class="lens-login-core"></span>
-            </div>
-            <div class="lens-login-copy">
-                <p class="lens-login-brand">Lens</p>
-                <p class="lens-login-tag">
-                    {{ $isVendor
-                        ? 'Your creator desk for bookings, delivery, and payouts across Egypt.'
-                        : 'The marketplace for photographers, studios, and creators across Egypt.' }}
-                </p>
-                <ul class="lens-login-points">
-                    @if ($isVendor)
-                        <li>Bookings in escrow</li>
-                        <li>Protected delivery</li>
-                        <li>Wallet payouts</li>
-                    @else
-                        <li>Bookings in escrow</li>
-                        <li>Verified talent</li>
-                        <li>Protected delivery</li>
-                    @endif
-                </ul>
-            </div>
+        <aside class="lens-login-stage">
+            <video
+                class="lens-login-video"
+                src="{{ asset('storage/logo.mp4') }}"
+                autoplay
+                muted
+                loop
+                playsinline
+                aria-label="Lens"
+            ></video>
         </aside>
 
         <div class="fi-simple-main-ctn lens-login-panel">

@@ -11,6 +11,7 @@ import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/auth/register_catalog.dart';
 import 'package:lens/features/auth/register_scaffold.dart';
+import 'package:lens/features/auth/vendor_register_page.dart';
 import 'package:lens/features/profile/addresses_page.dart';
 import 'package:lens/features/profile/app_settings_page.dart';
 import 'package:lens/features/profile/payment_methods_page.dart';
@@ -322,6 +323,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (SessionStore.instance.isVendor) {
+      return VendorRegisterPage(bootstrap: home.registerCatalog, editing: true);
+    }
     return ProfileScaffold(
       title: 'Edit Profile',
       action: TextButton(

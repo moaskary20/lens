@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/category_list_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
 
@@ -59,8 +60,6 @@ class _CategoriesPageState extends State<CategoriesPage> with SingleTickerProvid
 
     return Scaffold(
       backgroundColor: LensColors.charcoal,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppShell.navFab(context),
       bottomNavigationBar: AppShell.navBar(context, index: 0),
       body: Stack(
         children: [
@@ -170,7 +169,7 @@ class _CategoriesPageState extends State<CategoriesPage> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('LENS', style: TextStyle(color: LensColors.primary, fontSize: 12, letterSpacing: 3, fontWeight: FontWeight.w800)),
+          const BrandLogo(width: 110, height: 28),
           const SizedBox(height: 10),
           const Text('Explore every department', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800, height: 1.1)),
           const SizedBox(height: 8),

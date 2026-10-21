@@ -7,15 +7,20 @@ import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/ai_search_page.dart';
-import 'package:lens/features/home/categories_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
+import 'package:lens/features/home/home_categories_section.dart';
 import 'package:lens/features/home/favorite_heart.dart';
+import 'package:lens/features/home/filter_page.dart';
 import 'package:lens/features/home/inbox.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, required this.data, required this.onOpenMenu, required this.onOpenSearch});
+  const HomePage({
+    super.key,
+    required this.data,
+    required this.onOpenMenu,
+    required this.onOpenSearch,
+  });
 
   final HomeData data;
   final VoidCallback onOpenMenu;
@@ -29,11 +34,26 @@ class HomePage extends StatelessWidget {
         child: CustomScrollView(
           cacheExtent: 1200,
           slivers: [
-            SliverToBoxAdapter(child: _Header(data: data, onOpenMenu: onOpenMenu)),
-            SliverToBoxAdapter(child: _SearchBar(data: data, onOpenSearch: onOpenSearch)),
-            if (data.on('ai_assistant')) SliverToBoxAdapter(child: _AiBanner(data: data)),
-            if (data.vendorTypes.isNotEmpty) SliverToBoxAdapter(child: _Categories(types: data.vendorTypes, home: data)),
-            ...data.popular.map((section) => SliverToBoxAdapter(child: _PopularBlock(section: section, data: data))),
+            SliverToBoxAdapter(
+              child: _Header(data: data, onOpenMenu: onOpenMenu),
+            ),
+            SliverToBoxAdapter(
+              child: _SearchBar(data: data, onOpenSearch: onOpenSearch),
+            ),
+            if (data.on('ai_assistant'))
+              SliverToBoxAdapter(child: _AiBanner(data: data)),
+            if (data.vendorTypes.isNotEmpty)
+              SliverToBoxAdapter(
+                child: HomeCategoriesSection(
+                  types: data.vendorTypes,
+                  home: data,
+                ),
+              ),
+            ...data.popular.map(
+              (section) => SliverToBoxAdapter(
+                child: _PopularBlock(section: section, data: data),
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         ),
@@ -58,15 +78,7 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                BrandLogo(
-                  name: data.name,
-                  logoUrl: data.logoUrl,
-                  width: 180,
-                  height: 42,
-                  fontSize: 34,
-                ),
-                const SizedBox(height: 4),
-                Text(data.tagline, style: const TextStyle(color: LensColors.slate, fontSize: 13)),
+                const BrandHeader(height: 42),
               ],
             ),
           ),
@@ -83,13 +95,15 @@ class _Header extends StatelessWidget {
           ListenableBuilder(
             listenable: FavoritesStore.instance,
             builder: (context, _) => _HeaderIcon(
-              icon: FavoritesStore.instance.count > 0 ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              icon: FavoritesStore.instance.count > 0
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
               tooltip: 'Favorites',
               onPressed: () => openFavorites(context, data),
               badge: FavoritesStore.instance.count,
             ),
           ),
-                  _HeaderIcon(
+          _HeaderIcon(
             icon: Icons.menu_rounded,
             tooltip: 'Menu',
             onPressed: onOpenMenu,
@@ -101,7 +115,12 @@ class _Header extends StatelessWidget {
 }
 
 class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon({required this.icon, required this.onPressed, this.badge = 0, this.tooltip});
+  const _HeaderIcon({
+    required this.icon,
+    required this.onPressed,
+    this.badge = 0,
+    this.tooltip,
+  });
 
   final IconData icon;
   final VoidCallback onPressed;
@@ -125,10 +144,17 @@ class _HeaderIcon extends StatelessWidget {
             child: IgnorePointer(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(color: LensColors.primary, borderRadius: BorderRadius.circular(99)),
+                decoration: BoxDecoration(
+                  color: LensColors.primary,
+                  borderRadius: BorderRadius.circular(99),
+                ),
                 child: Text(
                   badge > 99 ? '99+' : '$badge',
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -170,7 +196,10 @@ class _SearchBar extends StatelessWidget {
                         data.searchPlaceholder,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: LensColors.slate, fontSize: 14),
+                        style: const TextStyle(
+                          color: LensColors.slate,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -184,9 +213,8 @@ class _SearchBar extends StatelessWidget {
               color: LensColors.primary,
               borderRadius: BorderRadius.circular(14),
               child: InkWell(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'Filters')),
-                ),
+                key: const Key('home-filter-button'),
+                onTap: () => _openHomeFilters(context, data),
                 borderRadius: BorderRadius.circular(14),
                 child: const SizedBox(
                   width: 52,
@@ -209,102 +237,110 @@ class _AiBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 720;
+    final scale = compact ? width / 767 : 1.0;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
+      padding: EdgeInsets.fromLTRB(width * 0.051, 4, width * 0.051, 18),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF5A220F), Color(0xFF2A140E), Color(0xFF1A1B1F)],
-          ),
-          border: Border.all(color: const Color(0x66FF5A1F)),
+        key: const Key('home-ai-search-banner'),
+        padding: EdgeInsets.symmetric(
+          horizontal: 20 * scale,
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1112),
+          borderRadius: BorderRadius.circular(16 * scale),
+          border: Border.all(
+            color: const Color(0xFF252A2B),
+            width: scale,
+          ),
+        ),
+        child: SizedBox(
+          height: 120 * scale,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.auto_awesome, color: LensColors.warning, size: 18),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          data.aiPrompt,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
-                        ),
+                  _AiSparkle(size: 54 * scale),
+                  SizedBox(width: 16 * scale),
+                  Expanded(
+                    child: Transform.translate(
+                      offset: Offset(0, 7 * scale),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            data.aiPrompt,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 26 * scale,
+                              height: 1.15,
+                            ),
+                          ),
+                          SizedBox(height: 12 * scale),
+                          Text(
+                            data.aiHelper,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: const Color(0xFFE2E2E2),
+                              fontSize: 18 * scale,
+                              height: 1.15,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(data.aiHelper, style: const TextStyle(color: Color(0xFFD8D2C8), fontSize: 12, height: 1.35)),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: () => openAiSearch(context, data),
-              style: FilledButton.styleFrom(
-                backgroundColor: LensColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              Positioned(
+                top: 24 * scale,
+                right: 0,
+                child: _AiSearchButton(
+                  onPressed: () => openAiSearch(context, data),
+                  scale: scale,
+                ),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.auto_awesome, size: 14),
-                  SizedBox(width: 4),
-                  Text('AI Search', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                  Icon(Icons.chevron_right, size: 16),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _Categories extends StatelessWidget {
-  const _Categories({required this.types, required this.home});
+class _AiSparkle extends StatelessWidget {
+  const _AiSparkle({required this.size});
 
-  final List<VendorTypeItem> types;
-  final HomeData home;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: Column(
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
         children: [
-          _SectionHead(
-            title: 'Categories',
-            viewAllKey: const Key('view-all-categories'),
-            onViewAll: () => openAllCategories(context, home),
+          Icon(
+            Icons.auto_awesome,
+            color: LensColors.warning,
+            size: size * 0.72,
           ),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 560 ? 4 : 3;
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: types.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  mainAxisExtent: 88,
-                ),
-                itemBuilder: (context, index) {
-                  final type = types[index];
-                  return _CategoryTile(type: type, featured: index == 0, home: home);
-                },
-              );
-            },
+          Positioned(
+            right: 0,
+            bottom: 2,
+            child: Icon(
+              Icons.auto_awesome,
+              color: LensColors.warning,
+              size: size * 0.38,
+            ),
           ),
         ],
       ),
@@ -312,49 +348,50 @@ class _Categories extends StatelessWidget {
   }
 }
 
-class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({required this.type, required this.featured, required this.home});
+class _AiSearchButton extends StatelessWidget {
+  const _AiSearchButton({required this.onPressed, required this.scale});
 
-  final VendorTypeItem type;
-  final bool featured;
-  final HomeData home;
+  final VoidCallback onPressed;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: featured ? const Color(0xFF24140E) : const Color(0xFF141518),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _openCategory(context, home, type),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: featured ? const Color(0x55FF5A1F) : const Color(0xFF22242A)),
-          ),
-          padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_iconFor(type.slug), color: LensColors.primary, size: 24),
-              const SizedBox(height: 8),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  type.label,
-                  maxLines: 1,
-                  softWrap: false,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: LensColors.cream,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    height: 1,
-                    letterSpacing: -0.2,
+    return SizedBox(
+      key: const Key('home-ai-search-button'),
+      width: 196 * scale,
+      height: 52 * scale,
+      child: Material(
+        color: LensColors.primary,
+        borderRadius: BorderRadius.circular(999 * scale),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(999 * scale),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome, size: 20 * scale, color: Colors.white),
+                  SizedBox(width: 8 * scale),
+                  Text(
+                    'AI Search',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                  SizedBox(width: 8 * scale),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 24 * scale,
+                    color: Colors.white,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -383,7 +420,12 @@ class _PopularBlock extends StatelessWidget {
             child: _SectionHead(
               title: section.title,
               viewAllKey: Key('view-all-${section.slug}'),
-              onViewAll: () => _openCategory(context, data, _typeFor(data, section.slug, section.title), vendors: section.vendors),
+              onViewAll: () => _openCategory(
+                context,
+                data,
+                _typeFor(data, section.slug, section.title),
+                vendors: section.vendors,
+              ),
             ),
           ),
           SizedBox(
@@ -397,7 +439,10 @@ class _PopularBlock extends StatelessWidget {
               itemBuilder: (context, index) {
                 return SizedBox(
                   width: MediaQuery.sizeOf(context).width * 0.88,
-                  child: _VendorSpotlight(vendor: section.vendors[index], data: data),
+                  child: _VendorSpotlight(
+                    vendor: section.vendors[index],
+                    data: data,
+                  ),
                 );
               },
             ),
@@ -423,48 +468,61 @@ class _VendorSpotlight extends StatelessWidget {
         child: GestureDetector(
           onTap: () => openVendorProfile(context, vendor, data),
           child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _Cover(url: vendor.coverUrl, typeSlug: vendor.vendorType, seed: vendor.id),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.38, 0.72, 1],
-                  colors: [Colors.transparent, Color(0x66000000), Color(0xF2000000)],
+            fit: StackFit.expand,
+            children: [
+              _Cover(
+                url: vendor.coverUrl,
+                typeSlug: vendor.vendorType,
+                seed: vendor.id,
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: [0.38, 0.72, 1],
+                    colors: [
+                      Colors.transparent,
+                      Color(0x66000000),
+                      Color(0xF2000000),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 12, 14),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      if (data.on('badges') && vendor.badges.contains('top-rated')) const _TopRatedBadge(),
-                      const Spacer(),
-                      FavoriteHeart(vendor: vendor, size: 16, circle: true),
-                    ],
-                  ),
-                  const Spacer(),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _VendorAvatar(vendor: vendor),
-                      const SizedBox(width: 10),
-                      Expanded(child: _VendorMeta(vendor: vendor, data: data)),
-                      const SizedBox(width: 8),
-                      _ViewProfileButton(
-                        onPressed: () => openVendorProfile(context, vendor, data),
-                      ),
-                    ],
-                  ),
-                ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 12, 14),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        if (data.on('badges') &&
+                            vendor.badges.contains('top-rated'))
+                          const _TopRatedBadge(),
+                        const Spacer(),
+                        FavoriteHeart(vendor: vendor, size: 16, circle: true),
+                      ],
+                    ),
+                    const Spacer(),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _VendorAvatar(vendor: vendor),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _VendorMeta(vendor: vendor, data: data),
+                        ),
+                        const SizedBox(width: 8),
+                        _ViewProfileButton(
+                          onPressed: () =>
+                              openVendorProfile(context, vendor, data),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -523,7 +581,14 @@ class _TopRatedBadge extends StatelessWidget {
         children: [
           Icon(Icons.workspace_premium, color: Color(0xFFF5C451), size: 15),
           SizedBox(width: 4),
-          Text('Top Rated', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+          Text(
+            'Top Rated',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -550,7 +615,14 @@ class _VendorAvatar extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       alignment: Alignment.center,
       child: photo == null || photo.isEmpty
-          ? Text(vendor.initials, style: const TextStyle(color: LensColors.cream, fontSize: 13, fontWeight: FontWeight.w700))
+          ? Text(
+              vendor.initials,
+              style: const TextStyle(
+                color: LensColors.cream,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            )
           : Image.network(
               photo,
               fit: BoxFit.cover,
@@ -558,7 +630,11 @@ class _VendorAvatar extends StatelessWidget {
               height: 44,
               errorBuilder: (context, error, stackTrace) => Text(
                 vendor.initials,
-                style: const TextStyle(color: LensColors.cream, fontSize: 13, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: LensColors.cream,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
     );
@@ -573,7 +649,11 @@ class _VendorMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const metaStyle = TextStyle(color: Color(0xFFD0CBC3), fontSize: 12, height: 1.2);
+    const metaStyle = TextStyle(
+      color: Color(0xFFD0CBC3),
+      fontSize: 12,
+      height: 1.2,
+    );
     final location = vendor.location.isEmpty ? vendor.city : vendor.location;
 
     return Column(
@@ -583,17 +663,30 @@ class _VendorMeta extends StatelessWidget {
           vendor.publicName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 2),
         Row(
           children: [
             Flexible(
-              child: Text(vendor.vendorTypeName, maxLines: 1, overflow: TextOverflow.ellipsis, style: metaStyle),
+              child: Text(
+                vendor.vendorTypeName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: metaStyle,
+              ),
             ),
             if (data.on('reviews')) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.star_rounded, color: Color(0xFFF5C451), size: 14),
+              const Icon(
+                Icons.star_rounded,
+                color: Color(0xFFF5C451),
+                size: 14,
+              ),
               const SizedBox(width: 2),
               Text(
                 '${vendor.ratingAvg.toStringAsFixed(1)} (${vendor.ratingCount})',
@@ -603,7 +696,12 @@ class _VendorMeta extends StatelessWidget {
             if (location.isNotEmpty) ...[
               const Text('  ·  ', style: metaStyle),
               Flexible(
-                child: Text(location, maxLines: 1, overflow: TextOverflow.ellipsis, style: metaStyle),
+                child: Text(
+                  location,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: metaStyle,
+                ),
               ),
             ],
           ],
@@ -643,7 +741,11 @@ class _Cover extends StatelessWidget {
         errorBuilder: (context, error, stackTrace) => Container(
           color: LensColors.graphite,
           alignment: Alignment.center,
-          child: const Icon(Icons.photo_camera_outlined, color: LensColors.primary, size: 42),
+          child: const Icon(
+            Icons.photo_camera_outlined,
+            color: LensColors.primary,
+            size: 42,
+          ),
         ),
       ),
     );
@@ -651,7 +753,11 @@ class _Cover extends StatelessWidget {
 }
 
 class _SectionHead extends StatelessWidget {
-  const _SectionHead({required this.title, required this.onViewAll, this.viewAllKey});
+  const _SectionHead({
+    required this.title,
+    required this.onViewAll,
+    this.viewAllKey,
+  });
 
   final String title;
   final VoidCallback onViewAll;
@@ -668,32 +774,29 @@ class _SectionHead extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
             key: viewAllKey,
             onTap: onViewAll,
-            child: const Text('View all', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700)),
+            child: const Text(
+              'View all',
+              style: TextStyle(
+                color: LensColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-}
-
-IconData _iconFor(String slug) {
-  return switch (slug) {
-    'photographer' => Icons.photo_camera_outlined,
-    'videographer' => Icons.videocam_outlined,
-    'reels' => Icons.phone_iphone,
-    'model' => Icons.person_outline,
-    'studio' => Icons.home_work_outlined,
-    'ugc' => Icons.groups_outlined,
-    'food_stylist' => Icons.restaurant,
-    _ => Icons.category_outlined,
-  };
 }
 
 VendorTypeItem _typeFor(HomeData home, String slug, [String? fallback]) {
@@ -706,13 +809,50 @@ VendorTypeItem _typeFor(HomeData home, String slug, [String? fallback]) {
   return VendorTypeItem(slug: slug, label: fallback ?? slug);
 }
 
-void _openCategory(BuildContext context, HomeData home, VendorTypeItem type, {List<VendorCard>? vendors}) {
-  final items = vendors ??
-      home.popular.where((section) => section.slug == type.slug).expand((section) => section.vendors).toList();
+Future<void> _openHomeFilters(BuildContext context, HomeData data) async {
+  final types = data.vendorTypes;
+  final first = types.isEmpty
+      ? const VendorTypeItem(slug: 'photographer', label: 'Photographers')
+      : types.first;
+  final result = await Navigator.of(context).push<CategoryFilters>(
+    MaterialPageRoute<CategoryFilters>(
+      builder: (_) => FilterPage(
+        title: first.label,
+        vendorTypeSlug: first.slug,
+        catalog: data.filterCatalog,
+        types: types,
+      ),
+    ),
+  );
+  if (result == null || !context.mounted) {
+    return;
+  }
+  final type = _typeFor(data, result.vendorSlug ?? first.slug, first.label);
+  _openCategory(context, data, type, initialFilters: result);
+}
+
+void _openCategory(
+  BuildContext context,
+  HomeData home,
+  VendorTypeItem type, {
+  List<VendorCard>? vendors,
+  CategoryFilters? initialFilters,
+}) {
+  final items =
+      vendors ??
+      home.popular
+          .where((section) => section.slug == type.slug)
+          .expand((section) => section.vendors)
+          .toList();
 
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => CategoryListPage(type: type, home: home, vendors: items),
+      builder: (_) => CategoryListPage(
+        type: type,
+        home: home,
+        vendors: items,
+        initialFilters: initialFilters,
+      ),
     ),
   );
 }

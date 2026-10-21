@@ -6,24 +6,11 @@ class LensNavBar {
 
   static const inactive = Color(0xFFD6D1C8);
 
-  static Widget fab({required VoidCallback onPressed}) {
-    return FloatingActionButton(
-      onPressed: onPressed,
-      backgroundColor: LensColors.primary,
-      foregroundColor: Colors.white,
-      elevation: 3,
-      highlightElevation: 6,
-      focusElevation: 3,
-      hoverElevation: 4,
-      shape: const CircleBorder(),
-      child: const Icon(Icons.add, size: 30, weight: 500),
-    );
-  }
-
   static Widget bar({
     required bool bookingsOn,
     required int index,
     required ValueChanged<int> onSelect,
+    required VoidCallback onCreate,
     bool withFab = true,
   }) {
     return BottomAppBar(
@@ -32,8 +19,6 @@ class LensNavBar {
       elevation: 0,
       padding: EdgeInsets.zero,
       height: 72,
-      shape: withFab ? const CircularNotchedRectangle() : null,
-      notchMargin: withFab ? 7 : 0,
       child: SizedBox(
         height: 72,
         child: Row(
@@ -53,7 +38,7 @@ class LensNavBar {
                 selected: index == 1,
                 onTap: () => onSelect(1),
               ),
-            if (withFab) const SizedBox(width: 72),
+            if (withFab) _createItem(onTap: onCreate),
             _item(
               selectedIcon: Icons.search_rounded,
               icon: Icons.search_rounded,
@@ -69,6 +54,32 @@ class LensNavBar {
               onTap: () => onSelect(bookingsOn ? 3 : 2),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _createItem({required VoidCallback onTap}) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        splashColor: Colors.white.withValues(alpha: 0.16),
+        child: Center(
+          child: Semantics(
+            button: true,
+            label: 'Create',
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: LensColors.primary,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
+            ),
+          ),
         ),
       ),
     );

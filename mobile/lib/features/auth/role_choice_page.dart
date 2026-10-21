@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 
 class RoleChoicePage extends StatefulWidget {
   const RoleChoicePage({super.key, this.initialRole = 'user'});
@@ -32,7 +33,7 @@ class _RoleChoicePageState extends State<RoleChoicePage> {
               child: Row(
                 children: [
                   const Expanded(
-                    child: Text('Lens', style: TextStyle(color: LensColors.primary, fontSize: 32, fontWeight: FontWeight.w800, height: 1)),
+                    child: BrandHeader(height: 36),
                   ),
                   Row(
                     children: [
