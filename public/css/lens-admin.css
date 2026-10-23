@@ -532,11 +532,19 @@ body:has(.lens-login) .lens-orb {
     display: none;
 }
 
+html:has(.lens-login),
+body:has(.lens-login) {
+    height: 100%;
+    overflow: hidden;
+}
+
 .lens-login {
+    height: 100dvh;
+    max-height: 100dvh;
     min-height: 100dvh;
     display: grid !important;
     grid-template-columns: minmax(0, 1.05fr) minmax(22rem, 0.95fr);
-    align-items: stretch;
+    align-items: stretch !important;
     overflow: hidden;
     background: #0d0d0f !important;
 }
@@ -548,11 +556,11 @@ body:has(.lens-login) .lens-orb {
 }
 
 .lens-login-video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
     display: block;
     background: #0d0d0f;
 }
@@ -589,17 +597,19 @@ body:has(.lens-login) .lens-orb {
 }
 
 .lens-login .fi-simple-header {
-    align-items: flex-start;
-    text-align: start;
+    align-items: center;
+    text-align: center;
     margin-bottom: 1.4rem;
 }
 
 .lens-login .fi-logo {
+    display: block;
     width: auto !important;
     height: 48px !important;
     max-width: 168px;
+    margin-inline: auto;
     object-fit: contain;
-    object-position: left center;
+    object-position: center;
     mix-blend-mode: lighten;
     background: none;
 }
@@ -615,6 +625,8 @@ body:has(.lens-login) .lens-orb {
     font-weight: 800;
     color: #f2efe9 !important;
     margin-top: 0.85rem;
+    text-align: center;
+    width: 100%;
 }
 
 .lens-login .fi-simple-header-subheading {

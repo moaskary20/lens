@@ -29,7 +29,6 @@
                 src="{{ asset('branding/logo.mp4') }}"
                 autoplay
                 muted
-                loop
                 playsinline
                 aria-label="Lens"
             ></video>

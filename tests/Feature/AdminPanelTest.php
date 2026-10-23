@@ -43,6 +43,7 @@ class AdminPanelTest extends TestCase
         $response->assertSee('Operations console', false);
         $response->assertSee('lens-login', false);
         $response->assertSee('branding/logo.mp4', false);
+        $response->assertDontSee('loop', false);
         $response->assertSee('branding/lenslogo.png', false);
         $response->assertDontSee('Verified talent', false);
         $response->assertDontSee('The marketplace for photographers', false);

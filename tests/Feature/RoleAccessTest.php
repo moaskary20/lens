@@ -46,6 +46,7 @@ class RoleAccessTest extends TestCase
             ->assertOk()
             ->assertSee('lens-login', false)
             ->assertSee('branding/logo.mp4', false)
+            ->assertDontSee('loop', false)
             ->assertSee('branding/lenslogo.png', false)
             ->assertSee('Creator desk', false)
             ->assertDontSee('Wallet payouts', false)
