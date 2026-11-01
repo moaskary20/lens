@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Delete Account – Lens</title>
+<style>
+:root{--bg:#fafaf7;--surface:#fff;--text:#1d1d1f;--muted:#6b6b72;--accent:#c2410c;--danger:#b91c1c;--ok:#15803d;--border:#e6e4de;--soft:#fdf1ea;--dsoft:#fef2f2;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--surface:#1b1b1f;--text:#ececef;--muted:#9a9aa3;--accent:#fb923c;--danger:#f87171;--ok:#4ade80;--border:#2c2c32;--soft:#26201b;--dsoft:#2a1a1a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121214;--surface:#1b1b1f;--text:#ececef;--muted:#9a9aa3;--accent:#fb923c;--danger:#f87171;--ok:#4ade80;--border:#2c2c32;--soft:#26201b;--dsoft:#2a1a1a;color-scheme:dark}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 76px);scroll-behavior:smooth}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.7 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:10}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--border)}
+.bar{max-width:820px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:800;font-size:20px;letter-spacing:-.02em}.logo span{color:var(--accent)}
+button{font:inherit;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:8px;padding:6px 12px}
+.hero{max-width:820px;margin:0 auto;padding:44px 20px 10px}
+.hero h1{font-size:clamp(30px,5vw,42px);line-height:1.15;margin:0 0 10px;letter-spacing:-.02em}
+.hero p{color:var(--muted);margin:0}
+.wrap{max-width:820px;margin:0 auto;padding:20px;display:grid;gap:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 28px;min-width:0}
+h2{font-size:21px;margin:0 0 10px}
+p{margin:8px 0}ul,ol{padding-left:22px}li{margin:5px 0}
+a{color:var(--accent)}
+.warn{background:var(--dsoft);border-left:4px solid var(--danger);padding:12px 16px;border-radius:8px}
+.note{background:var(--soft);border-left:4px solid var(--accent);padding:12px 16px;border-radius:8px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.cols h3{margin:0 0 4px;font-size:16px}
+.table{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:460px;font-size:15px}
+th,td{text-align:left;padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+label{display:block;font-weight:600;margin:14px 0 4px;font-size:15px}
+input[type=text],input[type=email],select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.check{display:flex;gap:10px;align-items:flex-start;font-weight:400;margin-top:16px}
+.check input{margin-top:6px}
+.hint{color:var(--muted);font-size:14px;margin:4px 0 0}
+.danger{background:var(--danger);color:#fff;border:0;padding:12px 20px;font-weight:700;margin-top:18px;width:100%}
+.danger:disabled{opacity:.45;cursor:not-allowed}
+.msg{display:none;margin-top:16px;padding:12px 16px;border-radius:8px;border-left:4px solid var(--ok);background:var(--soft)}
+.err{color:var(--danger);font-size:14px;margin:4px 0 0;min-height:1em}
+footer{max-width:820px;margin:0 auto;padding:10px 20px 40px;color:var(--muted);font-size:14px}
+@media (max-width:640px){.cols{grid-template-columns:1fr}.card{padding:20px}}
+</style>
+</head>
+<body>
+<header><div class="bar"><div class="logo">Lens<span>.</span></div><button id="theme" type="button" aria-label="Toggle theme">Theme</button></div></header>
+
+<div class="hero">
+<h1>Delete Your Account</h1>
+<p>Request permanent deletion of your Lens account and personal data.</p>
+</div>
+
+<div class="wrap">
+
+<div class="card warn">
+<b>This action is permanent.</b> Once your account is deleted, you will lose access to your bookings, messages, saved photographers and any photos delivered through Lens. This cannot be undone.
+</div>
+
+<div class="card">
+<h2>Option 1: Delete from the app</h2>
+<p>The fastest way is from inside the Lens app:</p>
+<ol>
+<li>Open the Lens app and sign in.</li>
+<li>Go to <b>Profile</b> then <b>Settings</b>.</li>
+<li>Tap <b>Account</b> then <b>Delete Account</b>.</li>
+<li>Confirm with your password or a one-time code.</li>
+</ol>
+</div>
+
+<div class="card">
+<h2>Option 2: Request deletion here</h2>
+<p>If you can’t access the app, send us a request using the form below. Use the email address registered with your Lens account so we can verify it’s you.</p>
+<div id="f">
+<label for="name">Full name</label>
+<input type="text" id="name" autocomplete="name" placeholder="Your name">
+<label for="email">Account email <span style="color:var(--danger)">*</span></label>
+<input type="email" id="email" autocomplete="email" placeholder="you@example.com">
+<p class="err" id="emailErr"></p>
+<label for="type">Account type</label>
+<select id="type"><option>Client (I book photographers)</option><option>Photographer</option><option>Studio</option></select>
+<label for="reason">Reason for leaving (optional)</label>
+<select id="reason"><option value="">Select a reason</option><option>I no longer use the app</option><option>Privacy concerns</option><option>I found another service</option><option>Too many notifications</option><option>Other</option></select>
+<label for="extra">Anything else we should know? (optional)</label>
+<textarea id="extra" rows="3"></textarea>
+<label class="check"><input type="checkbox" id="agree"><span>I understand that my account and personal data will be permanently deleted and this cannot be undone.</span></label>
+<label for="confirm">Type <b>DELETE</b> to confirm</label>
+<input type="text" id="confirm" autocomplete="off" placeholder="DELETE">
+<button class="danger" id="go" type="button" disabled>Request Account Deletion</button>
+<div class="msg" id="msg"></div>
+</div>
+</div>
+
+<div class="card">
+<h2>What happens to your data</h2>
+<div class="cols">
+<div><h3>Deleted</h3>
+<ul>
+<li>Profile details and profile photo</li>
+<li>Saved photographers and studios</li>
+<li>Messages and reviews you wrote</li>
+<li>Location and device data</li>
+<li>Portfolio images (photographers and studios)</li>
+</ul></div>
+<div><h3>May be retained</h3>
+<ul>
+<li>Payment and invoice records, as required by tax and accounting laws</li>
+<li>Records needed to resolve disputes or enforce our terms</li>
+<li>Fraud-prevention and security logs</li>
+</ul></div>
+</div>
+<p>Retained data is kept only for as long as legally required and is then deleted or anonymized.</p>
+</div>
+
+<div class="card">
+<h2>Timeline</h2>
+<div class="table"><table>
+<tr><th>Step</th><th>When</th></tr>
+<tr><td>Verification of your request</td><td>Within 3 business days</td></tr>
+<tr><td>Account deactivated</td><td>Immediately after verification</td></tr>
+<tr><td>Personal data permanently deleted</td><td>Within 30 days</td></tr>
+<tr><td>Backups fully purged</td><td>Within 90 days</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<h2>Before you delete</h2>
+<ul>
+<li><b>Upcoming bookings:</b> cancel or complete them first. Cancellation and refund rules still apply.</li>
+<li><b>Download your photos:</b> save any delivered session photos you want to keep.</li>
+<li><b>Photographers and studios:</b> any pending payouts will be settled before deletion.</li>
+<li><b>Just taking a break?</b> You can deactivate your account in the app instead and come back later.</li>
+</ul>
+<div class="note">Questions? Contact us at <a href="mailto:privacy@lensapp.com">privacy@lensapp.com</a>. See also our <a href="lens-privacy-policy.html">Privacy Policy</a>.</div>
+</div>
+
+</div>
+<footer>© <span id="year">2026</span> Lens. All rights reserved.</footer>
+
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  var email=$('email'),agree=$('agree'),conf=$('confirm'),go=$('go');
+  var re=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function check(){
+    var ok=re.test(email.value.trim())&&agree.checked&&conf.value.trim()==='DELETE';
+    go.disabled=!ok;
+  }
+  [email,agree,conf].forEach(function(e){e.addEventListener('input',check);e.addEventListener('change',check);});
+  email.addEventListener('blur',function(){
+    $('emailErr').textContent=email.value&&!re.test(email.value.trim())?'Please enter a valid email address.':'';
+  });
+  go.addEventListener('click',function(){
+    var body='Account deletion request\n\nName: '+$('name').value.trim()+'\nEmail: '+email.value.trim()+
+      '\nAccount type: '+$('type').value+'\nReason: '+($('reason').value||'Not provided')+
+      '\nNotes: '+($('extra').value.trim()||'None')+
+      '\n\nI confirm that I want my Lens account and personal data permanently deleted.';
+    var link='mailto:privacy@lensapp.com?subject='+encodeURIComponent('Lens account deletion request')+'&body='+encodeURIComponent(body);
+    var m=$('msg');
+    m.style.display='block';
+    m.innerHTML='Your email app should open with the request ready to send. If it doesn’t, <a href="'+link+'">click here</a> or email privacy@lensapp.com from your registered address.';
+    window.location.href=link;
+  });
+  $('year').textContent=new Date().getFullYear();
+  var root=document.documentElement;
+  $('theme').addEventListener('click',function(){
+    var dark=root.getAttribute('data-theme')==='dark'||(!root.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme: dark)').matches);
+    root.setAttribute('data-theme',dark?'light':'dark');
+  });
+})();
+</script>
+</body>
+</html>
