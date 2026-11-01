@@ -648,6 +648,7 @@ class LensSeeder extends Seeder
         ])->pluck('id'));
 
         $this->seedHomeShowcaseVendors($cairo?->id, $alexandria?->id);
+        $this->concentrateVendorsInAlexandria($cairo?->id, $alexandria?->id);
 
         $category = Category::query()->where('slug', 'wedding')->first();
         $booking = Booking::query()->updateOrCreate(
@@ -1359,32 +1360,33 @@ class LensSeeder extends Seeder
     protected function seedHomeShowcaseVendors(?int $cairoId, ?int $alexandriaId): void
     {
         $rows = [
+            // Most showcase creators sit in Alexandria; a small Cairo set stays for travel/search coverage.
             ['email' => 'amira.photo@lens.app', 'phone' => '01055550011', 'name' => 'Amira Hassan', 'slug' => 'photographer', 'display' => 'Amira Frames', 'city' => $cairoId, 'rating' => 4.8, 'count' => 22, 'half' => 1600, 'full' => 2800],
-            ['email' => 'hossam.photo@lens.app', 'phone' => '01055550022', 'name' => 'Hossam Light', 'slug' => 'photographer', 'display' => 'Hossam Light', 'city' => $cairoId, 'rating' => 4.7, 'count' => 18, 'half' => 1500, 'full' => 2700],
+            ['email' => 'hossam.photo@lens.app', 'phone' => '01055550022', 'name' => 'Hossam Light', 'slug' => 'photographer', 'display' => 'Hossam Light', 'city' => $alexandriaId, 'rating' => 4.7, 'count' => 18, 'half' => 1500, 'full' => 2700],
             ['email' => 'nour.photo@lens.app', 'phone' => '01055550023', 'name' => 'Nour Portraits', 'slug' => 'photographer', 'display' => 'Nour Portraits', 'city' => $alexandriaId, 'rating' => 4.9, 'count' => 31, 'half' => 1700, 'full' => 3000],
-            ['email' => 'youssef.photo@lens.app', 'phone' => '01055550024', 'name' => 'Youssef Streets', 'slug' => 'photographer', 'display' => 'Youssef Streets', 'city' => $cairoId, 'rating' => 4.6, 'count' => 14, 'half' => 1400, 'full' => 2500],
-            ['email' => 'karim.video@lens.app', 'phone' => '01055550012', 'name' => 'Karim Motion', 'slug' => 'videographer', 'display' => 'Karim Motion', 'city' => $cairoId, 'rating' => 4.8, 'count' => 96, 'half' => 2200, 'full' => 3900],
+            ['email' => 'youssef.photo@lens.app', 'phone' => '01055550024', 'name' => 'Youssef Streets', 'slug' => 'photographer', 'display' => 'Youssef Streets', 'city' => $alexandriaId, 'rating' => 4.6, 'count' => 14, 'half' => 1400, 'full' => 2500],
+            ['email' => 'karim.video@lens.app', 'phone' => '01055550012', 'name' => 'Karim Motion', 'slug' => 'videographer', 'display' => 'Karim Motion', 'city' => $alexandriaId, 'rating' => 4.8, 'count' => 96, 'half' => 2200, 'full' => 3900],
             ['email' => 'layla.video@lens.app', 'phone' => '01055550013', 'name' => 'Layla Films', 'slug' => 'videographer', 'display' => 'Layla Films', 'city' => $alexandriaId, 'rating' => 4.7, 'count' => 41, 'half' => 1900, 'full' => 3400],
-            ['email' => 'tarek.video@lens.app', 'phone' => '01055550025', 'name' => 'Tarek Cinema', 'slug' => 'videographer', 'display' => 'Tarek Cinema', 'city' => $cairoId, 'rating' => 4.9, 'count' => 52, 'half' => 2400, 'full' => 4100],
-            ['email' => 'salma.video@lens.app', 'phone' => '01055550026', 'name' => 'Salma Docs', 'slug' => 'videographer', 'display' => 'Salma Docs', 'city' => $cairoId, 'rating' => 4.6, 'count' => 19, 'half' => 1800, 'full' => 3200],
-            ['email' => 'reels.mona@lens.app', 'phone' => '01055550016', 'name' => 'Mona Reels', 'slug' => 'reels', 'display' => 'Mona Reels', 'city' => $cairoId, 'rating' => 4.9, 'count' => 54, 'half' => 1200, 'full' => 2100],
-            ['email' => 'reels.habiba@lens.app', 'phone' => '01055550027', 'name' => 'Habiba Clips', 'slug' => 'reels', 'display' => 'Habiba Clips', 'city' => $cairoId, 'rating' => 4.8, 'count' => 27, 'half' => 1100, 'full' => 1900],
+            ['email' => 'tarek.video@lens.app', 'phone' => '01055550025', 'name' => 'Tarek Cinema', 'slug' => 'videographer', 'display' => 'Tarek Cinema', 'city' => $alexandriaId, 'rating' => 4.9, 'count' => 52, 'half' => 2400, 'full' => 4100],
+            ['email' => 'salma.video@lens.app', 'phone' => '01055550026', 'name' => 'Salma Docs', 'slug' => 'videographer', 'display' => 'Salma Docs', 'city' => $alexandriaId, 'rating' => 4.6, 'count' => 19, 'half' => 1800, 'full' => 3200],
+            ['email' => 'reels.mona@lens.app', 'phone' => '01055550016', 'name' => 'Mona Reels', 'slug' => 'reels', 'display' => 'Mona Reels', 'city' => $alexandriaId, 'rating' => 4.9, 'count' => 54, 'half' => 1200, 'full' => 2100],
+            ['email' => 'reels.habiba@lens.app', 'phone' => '01055550027', 'name' => 'Habiba Clips', 'slug' => 'reels', 'display' => 'Habiba Clips', 'city' => $alexandriaId, 'rating' => 4.8, 'count' => 27, 'half' => 1100, 'full' => 1900],
             ['email' => 'reels.ziad@lens.app', 'phone' => '01055550028', 'name' => 'Ziad Reels', 'slug' => 'reels', 'display' => 'Ziad Reels', 'city' => $alexandriaId, 'rating' => 4.7, 'count' => 21, 'half' => 1000, 'full' => 1800],
-            ['email' => 'reels.farah@lens.app', 'phone' => '01055550029', 'name' => 'Farah Mobile', 'slug' => 'reels', 'display' => 'Farah Mobile', 'city' => $cairoId, 'rating' => 4.6, 'count' => 16, 'half' => 950, 'full' => 1700],
-            ['email' => 'model.yasmin@lens.app', 'phone' => '01055550017', 'name' => 'Yasmin Atelier', 'slug' => 'model', 'display' => 'Yasmin Atelier', 'city' => $cairoId, 'rating' => 4.8, 'count' => 33, 'half' => 1400, 'full' => 2500],
-            ['email' => 'model.laila@lens.app', 'phone' => '01055550030', 'name' => 'Laila Cast', 'slug' => 'model', 'display' => 'Laila Cast', 'city' => $cairoId, 'rating' => 4.9, 'count' => 28, 'half' => 1500, 'full' => 2600],
+            ['email' => 'reels.farah@lens.app', 'phone' => '01055550029', 'name' => 'Farah Mobile', 'slug' => 'reels', 'display' => 'Farah Mobile', 'city' => $alexandriaId, 'rating' => 4.6, 'count' => 16, 'half' => 950, 'full' => 1700],
+            ['email' => 'model.yasmin@lens.app', 'phone' => '01055550017', 'name' => 'Yasmin Atelier', 'slug' => 'model', 'display' => 'Yasmin Atelier', 'city' => $alexandriaId, 'rating' => 4.8, 'count' => 33, 'half' => 1400, 'full' => 2500],
+            ['email' => 'model.laila@lens.app', 'phone' => '01055550030', 'name' => 'Laila Cast', 'slug' => 'model', 'display' => 'Laila Cast', 'city' => $alexandriaId, 'rating' => 4.9, 'count' => 28, 'half' => 1500, 'full' => 2600],
             ['email' => 'model.adam@lens.app', 'phone' => '01055550031', 'name' => 'Adam Runway', 'slug' => 'model', 'display' => 'Adam Runway', 'city' => $alexandriaId, 'rating' => 4.7, 'count' => 20, 'half' => 1300, 'full' => 2300],
-            ['email' => 'model.mariam@lens.app', 'phone' => '01055550032', 'name' => 'Mariam Studio', 'slug' => 'model', 'display' => 'Mariam Studio', 'city' => $cairoId, 'rating' => 4.6, 'count' => 15, 'half' => 1200, 'full' => 2200],
-            ['email' => 'nile.studio@lens.app', 'phone' => '01055550014', 'name' => 'Rania Loft', 'slug' => 'studio', 'display' => 'Nile Loft Studio', 'city' => $cairoId, 'rating' => 4.7, 'count' => 28, 'hourly' => 280],
+            ['email' => 'model.mariam@lens.app', 'phone' => '01055550032', 'name' => 'Mariam Studio', 'slug' => 'model', 'display' => 'Mariam Studio', 'city' => $alexandriaId, 'rating' => 4.6, 'count' => 15, 'half' => 1200, 'full' => 2200],
+            ['email' => 'nile.studio@lens.app', 'phone' => '01055550014', 'name' => 'Rania Loft', 'slug' => 'studio', 'display' => 'Nile Loft Studio', 'city' => $alexandriaId, 'rating' => 4.7, 'count' => 28, 'hourly' => 280],
             ['email' => 'giza.studio@lens.app', 'phone' => '01055550015', 'name' => 'Omar Daylight', 'slug' => 'studio', 'display' => 'Giza Daylight', 'city' => $cairoId, 'rating' => 4.5, 'count' => 15, 'hourly' => 220],
             ['email' => 'blackbox.studio@lens.app', 'phone' => '01055550020', 'name' => 'Maya Blackbox', 'slug' => 'studio', 'display' => 'Cairo Blackbox', 'city' => $cairoId, 'rating' => 4.6, 'count' => 21, 'hourly' => 300],
             ['email' => 'zamalek.studio@lens.app', 'phone' => '01055550021', 'name' => 'Hana Cyc', 'slug' => 'studio', 'display' => 'Zamalek Cyc', 'city' => $cairoId, 'rating' => 4.8, 'count' => 12, 'hourly' => 260],
-            ['email' => 'ugc.omar@lens.app', 'phone' => '01055550018', 'name' => 'Omar UGC', 'slug' => 'ugc', 'display' => 'Omar UGC', 'city' => $cairoId, 'rating' => 4.6, 'count' => 19, 'per_video' => 850],
-            ['email' => 'ugc.nada@lens.app', 'phone' => '01055550033', 'name' => 'Nada Social', 'slug' => 'ugc', 'display' => 'Nada Social', 'city' => $cairoId, 'rating' => 4.8, 'count' => 24, 'per_video' => 900],
+            ['email' => 'ugc.omar@lens.app', 'phone' => '01055550018', 'name' => 'Omar UGC', 'slug' => 'ugc', 'display' => 'Omar UGC', 'city' => $alexandriaId, 'rating' => 4.6, 'count' => 19, 'per_video' => 850],
+            ['email' => 'ugc.nada@lens.app', 'phone' => '01055550033', 'name' => 'Nada Social', 'slug' => 'ugc', 'display' => 'Nada Social', 'city' => $alexandriaId, 'rating' => 4.8, 'count' => 24, 'per_video' => 900],
             ['email' => 'ugc.kareem@lens.app', 'phone' => '01055550034', 'name' => 'Kareem Content', 'slug' => 'ugc', 'display' => 'Kareem Content', 'city' => $alexandriaId, 'rating' => 4.7, 'count' => 17, 'per_video' => 800],
-            ['email' => 'ugc.hana@lens.app', 'phone' => '01055550035', 'name' => 'Hana Creator', 'slug' => 'ugc', 'display' => 'Hana Creator', 'city' => $cairoId, 'rating' => 4.9, 'count' => 29, 'per_video' => 950],
-            ['email' => 'food.dina@lens.app', 'phone' => '01055550019', 'name' => 'Dina Plates', 'slug' => 'food_stylist', 'display' => 'Dina Plates', 'city' => $cairoId, 'rating' => 4.8, 'count' => 17, 'half' => 1500, 'full' => 2600],
-            ['email' => 'food.mariam@lens.app', 'phone' => '01055550036', 'name' => 'Chef Mariam', 'slug' => 'food_stylist', 'display' => 'Chef Mariam', 'city' => $cairoId, 'rating' => 4.9, 'count' => 23, 'half' => 1600, 'full' => 2800],
+            ['email' => 'ugc.hana@lens.app', 'phone' => '01055550035', 'name' => 'Hana Creator', 'slug' => 'ugc', 'display' => 'Hana Creator', 'city' => $alexandriaId, 'rating' => 4.9, 'count' => 29, 'per_video' => 950],
+            ['email' => 'food.dina@lens.app', 'phone' => '01055550019', 'name' => 'Dina Plates', 'slug' => 'food_stylist', 'display' => 'Dina Plates', 'city' => $alexandriaId, 'rating' => 4.8, 'count' => 17, 'half' => 1500, 'full' => 2600],
+            ['email' => 'food.mariam@lens.app', 'phone' => '01055550036', 'name' => 'Chef Mariam', 'slug' => 'food_stylist', 'display' => 'Chef Mariam', 'city' => $alexandriaId, 'rating' => 4.9, 'count' => 23, 'half' => 1600, 'full' => 2800],
             ['email' => 'food.bassem@lens.app', 'phone' => '01055550037', 'name' => 'Bassem Table', 'slug' => 'food_stylist', 'display' => 'Bassem Table', 'city' => $alexandriaId, 'rating' => 4.6, 'count' => 11, 'half' => 1400, 'full' => 2400],
             ['email' => 'food.sara@lens.app', 'phone' => '01055550038', 'name' => 'Sara Styling', 'slug' => 'food_stylist', 'display' => 'Sara Styling', 'city' => $cairoId, 'rating' => 4.7, 'count' => 15, 'half' => 1450, 'full' => 2500],
         ];
@@ -1504,6 +1506,41 @@ class LensSeeder extends Seeder
                 $vendor->filterTags()->sync(
                     FilterTag::query()->whereIn('slug', $foodTags[$row['display']])->pluck('id')
                 );
+            }
+        }
+    }
+
+    /**
+     * Keep a small Cairo set for travel-fee coverage; put everyone else in Alexandria.
+     */
+    protected function concentrateVendorsInAlexandria(?int $cairoId, ?int $alexandriaId): void
+    {
+        if (! $alexandriaId) {
+            return;
+        }
+
+        $keepInCairo = [
+            'Fahad Studio Light',
+            'Amira Frames',
+            'Giza Daylight',
+            'Cairo Blackbox',
+            'Zamalek Cyc',
+            'Sara Styling',
+        ];
+
+        Vendor::query()
+            ->whereNotIn('display_name', $keepInCairo)
+            ->update(['city_id' => $alexandriaId]);
+
+        if ($cairoId) {
+            Vendor::query()
+                ->whereIn('display_name', $keepInCairo)
+                ->update(['city_id' => $cairoId]);
+        }
+
+        foreach (Vendor::query()->with('user')->get() as $vendor) {
+            if ($vendor->user) {
+                $vendor->user->forceFill(['city_id' => $vendor->city_id])->save();
             }
         }
     }
