@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
@@ -29,7 +30,10 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: SessionStore.instance,
+      listenable: Listenable.merge([
+        SessionStore.instance,
+        BookedVendorsStore.instance,
+      ]),
       builder: (context, _) => SafeArea(
         child: CustomScrollView(
           cacheExtent: 1200,
@@ -78,13 +82,16 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const BrandHeader(height: 42),
+                const BrandHeader(),
               ],
             ),
           ),
           if (data.on('notifications'))
             ListenableBuilder(
-              listenable: NotificationsStore.instance,
+              listenable: Listenable.merge([
+                SessionStore.instance,
+                NotificationsStore.instance,
+              ]),
               builder: (context, _) => _HeaderIcon(
                 icon: Icons.notifications_none_rounded,
                 tooltip: 'Notifications',
@@ -93,7 +100,10 @@ class _Header extends StatelessWidget {
               ),
             ),
           ListenableBuilder(
-            listenable: FavoritesStore.instance,
+            listenable: Listenable.merge([
+              SessionStore.instance,
+              FavoritesStore.instance,
+            ]),
             builder: (context, _) => _HeaderIcon(
               icon: FavoritesStore.instance.count > 0
                   ? Icons.favorite_rounded

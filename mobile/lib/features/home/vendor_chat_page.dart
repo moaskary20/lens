@@ -61,8 +61,8 @@ class _VendorChatPageState extends State<VendorChatPage> {
   VendorCard get vendor => widget.vendor;
 
   String get _firstName {
-    final parts = vendor.displayName.trim().split(RegExp(r'\s+'));
-    return parts.isEmpty ? vendor.displayName : parts.first;
+    final parts = vendor.publicName.trim().split(RegExp(r'\s+'));
+    return parts.isEmpty ? vendor.publicName : parts.first;
   }
 
   String get _sessionType {
@@ -126,7 +126,9 @@ class _VendorChatPageState extends State<VendorChatPage> {
   @override
   void initState() {
     super.initState();
-    _seedLocal();
+    if (!_live) {
+      _seedLocal();
+    }
     _connect();
   }
 
@@ -602,7 +604,7 @@ class _VendorChatPageState extends State<VendorChatPage> {
                   children: [
                     Flexible(
                       child: Text(
-                        vendor.displayName,
+                        vendor.publicName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

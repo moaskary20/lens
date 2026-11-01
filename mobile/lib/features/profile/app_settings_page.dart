@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
+import 'package:lens/core/push_alerts.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
@@ -62,6 +63,12 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       _settings[key] = value;
       _saving = true;
     });
+    if (key == 'push_notifications' && value is bool) {
+      await PushAlerts.instance.setEnabled(value);
+      if (value) {
+        await PushAlerts.instance.previewLatestUnread();
+      }
+    }
     if (_live) {
       try {
         await _api.postJson('/app/account/settings', {'settings': _settings});
@@ -115,7 +122,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       ),
       child: const Align(
         alignment: Alignment.centerLeft,
-        child: BrandLogo(width: 110, height: 32),
+        child: BrandHeader(),
       ),
     );
   }
@@ -163,7 +170,6 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       _link(Icons.auto_awesome_outlined, 'What is Lens?', home.tagline, 'Lens helps you find, book, and chat with verified creators. Payments stay in escrow until you approve the work.'),
       if (home.on('cms')) _link(Icons.description_outlined, 'Terms of Service', 'Booking, payments, and protected delivery', 'Terms for using Lens for booking, payments, and protected delivery.'),
       if (home.on('cms')) _link(Icons.privacy_tip_outlined, 'Privacy Policy', 'How we store client and vendor data', 'Lens stores account, booking, and chat data to run sessions. Full card numbers are never saved.'),
-      _link(Icons.support_agent_outlined, 'Contact support', 'help@lens.app', 'Email help@lens.app or open Report an Issue from your profile.'),
     ]);
   }
 

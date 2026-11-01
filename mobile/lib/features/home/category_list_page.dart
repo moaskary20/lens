@@ -57,9 +57,27 @@ class _CategoryListPageState extends State<CategoryListPage> {
 
   Future<void> _load() async {
     try {
-      final payload = await ApiClient().getJson(
-        '/app/vendors?vendor_type=${Uri.encodeQueryComponent(widget.type.slug)}&limit=40',
-      );
+      final params = <String, String>{
+        'vendor_type': widget.type.slug,
+        'limit': '40',
+        if (_filters.verifiedOnly) 'verified': '1',
+      };
+      final cities = _filters.cities.difference({'All Cities'});
+      if (cities.length == 1) {
+        final needle = cities.first.toLowerCase();
+        for (final city in widget.home.cities) {
+          final name = '${city['name_en'] ?? city['name'] ?? ''}'.toLowerCase();
+          if (name == needle || name.contains(needle) || needle.contains(name)) {
+            final id = city['id'];
+            params['city_id'] = id is int ? '$id' : '$id';
+            break;
+          }
+        }
+      }
+      final query = params.entries
+          .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
+          .join('&');
+      final payload = await ApiClient().getJson('/app/vendors?$query');
       final vendors = (payload['vendors'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map((item) => VendorCard.fromJson(Map<String, dynamic>.from(item)))
@@ -137,7 +155,7 @@ class _CategoryListPageState extends State<CategoryListPage> {
         }
       }
       final price = vendor.startingFrom;
-      if (price != null) {
+      if (price != null && !_filters.isDefaultPrice(widget.type.slug)) {
         if (price < _filters.price.start) {
           return false;
         }
@@ -183,20 +201,35 @@ class _CategoryListPageState extends State<CategoryListPage> {
       _vendors = _sorted(_applyFilters(_allVendors));
       _total = _vendors.length;
     });
+    if (LensConfig.useNetwork) {
+      _load();
+    }
   }
 
   List<VendorCard> _sorted(List<VendorCard> input) => sortVendors(input, _sort);
 
   Future<void> _openSort() async {
-    final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => SortPage(initial: _sort)),
+    final isStudio = widget.type.slug == 'studio';
+    final result = await Navigator.of(context).push<SortResult>(
+      MaterialPageRoute(
+        builder: (_) => SortPage(
+          initial: _sort,
+          initialPrice: _filters.price,
+          priceMin: isStudio ? 0 : (widget.type.slug == 'model' ? 500 : 0),
+          priceMax: isStudio ? 2000 : 10000,
+        ),
+      ),
     );
     if (!mounted || result == null) {
       return;
     }
     setState(() {
-      _sort = result;
+      _sort = result.sort;
+      if (result.price != null) {
+        _filters = _filters.copyWith(price: result.price);
+      }
       _vendors = _sorted(_applyFilters(_allVendors));
+      _total = _vendors.length;
     });
   }
 

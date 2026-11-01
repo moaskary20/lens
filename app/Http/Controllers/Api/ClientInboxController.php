@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeviceToken;
 use App\Models\Favorite;
 use App\Models\Vendor;
 use App\Support\AppClient;
@@ -116,6 +117,52 @@ class ClientInboxController extends Controller
         $count = LensNotifier::toClients($data['title'], $data['body']);
 
         return response()->json(['sent' => $count]);
+    }
+
+    public function registerDevice(Request $request): JsonResponse
+    {
+        abort_unless(Feature::enabled('notifications'), 404);
+
+        $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'receive_notifications', 'Notifications are disabled for this role.');
+
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:512'],
+            'platform' => ['nullable', 'string', 'in:android,ios,web'],
+        ]);
+
+        $token = DeviceToken::query()->updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'token' => $data['token'],
+            ],
+            [
+                'platform' => $data['platform'] ?? 'android',
+            ],
+        );
+
+        return response()->json([
+            'registered' => true,
+            'id' => $token->id,
+            'platform' => $token->platform,
+        ]);
+    }
+
+    public function forgetDevice(Request $request): JsonResponse
+    {
+        abort_unless(Feature::enabled('notifications'), 404);
+
+        $user = AppClient::requireUser();
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:512'],
+        ]);
+
+        DeviceToken::query()
+            ->where('user_id', $user->id)
+            ->where('token', $data['token'])
+            ->delete();
+
+        return response()->json(['registered' => false]);
     }
 
     /**

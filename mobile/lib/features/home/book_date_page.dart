@@ -1,10 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/book_draft.dart';
 import 'package:lens/features/home/book_project_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
@@ -45,8 +44,9 @@ class _BookDatePageState extends State<BookDatePage> {
   @override
   void initState() {
     super.initState();
-    _visible = DateTime(2026, 9);
-    _selected = DateTime(2026, 9, 15);
+    final now = DateTime.now();
+    _visible = DateTime(now.year, now.month);
+    _selected = DateTime(now.year, now.month, now.day);
   }
 
   String get _location {
@@ -77,12 +77,17 @@ class _BookDatePageState extends State<BookDatePage> {
   bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
   bool _isAvailable(DateTime date) {
-    if (date.year == 2026 && date.month == 9) {
-      const days = {10, 11, 12, 15, 16, 17, 18, 19, 21, 22, 24, 25, 26, 28, 29, 30};
-      return days.contains(date.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    if (day.isBefore(today)) {
+      return false;
+    }
+    if (_sameDay(day, today)) {
+      return true;
     }
     final seed = vendor.id + date.day;
-    if (date.day <= 9 || date.day == 13 || date.day == 20 || date.day == 23 || date.day == 27) {
+    if (date.day == 13 || date.day == 20 || date.day == 23 || date.day == 27) {
       return false;
     }
     return seed % 5 != 0;
@@ -188,7 +193,7 @@ class _BookDatePageState extends State<BookDatePage> {
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.chevron_left_rounded, color: LensColors.cream, size: 32),
           ),
-          const Expanded(child: Center(child: _LensMark())),
+          const Expanded(child: Center(child: BrandHeader(height: 36))),
           FavoriteHeart(vendor: vendor, size: 22),
           IconButton(
             onPressed: () {
@@ -636,54 +641,4 @@ class _LegendDot extends StatelessWidget {
       ],
     );
   }
-}
-
-class _LensMark extends StatelessWidget {
-  const _LensMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: -2,
-            child: CustomPaint(size: const Size(22, 14), painter: _SunburstPainter()),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              'lens',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 0.2, height: 1),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SunburstPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = LensColors.primary
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    final origin = Offset(size.width / 2, size.height);
-    for (var i = 0; i < 7; i++) {
-      final angle = -math.pi + (i * math.pi / 6);
-      canvas.drawLine(
-        origin + Offset(math.cos(angle) * 2, math.sin(angle) * 2),
-        origin + Offset(math.cos(angle) * 9, math.sin(angle) * 9),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

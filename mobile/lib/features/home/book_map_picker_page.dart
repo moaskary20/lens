@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:lens/core/config.dart';
+import 'package:lens/core/device_location.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/home/book_draft.dart';
 
@@ -15,12 +16,16 @@ class BookMapPickerPage extends StatefulWidget {
     this.fallbackLabel = 'Cairo, Egypt',
     this.fallbackLatitude = 30.0444,
     this.fallbackLongitude = 31.2357,
+    this.useCurrentLocation = true,
+    this.currentPlaceResolver,
   });
 
   final PickedMapLocation? initial;
   final String fallbackLabel;
   final double fallbackLatitude;
   final double fallbackLongitude;
+  final bool useCurrentLocation;
+  final Future<PickedMapLocation?> Function()? currentPlaceResolver;
 
   @override
   State<BookMapPickerPage> createState() => _BookMapPickerPageState();
@@ -40,6 +45,7 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
   late PickedMapLocation _picked;
   List<PickedMapLocation> _suggestions = const [];
   bool _searching = false;
+  bool _locating = false;
 
   @override
   void initState() {
@@ -50,6 +56,38 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
           latitude: widget.fallbackLatitude,
           longitude: widget.fallbackLongitude,
         );
+    if (widget.initial == null && widget.useCurrentLocation) {
+      _loadCurrentLocation();
+    }
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    setState(() => _locating = true);
+    try {
+      final resolved = await (widget.currentPlaceResolver?.call() ?? _devicePlace());
+      if (!mounted || resolved == null) {
+        return;
+      }
+      _use(resolved);
+    } catch (_) {
+      // Keep fallback pin when GPS/permission is unavailable.
+    } finally {
+      if (mounted) {
+        setState(() => _locating = false);
+      }
+    }
+  }
+
+  Future<PickedMapLocation?> _devicePlace() async {
+    if (!LensConfig.useNetwork) {
+      return null;
+    }
+    final place = await DeviceLocation.currentPlace();
+    return PickedMapLocation(
+      label: place.label,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    );
   }
 
   @override
@@ -118,6 +156,8 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
+                  _currentChip(),
+                  const SizedBox(width: 8),
                   for (final place in _fallbackPlaces) ...[
                     _chip(place),
                     const SizedBox(width: 8),
@@ -178,6 +218,28 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Column(
                 children: [
+                  if (_locating)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: LensColors.primary,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Finding your current location...',
+                            style: TextStyle(color: Color(0xFFB0ABA3), fontSize: 12.5),
+                          ),
+                        ],
+                      ),
+                    ),
                   Text(_picked.label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   const Text('Powered by Google Maps', style: TextStyle(color: Color(0xFF6B6B70), fontSize: 11.5)),
@@ -193,6 +255,38 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _currentChip() {
+    return GestureDetector(
+      onTap: _locating ? null : _loadCurrentLocation,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0x33FF5A1F),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: LensColors.primary),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_locating)
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2, color: LensColors.primary),
+              )
+            else
+              const Icon(Icons.my_location_rounded, color: LensColors.primary, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              _locating ? 'Locating...' : 'Current location',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5),
             ),
           ],
         ),

@@ -38,7 +38,7 @@ class ApiClient {
     final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'));
     request.headers.addAll({
       'Accept': 'application/json',
-      'X-Lens-Client': SessionStore.instance.email ?? LensConfig.clientEmail,
+      if (SessionStore.instance.email != null) 'X-Lens-Client': SessionStore.instance.email!,
     });
     _writeFields(request, body);
     request.files.addAll(files);
@@ -71,9 +71,13 @@ class ApiClient {
     });
   }
 
-  Future<Map<String, dynamic>> deleteJson(String path) async {
+  Future<Map<String, dynamic>> deleteJson(String path, {Map<String, dynamic>? body}) async {
     final response = await _client
-        .delete(Uri.parse('$_baseUrl$path'), headers: _headers)
+        .delete(
+          Uri.parse('$_baseUrl$path'),
+          headers: _headers,
+          body: body == null ? null : jsonEncode(body),
+        )
         .timeout(const Duration(seconds: 8));
     return _decode(response, path);
   }
@@ -81,7 +85,7 @@ class ApiClient {
   Map<String, String> get _headers => {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'X-Lens-Client': SessionStore.instance.email ?? LensConfig.clientEmail,
+        if (SessionStore.instance.email != null) 'X-Lens-Client': SessionStore.instance.email!,
       };
 
   Map<String, dynamic> _decode(http.Response response, String path) {

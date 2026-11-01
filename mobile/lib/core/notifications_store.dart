@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
+import 'package:lens/core/session_store.dart';
 
 class AppNotice {
   const AppNotice({
@@ -36,7 +37,9 @@ class AppNotice {
 }
 
 class NotificationsStore extends ChangeNotifier {
-  NotificationsStore._();
+  NotificationsStore._() {
+    SessionStore.instance.addListener(_onSessionChanged);
+  }
 
   static final NotificationsStore instance = NotificationsStore._();
 
@@ -44,13 +47,19 @@ class NotificationsStore extends ChangeNotifier {
   int _unread = 0;
   ApiClient _api = ApiClient();
 
-  List<AppNotice> get items => List.unmodifiable(_items);
+  List<AppNotice> get items => SessionStore.instance.isGuest ? const [] : List.unmodifiable(_items);
 
-  int get unread => _unread;
+  int get unread => SessionStore.instance.isGuest ? 0 : _unread;
 
   void hydrate({int unread = 0}) {
+    if (SessionStore.instance.isGuest) {
+      _items = [];
+      _unread = 0;
+      notifyListeners();
+      return;
+    }
     _unread = unread;
-    if (_items.isEmpty) {
+    if (_items.isEmpty && !LensConfig.useNetwork) {
       _items = _demo;
       if (unread == 0) {
         _unread = _items.where((item) => !item.read).length;
@@ -63,7 +72,18 @@ class NotificationsStore extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
+    if (SessionStore.instance.isGuest) {
+      _items = [];
+      _unread = 0;
+      notifyListeners();
+      return;
+    }
     if (!LensConfig.useNetwork) {
+      if (_items.isEmpty) {
+        _items = _demo;
+        _unread = _items.where((item) => !item.read).length;
+        notifyListeners();
+      }
       return;
     }
     try {
@@ -78,7 +98,7 @@ class NotificationsStore extends ChangeNotifier {
   }
 
   Future<void> markRead(AppNotice notice) async {
-    if (notice.read) {
+    if (SessionStore.instance.isGuest || notice.read) {
       return;
     }
     _items = [for (final item in _items) item.id == notice.id ? item.copyWith(read: true) : item];
@@ -93,6 +113,9 @@ class NotificationsStore extends ChangeNotifier {
   }
 
   Future<void> markAllRead() async {
+    if (SessionStore.instance.isGuest) {
+      return;
+    }
     _items = [for (final item in _items) item.copyWith(read: true)];
     _unread = 0;
     notifyListeners();
@@ -102,6 +125,16 @@ class NotificationsStore extends ChangeNotifier {
     try {
       await _api.postJson('/app/notifications/read-all');
     } catch (_) {}
+  }
+
+  void _onSessionChanged() {
+    if (SessionStore.instance.isGuest) {
+      _items = [];
+      _unread = 0;
+      notifyListeners();
+      return;
+    }
+    refresh();
   }
 
   @visibleForTesting

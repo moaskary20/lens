@@ -2,9 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
+import 'package:lens/core/session_store.dart';
 
 class FavoritesStore extends ChangeNotifier {
-  FavoritesStore._();
+  FavoritesStore._() {
+    SessionStore.instance.addListener(_onSessionChanged);
+  }
 
   static final FavoritesStore instance = FavoritesStore._();
 
@@ -13,14 +16,17 @@ class FavoritesStore extends ChangeNotifier {
   ApiClient _api = ApiClient();
 
   List<VendorCard> get vendors {
+    if (SessionStore.instance.isGuest) {
+      return const [];
+    }
     final items = _ids.map((id) => _cards[id]).whereType<VendorCard>().toList();
     items.sort((a, b) => a.displayName.compareTo(b.displayName));
     return items;
   }
 
-  int get count => _ids.length;
+  int get count => SessionStore.instance.isGuest ? 0 : _ids.length;
 
-  bool saved(int id) => _ids.contains(id);
+  bool saved(int id) => !SessionStore.instance.isGuest && _ids.contains(id);
 
   void remember(Iterable<VendorCard> vendors) {
     for (final vendor in vendors) {
@@ -30,6 +36,11 @@ class FavoritesStore extends ChangeNotifier {
 
   void hydrate(HomeData home) {
     remember(home.popular.expand((section) => section.vendors));
+    if (SessionStore.instance.isGuest) {
+      _ids.clear();
+      notifyListeners();
+      return;
+    }
     _ids
       ..clear()
       ..addAll(home.favoriteIds);
@@ -40,6 +51,11 @@ class FavoritesStore extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
+    if (SessionStore.instance.isGuest) {
+      _ids.clear();
+      notifyListeners();
+      return;
+    }
     if (!LensConfig.useNetwork) {
       return;
     }
@@ -58,6 +74,9 @@ class FavoritesStore extends ChangeNotifier {
   }
 
   Future<void> toggle(VendorCard vendor) async {
+    if (SessionStore.instance.isGuest) {
+      return;
+    }
     remember([vendor]);
     final adding = !_ids.contains(vendor.id);
     if (adding) {
@@ -76,6 +95,15 @@ class FavoritesStore extends ChangeNotifier {
         await _api.deleteJson('/app/favorites/${vendor.id}');
       }
     } catch (_) {}
+  }
+
+  void _onSessionChanged() {
+    if (SessionStore.instance.isGuest) {
+      _ids.clear();
+      notifyListeners();
+      return;
+    }
+    refresh();
   }
 
   @visibleForTesting

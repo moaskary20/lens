@@ -1,16 +1,20 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/book_draft.dart';
 import 'package:lens/features/home/book_map_picker_page.dart';
+import 'package:lens/features/home/book_moodboard_page.dart';
 import 'package:lens/features/home/book_project_catalog.dart';
 import 'package:lens/features/home/book_review_page.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
 
 class BookProjectPage extends StatefulWidget {
   const BookProjectPage({super.key, required this.draft});
@@ -28,12 +32,13 @@ class _BookProjectPageState extends State<BookProjectPage> {
   String? _error;
   late List<BookPriceOption> _prices;
   BookPriceOption? _price;
+  late List<String> _typeOptions;
+  late bool _loadingPrices;
 
   BookDraft get draft => widget.draft;
   VendorCard get vendor => draft.vendor;
 
   String get _typeLabel => BookProjectCatalog.typeLabel(vendor.vendorType);
-  List<String> get _typeOptions => BookProjectCatalog.typeOptions(vendor.vendorType);
   List<BookProjectField> get _extras => BookProjectCatalog.extraFields(vendor.vendorType);
 
   @override
@@ -42,31 +47,57 @@ class _BookProjectPageState extends State<BookProjectPage> {
     _name.text = draft.projectName;
     _brief.text = draft.brief;
     _notes.text = draft.notes;
-    _prices = BookProjectCatalog.pricesFor(vendor);
+    _typeOptions = BookProjectCatalog.typeOptions(vendor.vendorType);
+    // Avoid flashing local half/full packages that the API may replace a moment later.
+    _loadingPrices = LensConfig.useNetwork;
+    _prices = _loadingPrices ? const [] : BookProjectCatalog.pricesFor(vendor);
     _price = _matchPrice(draft.packageKey, _prices);
-    final shots = VendorPhotos.shots(vendor.vendorType, vendor.id);
-    if (draft.images.isEmpty) {
-      draft.images = shots.take(3).toList();
-    }
-    _loadPrices();
+    _loadFromApi();
   }
 
-  Future<void> _loadPrices() async {
+  Future<void> _loadFromApi() async {
+    if (!LensConfig.useNetwork) {
+      return;
+    }
     try {
       final payload = await ApiClient().getJson('/app/vendors/${vendor.id}');
-      final remote = (payload['packages'] as List<dynamic>? ?? const [])
+      final remoteTypes = (payload['project_types'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => item['label']?.toString().trim() ?? '')
+          .where((label) => label.isNotEmpty)
+          .toList();
+      final remotePrices = (payload['packages'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map((item) => BookPriceOption.fromJson(Map<String, dynamic>.from(item)))
           .where((item) => item.price > 0)
           .toList();
-      if (!mounted || remote.isEmpty) {
+      if (!mounted) {
         return;
       }
+      final fallback = BookProjectCatalog.pricesFor(vendor);
+      final nextPrices = remotePrices.isNotEmpty ? remotePrices : fallback;
       setState(() {
-        _prices = remote;
-        _price = _matchPrice(_price?.key ?? draft.packageKey, remote);
+        if (remoteTypes.isNotEmpty) {
+          _typeOptions = remoteTypes;
+          if (draft.projectType.isNotEmpty && !_typeOptions.contains(draft.projectType)) {
+            draft.projectType = '';
+          }
+        }
+        _prices = nextPrices;
+        _price = _matchPrice(_price?.key ?? draft.packageKey, nextPrices);
+        _loadingPrices = false;
       });
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      final fallback = BookProjectCatalog.pricesFor(vendor);
+      setState(() {
+        _prices = fallback;
+        _price = _matchPrice(_price?.key ?? draft.packageKey, fallback);
+        _loadingPrices = false;
+      });
+    }
   }
 
   @override
@@ -160,8 +191,10 @@ class _BookProjectPageState extends State<BookProjectPage> {
                   _uploadBox(),
                   const SizedBox(height: 12),
                   _imageRow(),
-                  const SizedBox(height: 14),
-                  _moodboard(),
+                  if (draft.home.moodboardOn && !draft.home.moodboardLocked) ...[
+                    const SizedBox(height: 14),
+                    _moodboard(),
+                  ],
                   const SizedBox(height: 16),
                   _label('Additional Notes (Optional)'),
                   _area(
@@ -214,7 +247,7 @@ class _BookProjectPageState extends State<BookProjectPage> {
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.chevron_left_rounded, color: LensColors.cream, size: 32),
           ),
-          const Expanded(child: Center(child: _LensMark())),
+          const Expanded(child: Center(child: BrandHeader(height: 36))),
           const SizedBox(width: 48),
         ],
       ),
@@ -455,7 +488,7 @@ class _BookProjectPageState extends State<BookProjectPage> {
     );
   }
 
-  Widget _thumb(String url, VoidCallback onRemove) {
+  Widget _thumb(String path, VoidCallback onRemove) {
     return SizedBox(
       width: 72,
       height: 72,
@@ -465,9 +498,7 @@ class _BookProjectPageState extends State<BookProjectPage> {
             child: Container(
               decoration: BoxDecoration(color: LensColors.graphite, borderRadius: BorderRadius.circular(12)),
               clipBehavior: Clip.antiAlias,
-              child: LensConfig.useNetwork
-                  ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite))
-                  : const ColoredBox(color: LensColors.graphite),
+              child: _imageFor(path),
             ),
           ),
           Positioned(
@@ -488,39 +519,71 @@ class _BookProjectPageState extends State<BookProjectPage> {
     );
   }
 
+  Widget _imageFor(String path) {
+    const fallback = ColoredBox(color: LensColors.graphite);
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      );
+    }
+    if (kIsWeb) {
+      return fallback;
+    }
+    return Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => fallback,
+    );
+  }
+
   Widget _moodboard() {
+    final attached = draft.hasMoodboard;
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'Lens AI Moodboard')),
-      ),
+      onTap: () async {
+        draft.brief = _brief.text.trim();
+        final changed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(builder: (_) => BookMoodboardPage(draft: draft)),
+        );
+        if (changed == true && mounted) {
+          setState(() {});
+        }
+      },
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
         decoration: BoxDecoration(
           color: const Color(0xFF1A120E),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0x55FF5A1F)),
+          border: Border.all(color: attached ? const Color(0x883D8B5F) : const Color(0x55FF5A1F)),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.auto_awesome, color: LensColors.primary, size: 22),
-            SizedBox(width: 10),
+            Icon(
+              attached ? Icons.check_circle_rounded : Icons.auto_awesome,
+              color: attached ? LensColors.success : LensColors.primary,
+              size: 22,
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Attach Lens AI Moodboard (Optional)',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
+                    attached ? 'Lens AI Moodboard attached' : 'Attach Lens AI Moodboard (Optional)',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
                   ),
-                  SizedBox(height: 3),
+                  const SizedBox(height: 3),
                   Text(
-                    'Generate or upload a moodboard to share the visual direction.',
-                    style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12, height: 1.3),
+                    attached
+                        ? draft.moodboard!.summaryLine
+                        : 'Generate or upload a moodboard to share the visual direction.',
+                    style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12, height: 1.3),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
           ],
         ),
       ),
@@ -536,13 +599,47 @@ class _BookProjectPageState extends State<BookProjectPage> {
     return options.isEmpty ? null : options.first;
   }
 
-  void _addImage() {
-    final pool = VendorPhotos.shots(vendor.vendorType, vendor.id + draft.images.length + 1);
-    final next = pool.firstWhere((url) => !draft.images.contains(url), orElse: () => pool.first);
-    setState(() => draft.images.add(next));
+  Future<void> _addImage() async {
+    try {
+      final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
+      if (picked.isEmpty || !mounted) {
+        return;
+      }
+      setState(() {
+        for (final file in picked) {
+          if (!draft.images.contains(file.path)) {
+            draft.images.add(file.path);
+          }
+        }
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the photo library.')),
+      );
+    }
   }
 
   Widget _priceGrid() {
+    if (_loadingPrices) {
+      return Column(
+        children: [
+          for (var i = 0; i < 2; i++) ...[
+            Container(
+              height: 52,
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF141416),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF2A2A2E)),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
     if (_prices.isEmpty) {
       return const Text('This vendor has no published prices yet.', style: TextStyle(color: Color(0xFFFF6B6B)));
     }
@@ -550,6 +647,7 @@ class _BookProjectPageState extends State<BookProjectPage> {
       children: [
         for (final option in _prices) ...[
           GestureDetector(
+            key: ValueKey('session-price-${option.key}'),
             onTap: () => setState(() => _price = option),
             child: Container(
               width: double.infinity,
@@ -698,54 +796,4 @@ class _DashPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DashPainter oldDelegate) => oldDelegate.radius != radius;
-}
-
-class _LensMark extends StatelessWidget {
-  const _LensMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: -2,
-            child: CustomPaint(size: const Size(22, 14), painter: _SunburstPainter()),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              'lens',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 0.2, height: 1),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SunburstPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = LensColors.primary
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    final origin = Offset(size.width / 2, size.height);
-    for (var i = 0; i < 7; i++) {
-      final angle = -math.pi + (i * math.pi / 6);
-      canvas.drawLine(
-        origin + Offset(math.cos(angle) * 2, math.sin(angle) * 2),
-        origin + Offset(math.cos(angle) * 9, math.sin(angle) * 9),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

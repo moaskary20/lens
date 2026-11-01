@@ -1,9 +1,15 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lens/app.dart';
+import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/booked_vendors_store.dart';
+import 'package:lens/core/config.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
+import 'package:lens/core/push_alerts.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
@@ -110,17 +116,21 @@ class AppShell extends StatefulWidget {
 }
 
 class AppShellState extends State<AppShell>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   int _index = 0;
+  final List<int> _tabHistory = [0];
   bool _focusSearch = false;
   bool _guestBookings = false;
+  late Map<String, dynamic> _bootstrap;
   late final AnimationController _menu;
   late final Animation<double> _menuAnim;
 
   @override
   void initState() {
     super.initState();
-    AppShell.currentBootstrap = widget.bootstrap;
+    WidgetsBinding.instance.addObserver(this);
+    _bootstrap = Map<String, dynamic>.from(widget.bootstrap);
+    AppShell.currentBootstrap = _bootstrap;
     _menu = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -130,30 +140,24 @@ class AppShellState extends State<AppShell>
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
-    final home = HomeData.fromJson(widget.bootstrap);
+    final home = HomeData.fromJson(_bootstrap);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
       FavoritesStore.instance.hydrate(home);
       NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
+      BookedVendorsStore.instance.hydrate();
+      PushAlerts.instance.start(onOpenInbox: _openInboxFromPush);
+      _refreshBootstrap();
     });
     AppShell.openBookingsTab = ({bool guestPreview = false}) =>
         openBookings(guestPreview: guestPreview);
-    AppShell.selectTab = (index) => setState(() {
-      _index = index;
-      if (index != 1) {
-        _guestBookings = false;
-      }
-      if (index !=
-          (HomeData.fromJson(widget.bootstrap).on('bookings') ? 2 : 1)) {
-        _focusSearch = false;
-      }
-    });
+    AppShell.selectTab = _selectTab;
     if (widget.openClientCreateOnStart) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          openClientCreateFlow(context, home);
+          openClientCreateFlow(context, HomeData.fromJson(_bootstrap));
         }
       });
     }
@@ -161,7 +165,9 @@ class AppShellState extends State<AppShell>
 
   @override
   void dispose() {
-    if (identical(AppShell.currentBootstrap, widget.bootstrap)) {
+    WidgetsBinding.instance.removeObserver(this);
+    if (identical(AppShell.currentBootstrap, _bootstrap)) {
+      PushAlerts.instance.stop();
       AppShell.openBookingsTab = null;
       AppShell.selectTab = null;
       AppShell.currentHome = null;
@@ -171,13 +177,144 @@ class AppShellState extends State<AppShell>
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshBootstrap();
+      NotificationsStore.instance.refresh();
+    }
+  }
+
+  void _openInboxFromPush() {
+    final home = AppShell.currentHome ?? HomeData.fromJson(_bootstrap);
+    if (!home.on('notifications')) {
+      return;
+    }
+    final nav = LensApp.navigatorKey.currentState;
+    if (nav == null) {
+      return;
+    }
+    openNotifications(nav.context, home);
+  }
+
+  Future<void> _refreshBootstrap() async {
+    if (!LensConfig.useNetwork) {
+      return;
+    }
+    try {
+      final remote = await ApiClient().getJson('/app/bootstrap');
+      final types = remote['vendor_types'];
+      if (!mounted || types is! List) {
+        return;
+      }
+      setState(() {
+        _bootstrap = Map<String, dynamic>.from(remote);
+        AppShell.currentBootstrap = _bootstrap;
+      });
+      final home = HomeData.fromJson(_bootstrap);
+      AppShell.currentHome = home;
+      FavoritesStore.instance.hydrate(home);
+      NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
+    } catch (_) {}
+  }
+
   void _openMenu() => _menu.forward();
 
   void _closeMenu() => _menu.reverse();
 
+  bool get _menuOpen => _menu.value > 0.04;
+
+  bool _exitDialogOpen = false;
+
+  void _selectTab(int index, {bool resetHistory = false, bool guestBookings = false}) {
+    if (index == 0) {
+      _refreshBootstrap();
+    }
+    setState(() {
+      if (resetHistory || index == 0) {
+        _tabHistory
+          ..clear()
+          ..add(0);
+      } else if (index != _index) {
+        _tabHistory.add(index);
+      }
+      _index = index;
+      _guestBookings = index == 1 && guestBookings;
+      final searchIndex = HomeData.fromJson(_bootstrap).on('bookings') ? 2 : 1;
+      if (index != searchIndex) {
+        _focusSearch = false;
+      }
+    });
+  }
+
+  Future<void> _confirmExitApp() async {
+    if (!mounted || _exitDialogOpen) {
+      return;
+    }
+    _exitDialogOpen = true;
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('exit-app-dialog'),
+        backgroundColor: const Color(0xFF191A1F),
+        title: const Text(
+          'Exit Lens?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          'Are you sure you want to close the app?',
+          style: TextStyle(color: Color(0xFFC9C4BB)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('exit-app-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: LensColors.primary),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+    _exitDialogOpen = false;
+    if (shouldExit == true) {
+      await SystemNavigator.pop();
+    }
+  }
+
+  void _handleSystemBack() {
+    if (_menuOpen) {
+      _closeMenu();
+      return;
+    }
+    if (_tabHistory.length > 1) {
+      _tabHistory.removeLast();
+      setState(() {
+        _index = _tabHistory.last;
+        _guestBookings = false;
+        final searchIndex = HomeData.fromJson(_bootstrap).on('bookings')
+            ? 2
+            : 1;
+        if (_index != searchIndex) {
+          _focusSearch = false;
+        }
+      });
+      return;
+    }
+    if (_index != 0) {
+      _selectTab(0, resetHistory: true);
+      return;
+    }
+    _confirmExitApp();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final home = HomeData.fromJson(widget.bootstrap);
+    final home = HomeData.fromJson(_bootstrap);
     AppShell.currentHome = home;
     final bookingsOn = home.on('bookings');
     final searchIndex = bookingsOn ? 2 : 1;
@@ -191,16 +328,13 @@ class AppShellState extends State<AppShell>
         BookingsPage(
           home: home,
           asRoute: _guestBookings,
-          onBack: () => setState(() {
-            _index = 0;
-            _guestBookings = false;
-          }),
+          onBack: _handleSystemBack,
         ),
       SearchPage(data: home, autofocus: _focusSearch && _index == searchIndex),
       ProfilePage(
         data: home,
-        bootstrap: widget.bootstrap,
-        onOpenBookings: bookingsOn ? () => setState(() => _index = 1) : null,
+        bootstrap: _bootstrap,
+        onOpenBookings: bookingsOn ? () => _selectTab(1) : null,
       ),
     ];
 
@@ -214,7 +348,15 @@ class AppShellState extends State<AppShell>
         ? 'search'
         : 'profile';
 
-    return AnimatedBuilder(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        _handleSystemBack();
+      },
+      child: AnimatedBuilder(
       animation: _menuAnim,
       builder: (context, child) {
         final t = _menuAnim.value;
@@ -269,16 +411,9 @@ class AppShellState extends State<AppShell>
           bookingsOn: bookingsOn,
           index: visibleIndex,
           onCreate: () => AppShell.create(context),
-          onSelect: (index) => setState(() {
-            _index = index;
-            if (index != 1) {
-              _guestBookings = false;
-            }
-            if (index != searchIndex) {
-              _focusSearch = false;
-            }
-          }),
+          onSelect: _selectTab,
         ),
+      ),
       ),
     );
   }
@@ -292,15 +427,15 @@ class AppShellState extends State<AppShell>
     _closeMenu();
     switch (id) {
       case 'home':
-        setState(() => _index = 0);
+        _selectTab(0, resetHistory: true);
       case 'search':
         _openSearch();
       case 'bookings':
         if (bookingsOn) {
-          setState(() => _index = 1);
+          _selectTab(1);
         }
       case 'profile':
-        setState(() => _index = bookingsOn ? 3 : 2);
+        _selectTab(bookingsOn ? 3 : 2);
       case 'favorites':
         openFavorites(context, home);
       case 'notifications':
@@ -316,31 +451,27 @@ class AppShellState extends State<AppShell>
           MaterialPageRoute<void>(builder: (_) => AppSettingsPage(home: home)),
         );
       case 'signin':
-        setState(() => _index = bookingsOn ? 3 : 2);
+        _selectTab(bookingsOn ? 3 : 2);
       case 'signout':
         SessionStore.instance.signOut();
-        setState(() => _index = 0);
+        _selectTab(0, resetHistory: true);
     }
   }
 
   void openBookings({bool guestPreview = false}) {
-    final bookingsOn = HomeData.fromJson(widget.bootstrap).on('bookings');
+    final bookingsOn = HomeData.fromJson(_bootstrap).on('bookings');
     if (!bookingsOn) {
       return;
     }
-    setState(() {
-      _index = 1;
-      _guestBookings = guestPreview;
-      _focusSearch = false;
-    });
+    _selectTab(1, guestBookings: guestPreview);
   }
 
   void _openSearch({bool focus = false}) {
-    final bookingsOn = HomeData.fromJson(widget.bootstrap).on('bookings');
-    setState(() {
-      _index = bookingsOn ? 2 : 1;
-      _focusSearch = focus;
-    });
+    final bookingsOn = HomeData.fromJson(_bootstrap).on('bookings');
+    _selectTab(bookingsOn ? 2 : 1);
+    if (focus) {
+      setState(() => _focusSearch = true);
+    }
   }
 }
 
@@ -361,6 +492,10 @@ class _LensMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final scale = width < 720 ? width / 767 : 1.0;
+    final labelSize = 26 * scale;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: DecoratedBox(
@@ -386,14 +521,7 @@ class _LensMenu extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: BrandLogo(
-                          name: home.name,
-                          logoUrl: null,
-                          width: 180,
-                          height: 40,
-                          fontSize: 32,
-                          color: LensColors.cream,
-                        ),
+                        child: BrandLogo(name: home.name),
                       ),
                       IconButton(
                         tooltip: 'Close',
@@ -409,25 +537,38 @@ class _LensMenu extends StatelessWidget {
                   const SizedBox(height: 6),
                   const Divider(color: Color(0xFF2A2D34), height: 1),
                   const SizedBox(height: 10),
-                  _item(id: 'home', icon: Icons.home_outlined, label: 'Home'),
+                  _item(
+                    id: 'home',
+                    icon: Icons.home_outlined,
+                    label: 'Home',
+                    fontSize: labelSize,
+                  ),
                   if (home.on('favorites'))
                     _item(
                       id: 'favorites',
                       icon: Icons.favorite_border_rounded,
                       label: 'Favorites',
                       badge: FavoritesStore.instance.count,
+                      fontSize: labelSize,
                     ),
                   if (bookingsOn)
                     _item(
                       id: 'bookings',
                       icon: Icons.calendar_month_outlined,
                       label: 'Bookings',
+                      fontSize: labelSize,
                     ),
-                  _item(id: 'search', icon: Icons.search, label: 'Search'),
+                  _item(
+                    id: 'search',
+                    icon: Icons.search,
+                    label: 'Search',
+                    fontSize: labelSize,
+                  ),
                   _item(
                     id: 'profile',
                     icon: Icons.person_outline,
                     label: 'Profile',
+                    fontSize: labelSize,
                   ),
                   if (home.on('notifications'))
                     _item(
@@ -435,6 +576,7 @@ class _LensMenu extends StatelessWidget {
                       icon: Icons.notifications_none_rounded,
                       label: 'Notifications',
                       badge: NotificationsStore.instance.unread,
+                      fontSize: labelSize,
                     ),
                   const SizedBox(height: 8),
                   const Divider(color: Color(0xFF2A2D34), height: 1),
@@ -444,22 +586,26 @@ class _LensMenu extends StatelessWidget {
                       id: 'messages',
                       icon: Icons.chat_bubble_outline_rounded,
                       label: 'Messages',
+                      fontSize: labelSize,
                     ),
                   if (home.on('issue_reports'))
                     _item(
                       id: 'report',
                       icon: Icons.help_outline_rounded,
                       label: 'Report an Issue',
+                      fontSize: labelSize,
                     ),
                   _item(
                     id: 'settings',
                     icon: Icons.settings_outlined,
                     label: 'App Settings',
+                    fontSize: labelSize,
                   ),
                   _item(
                     id: signedIn ? 'signout' : 'signin',
                     icon: signedIn ? Icons.logout_rounded : Icons.login_rounded,
                     label: signedIn ? 'Log Out' : 'Sign In',
+                    fontSize: labelSize,
                   ),
                 ],
               );
@@ -474,6 +620,7 @@ class _LensMenu extends StatelessWidget {
     required String id,
     required IconData icon,
     required String label,
+    required double fontSize,
     int badge = 0,
   }) {
     final on = selected == id;
@@ -503,10 +650,11 @@ class _LensMenu extends StatelessWidget {
                 Expanded(
                   child: Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
-                      fontSize: 16,
+                      fontSize: fontSize,
+                      height: 1.15,
                     ),
                   ),
                 ),

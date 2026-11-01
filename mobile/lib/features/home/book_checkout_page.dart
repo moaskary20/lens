@@ -1,12 +1,12 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/book_confirmed_page.dart';
 import 'package:lens/features/home/book_draft.dart';
 import 'package:lens/features/home/book_payment_page.dart';
@@ -147,7 +147,7 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.chevron_left_rounded, color: LensColors.cream, size: 32),
           ),
-          const Expanded(child: Center(child: _LensMark())),
+          const Expanded(child: Center(child: BrandHeader(height: 36))),
           const SizedBox(width: 48),
         ],
       ),
@@ -556,6 +556,7 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
     if (!mounted) {
       return;
     }
+    BookedVendorsStore.instance.remember(vendor.id);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => BookConfirmedPage(
@@ -591,14 +592,22 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
     try {
       final payload = await ApiClient().postJson('/app/bookings/quote', {
         'vendor_id': vendor.id,
+        'package_type': draft.packageKey,
         'session_price': _session,
+        'duration_hours': draft.packageKey.contains('full')
+            ? 12
+            : (draft.packageKey.contains('hour') ? 4 : 6),
         'promo_code': code,
         'location_text': draft.location,
       });
       if (!mounted) {
         return;
       }
+      final backendSession = (payload['session_price'] as num?)?.toDouble();
       setState(() {
+        if (backendSession != null && backendSession > 0) {
+          draft.sessionPrice = backendSession;
+        }
         _discount = (payload['discount_amount'] as num?)?.toDouble() ?? 0;
         _quotedTotal = (payload['total_paid'] as num?)?.toDouble() ?? 0;
         _promoError = _discount > 0 ? null : 'Code accepted with no extra discount.';
@@ -617,6 +626,10 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
       return null;
     }
     try {
+      final notes = [
+        if (draft.notes.trim().isNotEmpty) draft.notes.trim(),
+        if (draft.hasMoodboard) draft.moodboard!.toNotesBlock(),
+      ].join('\n\n');
       final payload = await ApiClient().postJson('/app/bookings', {
         'vendor_id': vendor.id,
         'project_name': _title,
@@ -633,7 +646,7 @@ class _BookCheckoutPageState extends State<BookCheckoutPage> {
         'payment_details': draft.payment?.toApi(),
         'promo_code': draft.promoCode,
         'project_details': draft.details,
-        'notes': draft.notes,
+        'notes': notes,
       });
       return payload['id'] is int ? payload['id'] as int : int.tryParse('${payload['id']}');
     } catch (error) {
@@ -709,56 +722,6 @@ class _EscrowLockPainter extends CustomPainter {
       ..moveTo(w * 0.40, h * 0.46)
       ..cubicTo(w * 0.40, h * 0.32, w * 0.60, h * 0.32, w * 0.60, h * 0.46);
     canvas.drawPath(shackle, lock);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _LensMark extends StatelessWidget {
-  const _LensMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: -2,
-            child: CustomPaint(size: const Size(22, 14), painter: _SunburstPainter()),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              'lens',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 0.2, height: 1),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SunburstPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = LensColors.primary
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    final origin = Offset(size.width / 2, size.height);
-    for (var i = 0; i < 7; i++) {
-      final angle = -math.pi + (i * math.pi / 6);
-      canvas.drawLine(
-        origin + Offset(math.cos(angle) * 2, math.sin(angle) * 2),
-        origin + Offset(math.cos(angle) * 9, math.sin(angle) * 9),
-        paint,
-      );
-    }
   }
 
   @override

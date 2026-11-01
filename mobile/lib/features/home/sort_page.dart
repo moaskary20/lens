@@ -2,10 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 
+class SortResult {
+  const SortResult({
+    required this.sort,
+    this.price,
+  });
+
+  final String sort;
+  final RangeValues? price;
+}
+
 class SortPage extends StatefulWidget {
-  const SortPage({super.key, this.initial = 'rating'});
+  const SortPage({
+    super.key,
+    this.initial = 'rating',
+    this.initialPrice = const RangeValues(0, 10000),
+    this.priceMin = 0,
+    this.priceMax = 10000,
+  });
 
   final String initial;
+  final RangeValues initialPrice;
+  final double priceMin;
+  final double priceMax;
 
   @override
   State<SortPage> createState() => _SortPageState();
@@ -13,14 +32,23 @@ class SortPage extends StatefulWidget {
 
 class _SortPageState extends State<SortPage> {
   late String _selected;
+  late RangeValues _price;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.initial == 'recommended' ? 'rating' : widget.initial;
+    final min = widget.priceMin;
+    final max = widget.priceMax;
+    final start = widget.initialPrice.start.clamp(min, max).toDouble();
+    final end = widget.initialPrice.end.clamp(min, max).toDouble();
+    _price = RangeValues(start, end < start ? start : end);
   }
 
   bool get _priceSelected => _selected == 'price_asc' || _selected == 'price_desc';
+
+  double get _min => widget.priceMin;
+  double get _max => widget.priceMax;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +109,12 @@ class _SortPageState extends State<SortPage> {
                 width: double.infinity,
                 height: 54,
                 child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(_selected),
+                  onPressed: () => Navigator.of(context).pop(
+                    SortResult(
+                      sort: _selected,
+                      price: _priceSelected ? _price : null,
+                    ),
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: LensColors.primary,
                     foregroundColor: Colors.white,
@@ -92,7 +125,10 @@ class _SortPageState extends State<SortPage> {
               ),
             ),
             TextButton(
-              onPressed: () => setState(() => _selected = 'rating'),
+              onPressed: () => setState(() {
+                _selected = 'rating';
+                _price = RangeValues(_min, _max);
+              }),
               child: const Text('Clear All', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700, fontSize: 15)),
             ),
             const SizedBox(height: 12),
@@ -127,7 +163,7 @@ class _SortPageState extends State<SortPage> {
               children: [
                 Icon(icon, color: selected ? LensColors.primary : const Color(0xFFD6D1C8), size: 22),
                 const SizedBox(width: 12),
-                Expanded(child: _labels(title, subtitle)),
+                Expanded(child: _SortLabels(title: title, subtitle: subtitle)),
                 _radio(selected),
               ],
             ),
@@ -148,17 +184,32 @@ class _SortPageState extends State<SortPage> {
       child: Column(
         children: [
           InkWell(
-            onTap: () => setState(() => _selected = 'price_asc'),
+            onTap: () => setState(() {
+              if (!_priceSelected) {
+                _selected = 'price_asc';
+              }
+            }),
             child: Row(
               children: [
                 Icon(Icons.toll_outlined, color: _priceSelected ? LensColors.primary : const Color(0xFFD6D1C8), size: 22),
                 const SizedBox(width: 12),
                 const Expanded(child: _SortLabels(title: 'Price', subtitle: 'Sort by project price')),
+                Text(
+                  _priceTrailing(_price),
+                  style: TextStyle(
+                    color: _priceSelected ? LensColors.primary : const Color(0xFF8E8B84),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 10),
                 _radio(_priceSelected),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          _priceSlider(),
+          const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
               color: const Color(0xFF101114),
@@ -178,6 +229,101 @@ class _SortPageState extends State<SortPage> {
     );
   }
 
+  Widget _priceSlider() {
+    final start = _price.start.clamp(_min, _max).toDouble();
+    final end = _price.end.clamp(_min, _max).toDouble();
+    final safe = RangeValues(start, end < start ? start : end);
+    final span = (_max - _min).abs();
+    final divisions = span <= 0
+        ? null
+        : span <= 100
+            ? span.round().clamp(1, 100)
+            : span <= 2000
+                ? 40
+                : 100;
+
+    return Column(
+      children: [
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: LensColors.primary,
+            inactiveTrackColor: const Color(0xFF2A2D34),
+            thumbColor: LensColors.primary,
+            overlayColor: LensColors.primary.withValues(alpha: 0.16),
+            rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 8),
+            rangeTrackShape: const RoundedRectRangeSliderTrackShape(),
+            showValueIndicator: ShowValueIndicator.onDrag,
+            valueIndicatorColor: LensColors.primary,
+            valueIndicatorTextStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+            trackHeight: 4,
+          ),
+          child: RangeSlider(
+            min: _min,
+            max: _max,
+            divisions: divisions,
+            labels: RangeLabels(_formatAmount(safe.start), _formatAmount(safe.end)),
+            values: safe,
+            onChanged: (next) {
+              setState(() {
+                if (!_priceSelected) {
+                  _selected = 'price_asc';
+                }
+                final clamped = RangeValues(
+                  next.start.clamp(_min, _max).toDouble(),
+                  next.end.clamp(_min, _max).toDouble(),
+                );
+                _price = RangeValues(
+                  clamped.start,
+                  clamped.end < clamped.start ? clamped.start : clamped.end,
+                );
+              });
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+          child: Row(
+            children: [
+              Text(
+                'EGP ${_formatAmount(safe.start)}',
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              Text(
+                safe.end >= _max ? 'EGP ${_formatAmount(_max)}+' : 'EGP ${_formatAmount(safe.end)}',
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _priceTrailing(RangeValues values) {
+    final start = values.start.clamp(_min, _max);
+    final end = values.end.clamp(_min, _max);
+    final endLabel = end >= _max ? '${_formatAmount(_max)}+' : _formatAmount(end);
+    return 'EGP ${_formatAmount(start)} - $endLabel';
+  }
+
+  String _formatAmount(num value) {
+    final digits = value.round().toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      final fromEnd = digits.length - i;
+      buffer.write(digits[i]);
+      if (fromEnd > 1 && fromEnd % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+    return buffer.toString();
+  }
+
   Widget _nested(String title, String value) {
     return InkWell(
       onTap: () => setState(() => _selected = value),
@@ -194,8 +340,6 @@ class _SortPageState extends State<SortPage> {
       ),
     );
   }
-
-  Widget _labels(String title, String subtitle) => _SortLabels(title: title, subtitle: subtitle);
 
   Widget _radio(bool selected) {
     return Container(

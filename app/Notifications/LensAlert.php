@@ -23,7 +23,7 @@ class LensAlert extends Notification
      */
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
+        $channels = ['database', 'fcm'];
 
         if (LensNotifier::shouldEmail($this->event, $notifiable instanceof \App\Models\User ? $notifiable : null)) {
             $channels[] = 'mail';

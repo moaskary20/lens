@@ -5,7 +5,7 @@ import 'package:lens/features/shell/app_shell.dart';
 
 class CategoryFilters {
   const CategoryFilters({
-    this.gender = 'Men',
+    this.gender = 'All',
     this.services = const {},
     this.cities = const {},
     this.age = const RangeValues(18, 50),
@@ -18,8 +18,8 @@ class CategoryFilters {
     this.accents = const {},
     this.languages = const {},
     this.ageGroups = const {},
-    this.studioSize = const RangeValues(50, 500),
-    this.followers = const RangeValues(1000, 1000000),
+    this.studioSize = const RangeValues(0, 1000),
+    this.followers = const RangeValues(0, 1000000),
     this.price = const RangeValues(0, 10000),
     this.minRating,
     this.availability = 'any',
@@ -424,22 +424,59 @@ class CategoryFilters {
     );
   }
 
-  bool get isEmpty =>
-      services.isEmpty &&
-      cities.isEmpty &&
-      tops.isEmpty &&
-      pants.isEmpty &&
-      shoes.isEmpty &&
-      equipment.isEmpty &&
-      contentTypes.isEmpty &&
-      accents.isEmpty &&
-      languages.isEmpty &&
-      ageGroups.isEmpty &&
-      price.start == 0 &&
-      price.end == 10000 &&
-      minRating == null &&
-      availability == 'any' &&
-      !verifiedOnly;
+  bool get isEmpty => isClearedFor(vendorSlug);
+
+  bool isClearedFor(String? slug) {
+    final type = (slug ?? vendorSlug ?? '').toLowerCase();
+    final genderOk = switch (type) {
+      'model' || 'ugc' => gender == 'All',
+      _ => true,
+    };
+    return services.isEmpty &&
+        cities.isEmpty &&
+        tops.isEmpty &&
+        pants.isEmpty &&
+        shoes.isEmpty &&
+        equipment.isEmpty &&
+        contentTypes.isEmpty &&
+        accents.isEmpty &&
+        languages.isEmpty &&
+        ageGroups.isEmpty &&
+        genderOk &&
+        isDefaultPrice(type) &&
+        isDefaultStudioSize(type) &&
+        isDefaultFollowers(type) &&
+        minRating == null &&
+        availability == 'any' &&
+        !verifiedOnly;
+  }
+
+  bool isDefaultPrice(String? slug) {
+    final type = (slug ?? vendorSlug ?? '').toLowerCase();
+    if (type == 'studio') {
+      return price.start <= 0 && price.end >= 2000;
+    }
+    if (type == 'model' || type == 'ugc' || type == 'food_stylist') {
+      return price.start <= 500 && price.end >= 10000;
+    }
+    return price.start <= 0 && price.end >= 10000;
+  }
+
+  bool isDefaultStudioSize(String? slug) {
+    final type = (slug ?? vendorSlug ?? '').toLowerCase();
+    if (type != 'studio') {
+      return true;
+    }
+    return studioSize.start <= 0 && studioSize.end >= 1000;
+  }
+
+  bool isDefaultFollowers(String? slug) {
+    final type = (slug ?? vendorSlug ?? '').toLowerCase();
+    if (type != 'ugc') {
+      return true;
+    }
+    return followers.start <= 0 && followers.end >= 1000000;
+  }
 }
 
 class FilterPage extends StatefulWidget {
@@ -506,25 +543,74 @@ class _FilterPageState extends State<FilterPage> {
   void initState() {
     super.initState();
     _slug = widget.initial.vendorSlug ?? widget.vendorTypeSlug;
-    _filters = widget.initial.isEmpty ? _previewForType : widget.initial;
+    _filters = widget.initial.isEmpty ? _clearedForType : widget.initial;
+    _filters = _normalizeRanges(_filters);
     _cityQuery = TextEditingController();
   }
 
-  CategoryFilters get _previewForType {
-    if (_isModel) {
-      return CategoryFilters.modelPreview;
-    }
+  CategoryFilters _normalizeRanges(CategoryFilters filters) {
     if (_isStudio) {
-      return CategoryFilters.studioPreview;
+      return filters.copyWith(
+        price: _clampRange(filters.price, 0, 2000),
+        studioSize: _clampRange(filters.studioSize, 0, 1000),
+      );
+    }
+    if (_isModel) {
+      final kids = filters.gender == 'Kids';
+      return filters.copyWith(
+        price: _clampRange(filters.price, 500, 10000),
+        age: _clampRange(filters.age, 0, kids ? 17 : 60),
+        height: _clampRange(filters.height, kids ? 80 : 140, 210),
+      );
     }
     if (_isUgc) {
-      return CategoryFilters.ugcPreview;
+      return filters.copyWith(
+        price: _clampRange(filters.price, 0, 10000),
+        followers: _clampRange(filters.followers, 0, 1000000),
+      );
     }
     if (_isFood) {
-      return CategoryFilters.foodPreview;
+      return filters.copyWith(price: _clampRange(filters.price, 0, 10000));
     }
-    return const CategoryFilters();
+    return filters.copyWith(price: _clampRange(filters.price, 0, 10000));
   }
+
+  /// Neutral defaults for the active vendor type (no chips selected).
+  CategoryFilters get _clearedForType {
+    if (_isModel) {
+      return const CategoryFilters(
+        gender: 'All',
+        age: RangeValues(18, 50),
+        height: RangeValues(160, 200),
+        price: RangeValues(500, 10000),
+        vendorSlug: 'model',
+      );
+    }
+    if (_isStudio) {
+      return const CategoryFilters(
+        studioSize: RangeValues(0, 1000),
+        price: RangeValues(0, 2000),
+        vendorSlug: 'studio',
+      );
+    }
+    if (_isUgc) {
+      return const CategoryFilters(
+        gender: 'All',
+        followers: RangeValues(0, 1000000),
+        price: RangeValues(0, 10000),
+        vendorSlug: 'ugc',
+      );
+    }
+    if (_isFood) {
+      return const CategoryFilters(
+        price: RangeValues(0, 10000),
+        vendorSlug: 'food_stylist',
+      );
+    }
+    return CategoryFilters(vendorSlug: _activeSlug);
+  }
+
+  CategoryFilters get _previewForType => _clearedForType;
 
   @override
   void dispose() {
@@ -564,7 +650,10 @@ class _FilterPageState extends State<FilterPage> {
       }
     }
     final name = type?.label ?? widget.title;
-    return _isModel ? 'Filter $name (${_filters.gender})' : 'Filter $name';
+    if (_isModel && _filters.gender != 'All') {
+      return 'Filter $name (${_filters.gender})';
+    }
+    return 'Filter $name';
   }
 
   int get _activeCount {
@@ -630,10 +719,8 @@ class _FilterPageState extends State<FilterPage> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => setState(() {
-                      _filters = _previewForType;
-                      _cityQuery.clear();
-                    }),
+                    key: const Key('filter-reset-all'),
+                    onPressed: _resetAll,
                     child: const Text('Reset All', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700)),
                   ),
                 ],
@@ -686,12 +773,18 @@ class _FilterPageState extends State<FilterPage> {
                         children: [
                           _rangeSlider(
                             min: 0,
-                            max: 60,
+                            max: _filters.gender == 'Kids' ? 17 : 60,
                             values: _filters.age,
+                            unitSuffix: ' yrs',
                             onChanged: (value) => setState(() => _filters = _filters.copyWith(age: value)),
                           ),
                           _chips(
-                            _labels('model_age', CategoryFilters.ageBands),
+                            _labels(
+                              'model_age',
+                              _filters.gender == 'Kids'
+                                  ? const ['Under 18']
+                                  : CategoryFilters.ageBands,
+                            ),
                             _selectedAgeBands,
                             _selectAgeBand,
                           ),
@@ -706,9 +799,10 @@ class _FilterPageState extends State<FilterPage> {
                       child: Column(
                         children: [
                           _rangeSlider(
-                            min: 140,
+                            min: _filters.gender == 'Kids' ? 80 : 140,
                             max: 210,
                             values: _filters.height,
+                            unitSuffix: ' cm',
                             onChanged: (value) => setState(() => _filters = _filters.copyWith(height: value)),
                           ),
                           _chips(
@@ -788,13 +882,15 @@ class _FilterPageState extends State<FilterPage> {
                       id: 'price',
                       icon: Icons.payments_outlined,
                       title: 'Price Range (EGP/hour)',
-                      trailing: 'EGP ${_filters.price.start.round()} - ${_filters.price.end.round()}+',
+                      trailing: _priceTrailing(_filters.price, min: 0, max: 2000),
                       child: Column(
                         children: [
                           _rangeSlider(
                             min: 0,
                             max: 2000,
-                            values: RangeValues(_filters.price.start.clamp(0, 2000), _filters.price.end.clamp(0, 2000)),
+                            values: _filters.price,
+                            unitPrefix: 'EGP ',
+                            openEndedMax: true,
                             onChanged: (value) => setState(() => _filters = _filters.copyWith(price: value)),
                           ),
                           _chips(
@@ -816,6 +912,8 @@ class _FilterPageState extends State<FilterPage> {
                             min: 0,
                             max: 1000,
                             values: _filters.studioSize,
+                            unitSuffix: ' m²',
+                            openEndedMax: true,
                             onChanged: (value) => setState(() => _filters = _filters.copyWith(studioSize: value)),
                           ),
                           _chips(
@@ -846,31 +944,18 @@ class _FilterPageState extends State<FilterPage> {
                       id: 'price',
                       icon: Icons.calendar_view_day_outlined,
                       title: 'Price Range (EGP)',
-                      child: Column(
-                        children: [
-                          _rangeSlider(
-                            min: _isModel ? 500 : 0,
-                            max: 10000,
-                            values: RangeValues(
-                              _isModel ? _filters.price.start.clamp(500, 10000) : _filters.price.start,
-                              _filters.price.end,
-                            ),
-                            onChanged: (value) => setState(() => _filters = _filters.copyWith(price: value)),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Row(
-                              children: [
-                                Text(
-                                  _isModel ? '500' : '0',
-                                  style: const TextStyle(color: LensColors.slate, fontSize: 12, fontWeight: FontWeight.w600),
-                                ),
-                                const Spacer(),
-                                const Text('10,000+', style: TextStyle(color: LensColors.slate, fontSize: 12, fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          ),
-                        ],
+                      trailing: _priceTrailing(
+                        _filters.price,
+                        min: _isModel ? 500 : 0,
+                        max: 10000,
+                      ),
+                      child: _rangeSlider(
+                        min: _isModel ? 500 : 0,
+                        max: 10000,
+                        values: _filters.price,
+                        unitPrefix: 'EGP ',
+                        openEndedMax: true,
+                        onChanged: (value) => setState(() => _filters = _filters.copyWith(price: value)),
                       ),
                     ),
                   if (_isStudio)
@@ -1270,13 +1355,15 @@ class _FilterPageState extends State<FilterPage> {
         id: 'price',
         icon: Icons.payments_outlined,
         title: 'Price Range (EGP / video)',
-        trailing: 'EGP ${_filters.price.start.round()} - 10,000+',
+        trailing: _priceTrailing(_filters.price, min: 0, max: 10000),
         child: Column(
           children: [
             _rangeSlider(
               min: 0,
               max: 10000,
-              values: RangeValues(_filters.price.start.clamp(0, 10000), _filters.price.end.clamp(0, 10000)),
+              values: _filters.price,
+              unitPrefix: 'EGP ',
+              openEndedMax: true,
               onChanged: (value) => setState(() => _filters = _filters.copyWith(price: value)),
             ),
             _chips(_labels('food_price', CategoryFilters.ugcPriceBands), _selectedUgcPriceBands, _selectUgcPriceBand),
@@ -1339,6 +1426,8 @@ class _FilterPageState extends State<FilterPage> {
               min: 0,
               max: 1000000,
               values: _filters.followers,
+              compact: true,
+              openEndedMax: true,
               onChanged: (value) => setState(() => _filters = _filters.copyWith(followers: value)),
             ),
             _chips(_labels('ugc_followers', CategoryFilters.ugcFollowerBands), _selectedFollowerBands, _selectFollowerBand),
@@ -1349,13 +1438,15 @@ class _FilterPageState extends State<FilterPage> {
         id: 'price',
         icon: Icons.payments_outlined,
         title: 'Price Range (EGP / video)',
-        trailing: 'EGP ${_filters.price.start.round()} - ${_filters.price.end >= 10000 ? '10,000+' : _filters.price.end.round().toString()}',
+        trailing: _priceTrailing(_filters.price, min: 0, max: 10000),
         child: Column(
           children: [
             _rangeSlider(
               min: 0,
               max: 10000,
-              values: RangeValues(_filters.price.start.clamp(0, 10000), _filters.price.end.clamp(0, 10000)),
+              values: _filters.price,
+              unitPrefix: 'EGP ',
+              openEndedMax: true,
               onChanged: (value) => setState(() => _filters = _filters.copyWith(price: value)),
             ),
             _chips(_labels('ugc_price', CategoryFilters.ugcPriceBands), _selectedUgcPriceBands, _selectUgcPriceBand),
@@ -1484,8 +1575,35 @@ class _FilterPageState extends State<FilterPage> {
         _ => 'Any Time',
       };
 
+  void _resetAll() {
+    final cleared = _normalizeRanges(_clearedForType).copyWith(
+      vendorSlug: _activeSlug.isEmpty ? null : _activeSlug,
+    );
+    _cityQuery.clear();
+    Navigator.of(context).pop(cleared);
+  }
+
+  void _selectModelGender(String option) {
+    var age = _filters.age;
+    var height = _filters.height;
+    if (option == 'Kids') {
+      age = const RangeValues(0, 17);
+      if (height.start >= 140) {
+        height = const RangeValues(80, 160);
+      }
+    } else if (_filters.gender == 'Kids' || option == 'All') {
+      if (age.end.round() <= 17) {
+        age = const RangeValues(18, 50);
+      }
+      if (height.start.round() < 140) {
+        height = const RangeValues(140, 190);
+      }
+    }
+    setState(() => _filters = _filters.copyWith(gender: option, age: age, height: height));
+  }
+
   Widget _genderTabs() {
-    final options = _labels('model_identity', CategoryFilters.genders);
+    final options = ['All', ..._labels('model_identity', CategoryFilters.genders).where((item) => item != 'All')];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -1498,7 +1616,7 @@ class _FilterPageState extends State<FilterPage> {
           final selected = _filters.gender == option;
           return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _filters = _filters.copyWith(gender: option)),
+              onTap: () => _selectModelGender(option),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 height: 46,
@@ -1510,16 +1628,24 @@ class _FilterPageState extends State<FilterPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      option == 'Kids' ? Icons.escalator_warning_rounded : Icons.person_outline,
+                      switch (option) {
+                        'Kids' => Icons.escalator_warning_rounded,
+                        'All' => Icons.groups_outlined,
+                        _ => Icons.person_outline,
+                      },
                       color: selected ? Colors.white : const Color(0xFFD0CBC3),
-                      size: 18,
+                      size: 16,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      option,
-                      style: TextStyle(
-                        color: selected ? Colors.white : const Color(0xFFD0CBC3),
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        option,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selected ? Colors.white : const Color(0xFFD0CBC3),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                        ),
                       ),
                     ),
                   ],
@@ -1579,30 +1705,157 @@ class _FilterPageState extends State<FilterPage> {
     );
   }
 
+  String _formatAmount(num value) {
+    final digits = value.round().abs().toString();
+    final buffer = StringBuffer(value < 0 ? '-' : '');
+    for (var i = 0; i < digits.length; i++) {
+      final fromEnd = digits.length - i;
+      buffer.write(digits[i]);
+      if (fromEnd > 1 && fromEnd % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+    return buffer.toString();
+  }
+
+  String _formatCompact(num value) {
+    final n = value.round();
+    if (n >= 1000000) {
+      final m = n / 1000000;
+      return m == m.roundToDouble() ? '${m.round()}M' : '${m.toStringAsFixed(1)}M';
+    }
+    if (n >= 1000) {
+      final k = n / 1000;
+      return k == k.roundToDouble() ? '${k.round()}K' : '${k.toStringAsFixed(1)}K';
+    }
+    return _formatAmount(n);
+  }
+
+  String _priceTrailing(RangeValues values, {required double min, required double max}) {
+    final safe = _clampRange(values, min, max);
+    final endLabel = safe.end >= max - 0.001 ? '${_formatAmount(max)}+' : _formatAmount(safe.end);
+    return 'EGP ${_formatAmount(safe.start)} – $endLabel';
+  }
+
+  RangeValues _clampRange(RangeValues values, double min, double max) {
+    final start = values.start.clamp(min, max).toDouble();
+    final end = values.end.clamp(min, max).toDouble();
+    return RangeValues(start, end < start ? start : end);
+  }
+
+  int? _rangeDivisions(double min, double max) {
+    final span = (max - min).abs();
+    if (span <= 0) {
+      return null;
+    }
+    if (span <= 60) {
+      return span.round().clamp(1, 60);
+    }
+    if (span <= 500) {
+      return (span / 5).round().clamp(20, 100);
+    }
+    if (span <= 2000) {
+      return (span / 25).round().clamp(40, 120);
+    }
+    if (span <= 20000) {
+      return (span / 50).round().clamp(80, 200);
+    }
+    return 100;
+  }
+
   Widget _rangeSlider({
     required double min,
     required double max,
     required RangeValues values,
     required ValueChanged<RangeValues> onChanged,
+    bool showLabels = true,
+    String? unitPrefix,
+    String? unitSuffix,
+    bool openEndedMax = false,
+    bool compact = false,
   }) {
-    final start = values.start.clamp(min, max);
-    final end = values.end.clamp(min, max);
-    return SliderTheme(
-      data: SliderTheme.of(context).copyWith(
-        activeTrackColor: LensColors.primary,
-        inactiveTrackColor: const Color(0xFF2A2D34),
-        thumbColor: LensColors.primary,
-        overlayColor: LensColors.primary.withValues(alpha: 0.16),
-        rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 8),
-        rangeTrackShape: const RoundedRectRangeSliderTrackShape(),
-        trackHeight: 4,
-      ),
-      child: RangeSlider(
-        min: min,
-        max: max,
-        values: RangeValues(start, end < start ? start : end),
-        onChanged: onChanged,
-      ),
+    final safe = _clampRange(values, min, max);
+    final divisions = _rangeDivisions(min, max);
+    String labelFor(double value, {required bool isEnd}) {
+      final raw = compact ? _formatCompact(value) : _formatAmount(value);
+      final withPlus = openEndedMax && isEnd && value >= max - 0.001 ? '$raw+' : raw;
+      if (unitPrefix != null) {
+        return '$unitPrefix$withPlus';
+      }
+      if (unitSuffix != null) {
+        return '$withPlus$unitSuffix';
+      }
+      return withPlus;
+    }
+
+    final startLabel = labelFor(safe.start, isEnd: false);
+    final endLabel = labelFor(safe.end, isEnd: true);
+
+    return Column(
+      children: [
+        if (showLabels)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A120E),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0x55FF5A1F)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      startLabel,
+                      key: ValueKey('range-start-$startLabel'),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const Text('—', style: TextStyle(color: Color(0xFF8E8B84), fontWeight: FontWeight.w700)),
+                  Expanded(
+                    child: Text(
+                      endLabel,
+                      key: ValueKey('range-end-$endLabel'),
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: LensColors.primary,
+            inactiveTrackColor: const Color(0xFF2A2D34),
+            thumbColor: LensColors.primary,
+            overlayColor: LensColors.primary.withValues(alpha: 0.18),
+            rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 10),
+            rangeTrackShape: const RoundedRectRangeSliderTrackShape(),
+            rangeValueIndicatorShape: const PaddleRangeSliderValueIndicatorShape(),
+            showValueIndicator: ShowValueIndicator.alwaysVisible,
+            valueIndicatorColor: LensColors.primary,
+            valueIndicatorTextStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+            trackHeight: 4,
+          ),
+          child: RangeSlider(
+            min: min,
+            max: max,
+            divisions: divisions,
+            labels: RangeLabels(startLabel, endLabel),
+            values: safe,
+            onChanged: (next) {
+              onChanged(_clampRange(next, min, max));
+            },
+          ),
+        ),
+      ],
     );
   }
 

@@ -44,7 +44,7 @@ class RegisterScaffold extends StatelessWidget {
                     icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
                   ),
                   const Expanded(
-                    child: BrandLogo(width: 120, height: 34),
+                    child: BrandHeader(),
                   ),
                 ],
               ),

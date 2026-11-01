@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/shell/app_shell.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -17,11 +19,49 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void initState() {
     super.initState();
-    NotificationsStore.instance.refresh();
+    SessionStore.instance.addListener(_onSession);
+    _refreshIfSignedIn();
+  }
+
+  @override
+  void dispose() {
+    SessionStore.instance.removeListener(_onSession);
+    super.dispose();
+  }
+
+  void _onSession() {
+    if (!mounted) {
+      return;
+    }
+    setState(_refreshIfSignedIn);
+  }
+
+  void _refreshIfSignedIn() {
+    if (!SessionStore.instance.isGuest) {
+      NotificationsStore.instance.refresh();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (SessionStore.instance.isGuest) {
+      return Scaffold(
+        backgroundColor: LensColors.charcoal,
+        body: Stack(
+          children: [
+            LoginView(bootstrap: widget.home.registerCatalog),
+            SafeArea(
+              child: IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: LensColors.charcoal,
       bottomNavigationBar: AppShell.navBar(context, index: 0),

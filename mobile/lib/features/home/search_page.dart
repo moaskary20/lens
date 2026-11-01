@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/device_location.dart';
+import 'package:lens/core/egypt_governorates.dart';
+import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
@@ -42,10 +47,14 @@ class _SearchPageState extends State<SearchPage> {
 
   final _query = TextEditingController();
   final _focus = FocusNode();
+  final _api = ApiClient();
   String _city = 'Getting location...';
   bool _locating = false;
   bool _manualCitySelection = false;
+  bool _loadingVendors = false;
   String? _typeSlug;
+  List<VendorCard>? _remoteVendors;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -63,6 +72,11 @@ class _SearchPageState extends State<SearchPage> {
         if (mounted) _focus.requestFocus();
       });
     }
+    if (LensConfig.useNetwork) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadVendors();
+      });
+    }
   }
 
   @override
@@ -75,21 +89,119 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _query.dispose();
     _focus.dispose();
     super.dispose();
   }
 
-  List<String> get _cities {
-    final configuredCities = widget.data.cities
-        .map((city) => city['name'] ?? city['name_en'] ?? city['label'])
+  int? _cityIdFor(String cityName) {
+    if (!_isSelectableCity(cityName)) {
+      return null;
+    }
+    final needle = _normalizeCity(cityName);
+    for (final city in widget.data.cities) {
+      final name = EgyptGovernorates.toEnglish(
+        '${city['name_en'] ?? city['name'] ?? city['label'] ?? ''}',
+      );
+      if (_normalizeCity(name) == needle) {
+        final id = city['id'];
+        if (id is int) {
+          return id;
+        }
+        return int.tryParse('$id');
+      }
+    }
+    return null;
+  }
+
+  Future<void> _loadVendors() async {
+    if (!LensConfig.useNetwork || _loadingVendors) {
+      return;
+    }
+    setState(() => _loadingVendors = true);
+    try {
+      final params = <String, String>{
+        'limit': '40',
+        if (_typeSlug != null && _typeSlug!.isNotEmpty) 'vendor_type': _typeSlug!,
+        if (_query.text.trim().isNotEmpty) 'q': _query.text.trim(),
+      };
+      final cityId = _cityIdFor(_city);
+      if (cityId != null) {
+        params['city_id'] = '$cityId';
+      }
+      final query = params.entries
+          .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
+          .join('&');
+      final payload = await _api.getJson('/app/vendors?$query');
+      final vendors = (payload['vendors'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => VendorCard.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _remoteVendors = vendors;
+        _loadingVendors = false;
+      });
+      FavoritesStore.instance.remember(vendors);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingVendors = false);
+      }
+    }
+  }
+
+  void _scheduleVendorReload() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), _loadVendors);
+  }
+
+  List<String> get _catalogCities {
+    final configured = widget.data.cities
+        .map((city) => city['name_en'] ?? city['name'] ?? city['label'])
         .whereType<Object>()
-        .map((city) => city.toString().trim())
+        .map((city) => EgyptGovernorates.toEnglish(city.toString().trim()))
         .where((city) => city.isNotEmpty)
         .toSet()
-        .toList();
-    return configuredCities.isEmpty ? _fallbackCities : configuredCities;
+        .toList()
+      ..sort();
+    return configured.isEmpty ? _fallbackCities : configured;
   }
+
+  /// Current location + governorates that already have vendors, in English.
+  List<String> get _cities {
+    final vendorCities = <String>{};
+    for (final vendor in _allVendors) {
+      final english = EgyptGovernorates.toEnglish(vendor.city);
+      if (english.isEmpty) {
+        continue;
+      }
+      vendorCities.add(_matchConfiguredCity(english, catalog: _catalogCities));
+    }
+
+    final selected = <String>{
+      ...vendorCities,
+      if (_isSelectableCity(_city)) EgyptGovernorates.toEnglish(_city),
+    };
+
+    final ordered = _catalogCities
+        .where((city) => selected.any((item) => _normalizeCity(item) == _normalizeCity(city)))
+        .toList();
+    if (ordered.isNotEmpty) {
+      return ordered;
+    }
+    if (selected.isNotEmpty) {
+      return selected.toList()..sort();
+    }
+    return _catalogCities;
+  }
+
+  bool _isSelectableCity(String city) =>
+      city.isNotEmpty &&
+      city != 'Getting location...' &&
+      city != 'Select location';
 
   Future<void> _detectGovernorate({bool force = false}) async {
     if (_locating) return;
@@ -114,7 +226,13 @@ class _SearchPageState extends State<SearchPage> {
         );
       }
       if (!_manualCitySelection) {
-        setState(() => _city = _matchConfiguredCity(governorate.trim()));
+        setState(
+          () => _city = _matchConfiguredCity(
+            EgyptGovernorates.toEnglish(governorate.trim()),
+            catalog: _catalogCities,
+          ),
+        );
+        _loadVendors();
       }
     } catch (error) {
       if (!mounted) return;
@@ -131,21 +249,17 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
-  String _matchConfiguredCity(String governorate) {
+  String _matchConfiguredCity(String governorate, {List<String>? catalog}) {
     final normalized = _normalizeCity(governorate);
-    for (final city in _cities) {
+    for (final city in catalog ?? _catalogCities) {
       if (_normalizeCity(city) == normalized) {
         return city;
       }
     }
-    return governorate;
+    return EgyptGovernorates.toEnglish(governorate);
   }
 
-  String _normalizeCity(String city) => city
-      .replaceAll(RegExp(r'\s+Governorate$', caseSensitive: false), '')
-      .replaceAll(RegExp(r'\s+Province$', caseSensitive: false), '')
-      .trim()
-      .toLowerCase();
+  String _normalizeCity(String city) => EgyptGovernorates.normalize(city);
 
   List<VendorTypeItem> get _types {
     final types = [...widget.data.vendorTypes];
@@ -157,7 +271,7 @@ class _SearchPageState extends State<SearchPage> {
     return types;
   }
 
-  List<VendorCard> get _allVendors {
+  List<VendorCard> get _bootstrapVendors {
     final seen = <int>{};
     final items = <VendorCard>[];
     for (final section in widget.data.popular) {
@@ -170,17 +284,29 @@ class _SearchPageState extends State<SearchPage> {
     return items;
   }
 
+  List<VendorCard> get _allVendors {
+    final remote = _remoteVendors;
+    if (remote != null) {
+      return remote;
+    }
+    return _bootstrapVendors;
+  }
+
   List<VendorCard> _filtered({String? type}) {
     final needle = _query.text.trim().toLowerCase();
+    final usingRemote = _remoteVendors != null;
     return _allVendors.where((vendor) {
-      if (type != null && type.isNotEmpty && vendor.vendorType != type) {
+      if (type != null &&
+          type.isNotEmpty &&
+          vendor.vendorType != type &&
+          !(usingRemote && type == _typeSlug)) {
         return false;
       }
-      if (needle.isEmpty) {
+      if (usingRemote || needle.isEmpty) {
         return true;
       }
       final haystack = [
-        vendor.displayName,
+        vendor.publicName,
         vendor.vendorTypeName,
         vendor.city,
         vendor.location,
@@ -274,6 +400,7 @@ class _SearchPageState extends State<SearchPage> {
                   _manualCitySelection = true;
                   _city = value;
                 });
+                _loadVendors();
               }
             },
             itemBuilder: (context) => [
@@ -345,7 +472,10 @@ class _SearchPageState extends State<SearchPage> {
                     child: TextField(
                       controller: _query,
                       focusNode: _focus,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) {
+                        setState(() {});
+                        _scheduleVendorReload();
+                      },
                       style: const TextStyle(color: Colors.white, fontSize: 14),
                       cursorColor: LensColors.primary,
                       decoration: const InputDecoration(
@@ -393,7 +523,35 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
+  String _chipLabel(VendorTypeItem type) =>
+      type.slug == 'ugc' ? 'UGC' : type.label;
+
+  double _chipWidth(BuildContext context) {
+    const style = TextStyle(
+      color: Colors.white,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      height: 1.1,
+    );
+    var widest = 0.0;
+    final scaler = MediaQuery.textScalerOf(context);
+    for (final type in _types) {
+      final painter = TextPainter(
+        text: TextSpan(text: _chipLabel(type), style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      if (painter.width > widest) {
+        widest = painter.width;
+      }
+    }
+    // Horizontal padding 8+8 inside the chip.
+    return (widest + 16).clamp(72.0, 160.0);
+  }
+
   Widget _chips() {
+    final chipWidth = _chipWidth(context);
     return SizedBox(
       height: 88,
       child: ListView.separated(
@@ -405,9 +563,13 @@ class _SearchPageState extends State<SearchPage> {
           final type = _types[index];
           final selected = type.slug == _typeSlug;
           return GestureDetector(
-            onTap: () => setState(() => _typeSlug = type.slug),
+            onTap: () {
+              setState(() => _typeSlug = type.slug);
+              _loadVendors();
+            },
             child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              width: chipWidth,
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
               decoration: BoxDecoration(
                 color: const Color(0xFF141210),
                 borderRadius: BorderRadius.circular(16),
@@ -421,20 +583,26 @@ class _SearchPageState extends State<SearchPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    _iconFor(type.slug),
-                    color: LensColors.primary,
-                    size: 22,
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Center(
+                      child: Icon(
+                        _iconFor(type.slug),
+                        color: LensColors.primary,
+                        size: 24,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    type.slug == 'ugc' ? 'UGC' : type.label,
+                    _chipLabel(type),
                     maxLines: 1,
                     softWrap: false,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       height: 1.1,
                     ),
@@ -700,7 +868,7 @@ class _SearchVendorCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          vendor.displayName,
+                          vendor.publicName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1003,10 +1171,12 @@ IconData _iconFor(String slug) {
     'photographer' => Icons.photo_camera_outlined,
     'videographer' => Icons.videocam_outlined,
     'reels' => Icons.movie_creation_outlined,
-    'model' => Icons.person_outline,
+    'model' => Icons.person_outline_rounded,
     'studio' => Icons.apartment_outlined,
     'ugc' => Icons.groups_outlined,
-    'food_stylist' => Icons.restaurant,
+    'food_stylist' => Icons.restaurant_outlined,
+    'ai_motion' || 'ai_video' => Icons.auto_awesome_outlined,
+    'voice' || 'voiceover' => Icons.mic_none_outlined,
     _ => Icons.category_outlined,
   };
 }

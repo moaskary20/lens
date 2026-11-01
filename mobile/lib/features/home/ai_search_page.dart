@@ -145,7 +145,7 @@ class _AiSearchPageState extends State<AiSearchPage> with SingleTickerProviderSt
         {
           'rank': i + 1,
           'id': pool[i].id,
-          'display_name': pool[i].displayName,
+          'display_name': pool[i].publicName,
           'city': pool[i].city,
           'rating_avg': pool[i].ratingAvg,
           'price': pool[i].startingFrom,
@@ -157,8 +157,8 @@ class _AiSearchPageState extends State<AiSearchPage> with SingleTickerProviderSt
         ? null
         : {
             'id': pool.first.id,
-            'display_name': pool.first.displayName,
-            'why': '${pool.first.displayName} is the best fit: ${pool.first.ratingAvg} stars in ${pool.first.city}.',
+            'display_name': pool.first.publicName,
+            'why': '${pool.first.publicName} is the best fit: ${pool.first.ratingAvg} stars in ${pool.first.city}.',
           };
     final locale = SessionStore.instance.locale;
     final reply = pool.isEmpty
@@ -247,7 +247,7 @@ class _AiSearchPageState extends State<AiSearchPage> with SingleTickerProviderSt
                         if (_comparison.isNotEmpty) _compareCard(),
                         if (_vendors.isNotEmpty) _vendorList(),
                         if (_addOns.isNotEmpty) _addOnCard(),
-                        if (home.moodboardOn) _moodboardCard(),
+                        if (home.moodboardOn && !home.moodboardLocked) _moodboardCard(),
                       ],
                     ],
                   ),
@@ -364,7 +364,7 @@ class _AiSearchPageState extends State<AiSearchPage> with SingleTickerProviderSt
               _tag('Chat'),
               if (home.voiceInput) _tag('Voice'),
               _tag('Compare'),
-              if (home.moodboardOn) _tag(home.moodboardLocked ? 'Moodboard after pay' : 'Moodboard'),
+              if (home.moodboardOn && !home.moodboardLocked) _tag('Moodboard'),
             ],
           ),
           if (_lines.length <= 1) ...[
@@ -504,7 +504,7 @@ class _AiSearchPageState extends State<AiSearchPage> with SingleTickerProviderSt
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(vendor.displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                            Text(vendor.publicName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                             Text('${vendor.vendorTypeName} · ${vendor.city}', style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
                           ],
                         ),

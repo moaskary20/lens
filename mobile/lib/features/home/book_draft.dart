@@ -1,4 +1,5 @@
 import 'package:lens/core/models/home_data.dart';
+import 'package:lens/features/home/book_moodboard.dart';
 
 class BookPriceOption {
   const BookPriceOption({
@@ -55,6 +56,7 @@ class BookDraft {
     this.notes = '',
     Map<String, String>? details,
     List<String>? images,
+    this.moodboard,
     this.paymentMethod = 'card',
     this.promoCode,
     this.payment,
@@ -79,10 +81,12 @@ class BookDraft {
   String notes;
   Map<String, String> details;
   List<String> images;
+  BookMoodboard? moodboard;
   String paymentMethod;
   String? promoCode;
   BookPaymentDetails? payment;
 
+  bool get hasMoodboard => moodboard != null && moodboard!.isAttached;
   bool get hasPaymentDetails => payment != null && payment!.method == paymentMethod && payment!.isComplete;
 
   String get durationLabel {

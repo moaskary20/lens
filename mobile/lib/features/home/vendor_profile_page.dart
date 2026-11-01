@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/contact_launch.dart';
 import 'package:lens/core/models/home_data.dart';
@@ -55,8 +56,9 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   VendorCard get vendor => widget.vendor;
   bool get booked => widget.booked;
   bool get _guest => SessionStore.instance.isGuest;
-  String get _visibleName => vendor.publicName;
-  String get _visibleBio => _guest ? _bio.replaceAll(vendor.displayName, vendor.maskedName) : _bio;
+  bool get _revealName => booked || BookedVendorsStore.instance.has(vendor.id);
+  String get _visibleName => _revealName ? vendor.displayName : vendor.publicName;
+  String get _visibleBio => _revealName ? _bio : _bio.replaceAll(vendor.displayName, vendor.maskedName);
 
   String get _phone {
     if (_contactPhone.isNotEmpty) {
@@ -97,20 +99,34 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     _profession = vendor.vendorTypeName;
     _tagline = _taglineFor(type);
     _response = 'Responds in 1 hour';
-    _projects = vendor.ratingCount < 20 ? vendor.ratingCount * 3 : vendor.ratingCount;
-    if (_projects < 24) {
-      _projects = 24 + vendor.id;
-    }
-    _assisted = (_projects * 0.7).round();
-    _years = '${3 + (vendor.id % 4)}+';
-    _satisfaction = (vendor.ratingAvg * 20).round().clamp(90, 99);
+    _projects = vendor.completedSessions;
+    _assisted = 0;
+    _years = _projects > 0 ? '${(_projects / 15).floor().clamp(1, 20)}+' : '1+';
+    _satisfaction = vendor.ratingAvg > 0
+        ? (vendor.ratingAvg * 20).round().clamp(0, 99)
+        : 0;
     _equipment = _equipmentFor(type);
     _specialties = vendor.tags.isEmpty ? _filters.skip(1).take(3).toList() : vendor.tags;
     _packages = [
-      if (vendor.startingFrom != null) _Package(label: 'Starting from', price: vendor.startingFrom!),
-      _Package(label: 'Half day', price: (vendor.startingFrom ?? 1800) * 1.2),
-      _Package(label: 'Full day', price: (vendor.startingFrom ?? 1800) * 1.8),
+      if ((vendor.hourlyPrice ?? 0) > 0)
+        _Package(label: 'Price per hour per location', price: vendor.hourlyPrice!),
+      if ((vendor.halfDayPrice ?? 0) > 0)
+        _Package(label: 'Half-day price (6 hours)', price: vendor.halfDayPrice!),
+      if ((vendor.fullDayPrice ?? 0) > 0)
+        _Package(label: 'Full-day price (12 hours)', price: vendor.fullDayPrice!),
+      if ((vendor.perVideoPrice ?? 0) > 0)
+        _Package(label: 'Price per video', price: vendor.perVideoPrice!),
+      if (_packagesEmptyFallback(vendor))
+        _Package(label: 'Starting from', price: vendor.startingFrom!),
     ];
+  }
+
+  static bool _packagesEmptyFallback(VendorCard vendor) {
+    return (vendor.hourlyPrice ?? 0) <= 0 &&
+        (vendor.halfDayPrice ?? 0) <= 0 &&
+        (vendor.fullDayPrice ?? 0) <= 0 &&
+        (vendor.perVideoPrice ?? 0) <= 0 &&
+        vendor.startingFrom != null;
   }
 
   Future<void> _load() async {
@@ -127,11 +143,11 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         if (minutes is num) {
           _response = minutes <= 60 ? 'Responds in 1 hour' : 'Responds in ${(minutes / 60).ceil()} hours';
         }
-        if (payload['completed_sessions'] is num) {
-          _projects = (payload['completed_sessions'] as num).toInt();
+        if (payload['completed_sessions'] != null) {
+          _projects = int.tryParse('${payload['completed_sessions']}') ?? _projects;
         }
-        if (payload['assisted_sessions'] is num) {
-          _assisted = (payload['assisted_sessions'] as num).toInt();
+        if (payload['assisted_sessions'] != null) {
+          _assisted = int.tryParse('${payload['assisted_sessions']}') ?? _assisted;
         }
         if (payload['years_experience'] != null) {
           _years = '${payload['years_experience']}+';
@@ -182,7 +198,10 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: SessionStore.instance,
+      listenable: Listenable.merge([
+        SessionStore.instance,
+        BookedVendorsStore.instance,
+      ]),
       builder: (context, _) => _scaffold(),
     );
   }

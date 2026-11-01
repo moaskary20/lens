@@ -82,20 +82,37 @@ class BookProjectCatalog {
     if (remote.isNotEmpty) {
       return remote;
     }
-    final start = vendor.startingFrom ?? 1800;
-    return switch (vendor.vendorType) {
-      'studio' => [
-        BookPriceOption(key: 'hourly', label: 'Price per hour per location', price: start, durationHours: 1),
-        BookPriceOption(key: 'hourly_4', label: '4-hour studio block', price: start * 4, durationHours: 4),
-      ],
-      'ugc' || 'reels' => [
-        BookPriceOption(key: 'per_video', label: 'Price per video', price: start, durationHours: 2),
-        BookPriceOption(key: 'per_video_3', label: '3-video pack', price: start * 2.6),
-      ],
-      _ => [
-        BookPriceOption(key: 'half_day', label: 'Half-day price (6 hours)', price: start, durationHours: 6),
-        BookPriceOption(key: 'full_day', label: 'Full-day price (12 hours)', price: (start * 1.7).roundToDouble(), durationHours: 12),
-      ],
-    };
+
+    // Only real package columns — never invent half/full from startingFrom.
+    final fromBackend = <BookPriceOption>[
+      if ((vendor.hourlyPrice ?? 0) > 0)
+        BookPriceOption(
+          key: 'hourly',
+          label: 'Price per hour per location',
+          price: vendor.hourlyPrice!,
+          durationHours: 1,
+        ),
+      if ((vendor.halfDayPrice ?? 0) > 0)
+        BookPriceOption(
+          key: 'half_day',
+          label: 'Half-day price (6 hours)',
+          price: vendor.halfDayPrice!,
+          durationHours: 6,
+        ),
+      if ((vendor.fullDayPrice ?? 0) > 0)
+        BookPriceOption(
+          key: 'full_day',
+          label: 'Full-day price (12 hours)',
+          price: vendor.fullDayPrice!,
+          durationHours: 12,
+        ),
+      if ((vendor.perVideoPrice ?? 0) > 0)
+        BookPriceOption(
+          key: 'per_video',
+          label: 'Price per video',
+          price: vendor.perVideoPrice!,
+        ),
+    ];
+    return fromBackend;
   }
 }

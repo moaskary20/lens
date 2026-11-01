@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/demo_bootstrap.dart';
 import 'package:lens/core/models/home_data.dart';
@@ -7,11 +8,15 @@ import 'package:lens/core/theme/lens_theme.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
 
 void main() {
-  setUp(() => LensConfig.useNetwork = false);
+  setUp(() {
+    LensConfig.useNetwork = false;
+    BookedVendorsStore.instance.clear();
+  });
 
   testWidgets('in-app chat matches the booked conversation layout', (tester) async {
     final home = HomeData.fromJson(DemoBootstrap.payload());
     final vendor = home.popular.first.vendors.first;
+    BookedVendorsStore.instance.remember(vendor.id);
 
     await tester.pumpWidget(MaterialApp(
       theme: LensTheme.dark(),

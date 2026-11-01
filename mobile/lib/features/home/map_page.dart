@@ -119,14 +119,14 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _openSort() async {
-    final result = await Navigator.of(context).push<String>(
+    final result = await Navigator.of(context).push<SortResult>(
       MaterialPageRoute(builder: (_) => SortPage(initial: _sort)),
     );
     if (!mounted || result == null) {
       return;
     }
     setState(() {
-      _sort = result;
+      _sort = result.sort;
       _vendors = sortVendors(widget.vendors, _sort);
     });
   }
@@ -502,7 +502,7 @@ class _MapPin extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            vendor.displayName,
+            vendor.publicName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -653,7 +653,7 @@ class _ResultRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          vendor.displayName,
+                          vendor.publicName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),

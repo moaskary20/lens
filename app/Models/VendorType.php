@@ -52,8 +52,7 @@ class VendorType extends Model
 
     public function scopeMarketplace(Builder $query): Builder
     {
-        return $query
-            ->where('is_active', true)
-            ->whereIn('slug', Roles::enabledVendorTypeSlugs());
+        // App categories / + flow follow Admin → Vendor Types → Enabled.
+        return $query->where('is_active', true);
     }
 }

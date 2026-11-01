@@ -22,33 +22,40 @@ class ClientInboxTest extends TestCase
 
     public function test_bootstrap_exposes_inbox_counts(): void
     {
-        $this->getJson('/api/app/bootstrap')
+        $guest = $this->getJson('/api/app/bootstrap')
             ->assertOk()
             ->assertJsonPath('features.favorites', true)
             ->assertJsonPath('features.notifications', true);
+        $this->assertSame([], $guest->json('favorite_ids'));
+        $this->assertSame(0, $guest->json('unread_notifications'));
 
-        $payload = $this->getJson('/api/app/bootstrap')->assertOk();
+        $payload = $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
+            ->getJson('/api/app/bootstrap')
+            ->assertOk();
         $this->assertGreaterThan(0, count($payload->json('favorite_ids')));
         $this->assertGreaterThan(0, $payload->json('unread_notifications'));
     }
 
     public function test_client_can_save_and_forget_a_vendor(): void
     {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
         $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
         $vendor = Vendor::query()->where('is_active', true)->orderBy('id')->firstOrFail();
         Favorite::query()->where('user_id', $client->id)->where('vendor_id', $vendor->id)->delete();
 
-        $this->postJson('/api/app/favorites/'.$vendor->id)
+        $this->withHeaders($headers)
+            ->postJson('/api/app/favorites/'.$vendor->id)
             ->assertOk()
             ->assertJsonPath('favorited', true)
             ->assertJsonPath('vendor.id', $vendor->id);
 
         $this->assertTrue($client->favoriteVendors()->where('vendors.id', $vendor->id)->exists());
 
-        $list = $this->getJson('/api/app/favorites')->assertOk();
+        $list = $this->withHeaders($headers)->getJson('/api/app/favorites')->assertOk();
         $this->assertContains($vendor->id, $list->json('ids'));
 
-        $this->deleteJson('/api/app/favorites/'.$vendor->id)
+        $this->withHeaders($headers)
+            ->deleteJson('/api/app/favorites/'.$vendor->id)
             ->assertOk()
             ->assertJsonPath('favorited', false);
 
@@ -57,17 +64,42 @@ class ClientInboxTest extends TestCase
 
     public function test_client_can_read_app_notifications(): void
     {
-        $inbox = $this->getJson('/api/app/notifications')->assertOk();
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $inbox = $this->withHeaders($headers)->getJson('/api/app/notifications')->assertOk();
         $this->assertGreaterThan(0, $inbox->json('unread'));
         $this->assertNotEmpty($inbox->json('notifications.0.title'));
 
         $id = $inbox->json('notifications.0.id');
-        $this->postJson('/api/app/notifications/'.$id.'/read')
+        $this->withHeaders($headers)
+            ->postJson('/api/app/notifications/'.$id.'/read')
             ->assertOk()
             ->assertJsonPath('notification.read', true);
 
-        $this->postJson('/api/app/notifications/read-all')->assertOk()->assertJsonPath('unread', 0);
-        $this->getJson('/api/app/notifications')->assertJsonPath('unread', 0);
+        $this->withHeaders($headers)->postJson('/api/app/notifications/read-all')->assertOk()->assertJsonPath('unread', 0);
+        $this->withHeaders($headers)->getJson('/api/app/notifications')->assertJsonPath('unread', 0);
+    }
+
+    public function test_client_can_register_and_forget_a_device_token(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/device-token', [
+                'token' => 'fcm-test-token-123',
+                'platform' => 'android',
+            ])
+            ->assertOk()
+            ->assertJsonPath('registered', true);
+
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $this->assertTrue($client->deviceTokens()->where('token', 'fcm-test-token-123')->exists());
+
+        $this->withHeaders($headers)
+            ->deleteJson('/api/app/device-token', ['token' => 'fcm-test-token-123'])
+            ->assertOk()
+            ->assertJsonPath('registered', false);
+
+        $this->assertFalse($client->fresh()->deviceTokens()->where('token', 'fcm-test-token-123')->exists());
     }
 
     public function test_admin_can_send_notice_into_the_app(): void
@@ -100,7 +132,7 @@ class ClientInboxTest extends TestCase
             $client->fresh()->notifications()->get()->contains(fn ($item) => ($item->data['title'] ?? null) === 'Shoot tomorrow')
         );
 
-        $this->actingAs($admin)->get('/admin/users/'.$client->id.'/edit')
+        $this->actingAs($admin)->get('/admin/clients/'.$client->id.'/edit')
             ->assertOk()
             ->assertSee('Saved creators', false);
     }

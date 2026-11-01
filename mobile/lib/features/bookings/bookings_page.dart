@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/contact_launch.dart';
 import 'package:lens/core/models/home_data.dart';
@@ -62,6 +63,7 @@ class _BookingsPageState extends State<BookingsPage> {
   Future<void> _load() async {
     final session = SessionStore.instance;
     if (session.isGuest) {
+      BookedVendorsStore.instance.clear();
       setState(() {
         _items = [];
         _loading = false;
@@ -70,8 +72,10 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     setState(() => _loading = true);
     if (!LensConfig.useNetwork) {
+      final items = session.isVendor ? _demoVendor() : _demoClient();
+      _rememberBookedVendors(items);
       setState(() {
-        _items = session.isVendor ? _demoVendor() : _demoClient();
+        _items = items;
         _loading = false;
       });
       return;
@@ -82,20 +86,30 @@ class _BookingsPageState extends State<BookingsPage> {
           .whereType<Map>()
           .map((item) => _BookingItem.fromJson(Map<String, dynamic>.from(item)))
           .toList();
+      _rememberBookedVendors(items);
       if (mounted) {
         setState(() {
-          _items = items.isEmpty && session.isClient ? _demoClient() : items;
+          _items = items;
           _loading = false;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _items = session.isVendor ? _demoVendor() : _demoClient();
+          _items = [];
           _loading = false;
         });
       }
     }
+  }
+
+  void _rememberBookedVendors(List<_BookingItem> items) {
+    if (SessionStore.instance.isVendor) {
+      return;
+    }
+    BookedVendorsStore.instance.rememberAll(
+      items.map((item) => item.vendorId ?? item.vendor?.id ?? 0),
+    );
   }
 
   @override
@@ -124,7 +138,7 @@ class _BookingsPageState extends State<BookingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  BrandHeader(height: 34),
+                  BrandHeader(),
                   SizedBox(height: 10),
                   Text(
                     'Incoming bookings',
@@ -181,86 +195,89 @@ class _ClientBookings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: BrandHeader(),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AppSettingsPage(home: home),
-                    ),
+    return Scaffold(
+      backgroundColor: LensColors.charcoal,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: BrandHeader(),
                   ),
-                  icon: const Icon(
-                    Icons.settings_outlined,
-                    color: LensColors.cream,
-                  ),
-                ),
-                if (home.on('notifications'))
                   IconButton(
-                    onPressed: () => openNotifications(context, home),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AppSettingsPage(home: home),
+                      ),
+                    ),
                     icon: const Icon(
-                      Icons.notifications_none_rounded,
+                      Icons.settings_outlined,
                       color: LensColors.cream,
                     ),
                   ),
-              ],
+                  if (home.on('notifications'))
+                    IconButton(
+                      onPressed: () => openNotifications(context, home),
+                      icon: const Icon(
+                        Icons.notifications_none_rounded,
+                        color: LensColors.cream,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 20, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed:
-                      onBack ??
-                      (Navigator.of(context).canPop()
-                          ? () => Navigator.of(context).pop()
-                          : null),
-                  icon: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Colors.white,
-                    size: 30,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 20, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed:
+                        onBack ??
+                        (Navigator.of(context).canPop()
+                            ? () => Navigator.of(context).pop()
+                            : null),
+                    icon: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
-                ),
-                const Text(
-                  'My Bookings',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
+                  const Text(
+                    'My Bookings',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            child: Row(
-              children: [
-                _tabChip('Upcoming', upcoming.length, 'upcoming'),
-                _tabChip('Completed', completed.length, 'completed'),
-                _tabChip('Canceled', canceled.length, 'canceled'),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Row(
+                children: [
+                  _tabChip('Upcoming', upcoming.length, 'upcoming'),
+                  _tabChip('Completed', completed.length, 'completed'),
+                  _tabChip('Canceled', canceled.length, 'canceled'),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: LensColors.primary),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
-                    children: _sections(),
-                  ),
-          ),
-        ],
+            Expanded(
+              child: loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: LensColors.primary),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
+                      children: _sections(),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -537,7 +554,7 @@ class _ClientCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _action(item),
+                        _action(context, item),
                       ],
                     ),
                   ],
@@ -586,10 +603,16 @@ class _ClientCard extends StatelessWidget {
     );
   }
 
-  Widget _action(_BookingItem item) {
-    final cancel = item.group == 'upcoming';
+  Widget _action(BuildContext context, _BookingItem item) {
+    final cancel = item.group == 'upcoming' && _canCancelStatus(item.status);
     return OutlinedButton.icon(
-      onPressed: () {},
+      onPressed: () {
+        if (cancel) {
+          _cancelBooking(context);
+          return;
+        }
+        _openProject(context);
+      },
       icon: Icon(
         cancel ? Icons.delete_outline_rounded : Icons.chevron_right_rounded,
         size: 16,
@@ -609,6 +632,82 @@ class _ClientCard extends StatelessWidget {
         shape: const StadiumBorder(),
       ),
     );
+  }
+
+  bool _canCancelStatus(String status) {
+    return const {
+      'pending',
+      'accepted',
+      'checked_in',
+      'in_progress',
+    }.contains(status);
+  }
+
+  Future<void> _cancelBooking(BuildContext context) async {
+    if (!context.mounted) {
+      return;
+    }
+
+    // Show the policy sheet immediately; load the live quote inside it.
+    final result = await showModalBottomSheet<({bool confirmed, String reason, Map<String, dynamic> quote})>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF191A1F),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => _ClientCancelSheet(item: item),
+    );
+
+    if (!context.mounted || result == null || !result.confirmed) {
+      return;
+    }
+    final note = result.reason.trim();
+    if (note.isEmpty) {
+      _toast(context, 'Add a reason before cancelling.');
+      return;
+    }
+
+    final quote = result.quote;
+    if (!LensConfig.useNetwork || !SessionStore.instance.isClient || item.id <= 0) {
+      final policy = quote['policy'];
+      final policyName = policy is Map ? policy['name']?.toString() ?? 'policy' : 'policy';
+      final refund = (quote['client_refund'] as num?)?.toDouble() ?? 0;
+      final currency = quote['currency']?.toString() ?? 'EGP';
+      _toast(context, 'Cancelled under $policyName. Refund ${_money(refund, currency)}.');
+      onReload?.call();
+      return;
+    }
+
+    try {
+      final payload = await ApiClient().postJson(
+        '/app/bookings/${item.id}/cancel',
+        {'reason': note},
+      );
+      if (!context.mounted) {
+        return;
+      }
+      _toast(context, payload['message']?.toString() ?? 'Booking cancelled.');
+      onReload?.call();
+    } catch (error) {
+      if (context.mounted) {
+        _toast(context, error.toString().replaceFirst('ApiException: ', ''));
+      }
+    }
+  }
+
+  String _money(double amount, String currency) {
+    return '$currency ${amount.toStringAsFixed(2)}';
+  }
+
+  void _toast(BuildContext context, String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _openVendor(BuildContext context) {
@@ -824,6 +923,270 @@ class _VendorPhoto extends StatelessWidget {
                   child: Icon(Icons.person, color: LensColors.cream),
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _ClientCancelSheet extends StatefulWidget {
+  const _ClientCancelSheet({required this.item});
+
+  final _BookingItem item;
+
+  @override
+  State<_ClientCancelSheet> createState() => _ClientCancelSheetState();
+}
+
+class _ClientCancelSheetState extends State<_ClientCancelSheet> {
+  final _reason = TextEditingController();
+  late Map<String, dynamic> _quote;
+  bool _loadingQuote = false;
+  String? _quoteError;
+
+  @override
+  void initState() {
+    super.initState();
+    _quote = _fallbackQuote(widget.item);
+    _loadQuote();
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadQuote() async {
+    if (!LensConfig.useNetwork || !SessionStore.instance.isClient || widget.item.id <= 0) {
+      return;
+    }
+    setState(() {
+      _loadingQuote = true;
+      _quoteError = null;
+    });
+    try {
+      final remote = await ApiClient().getJson(
+        '/app/bookings/${widget.item.id}/cancellation-quote',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _quote = remote;
+        _loadingQuote = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loadingQuote = false;
+        _quoteError = error.toString().replaceFirst('ApiException: ', '');
+      });
+    }
+  }
+
+  Map<String, dynamic> _fallbackQuote(_BookingItem item) {
+    final session = item.total > 0 ? item.total : 1800.0;
+    return {
+      'currency': 'EGP',
+      'hours_notice': 96,
+      'client_refund': session,
+      'vendor_net': 0.0,
+      'platform_fee': session * 0.10,
+      'vendor_penalty': 0.0,
+      'policy': {
+        'name': 'Client cancel > 72 hours',
+        'description':
+            'Estimated from Lens cancellation tiers. Confirm to apply the live policy.',
+        'client_refund_percent': 100,
+        'vendor_payout_percent': 0,
+        'platform_fee_percent': 10,
+        'vendor_penalty_percent': 0,
+      },
+    };
+  }
+
+  String _money(double amount, String currency) =>
+      '$currency ${amount.toStringAsFixed(2)}';
+
+  Widget _line(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final currency = _quote['currency']?.toString() ?? 'EGP';
+    final policy = _quote['policy'] is Map
+        ? Map<String, dynamic>.from(_quote['policy'] as Map)
+        : const <String, dynamic>{};
+    final refund = (_quote['client_refund'] as num?)?.toDouble() ?? 0;
+    final fee = (_quote['platform_fee'] as num?)?.toDouble() ?? 0;
+    final vendorNet = (_quote['vendor_net'] as num?)?.toDouble() ?? 0;
+    final hours = _quote['hours_notice']?.toString() ?? '0';
+    final refundPct = policy['client_refund_percent']?.toString() ?? '0';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF55545A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Cancel this booking?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.item.displayProject,
+              style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            if (_loadingQuote)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 14),
+                child: LinearProgressIndicator(
+                  color: LensColors.primary,
+                  minHeight: 2,
+                ),
+              ),
+            Text(
+              policy['name']?.toString() ?? 'Cancellation policy',
+              style: const TextStyle(
+                color: LensColors.primary,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$hours hours notice · refund $refundPct%',
+              style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13),
+            ),
+            if (_quoteError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Using estimated terms. $_quoteError',
+                style: const TextStyle(color: Color(0xFFFFB080), fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 14),
+            _line('Your refund', _money(refund, currency)),
+            _line('Platform fee', _money(fee, currency)),
+            _line('Creator compensation', _money(vendorNet, currency)),
+            if ((policy['description']?.toString() ?? '').isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                policy['description'].toString(),
+                style: const TextStyle(
+                  color: Color(0xFF8E8B84),
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _reason,
+              maxLines: 3,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Why are you cancelling?',
+                hintStyle: const TextStyle(color: LensColors.slate),
+                filled: true,
+                fillColor: const Color(0xFF121316),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFF2B2C32)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFF2B2C32)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: LensColors.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF3A3A3E)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Keep booking'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context, (
+                        confirmed: true,
+                        reason: _reason.text,
+                        quote: _quote,
+                      ));
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF3B30),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Cancel booking'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1090,35 +1453,92 @@ class _VendorCard extends StatelessWidget {
   }
 
   Future<void> _cancel(BuildContext context) async {
+    Map<String, dynamic>? quote;
+    if (LensConfig.useNetwork) {
+      try {
+        quote = await ApiClient().getJson(
+          '/app/bookings/${item.id}/cancellation-quote',
+        );
+      } catch (error) {
+        if (context.mounted) {
+          _toast(context, error.toString().replaceFirst('ApiException: ', ''));
+        }
+        return;
+      }
+    }
+
     final reason = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF191A1F),
-        title: const Text(
-          'Cancel this booking?',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: TextField(
-          controller: reason,
-          maxLines: 3,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Please tell the client why',
-            hintStyle: TextStyle(color: LensColors.slate),
+      builder: (dialogContext) {
+        final currency = quote?['currency']?.toString() ?? 'EGP';
+        final policy = quote?['policy'] is Map
+            ? Map<String, dynamic>.from(quote!['policy'] as Map)
+            : const <String, dynamic>{};
+        final refund = (quote?['client_refund'] as num?)?.toDouble() ?? 0;
+        final penalty = (quote?['vendor_penalty'] as num?)?.toDouble() ?? 0;
+        final hours = quote?['hours_notice']?.toString() ?? '—';
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFF191A1F),
+          title: const Text(
+            'Cancel this booking?',
+            style: TextStyle(color: Colors.white),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep booking'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (policy.isNotEmpty) ...[
+                  Text(
+                    policy['name']?.toString() ?? 'Cancellation policy',
+                    style: const TextStyle(
+                      color: LensColors.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$hours hours notice',
+                    style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Client refund: $currency ${refund.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13),
+                  ),
+                  if (penalty > 0)
+                    Text(
+                      'Your penalty: $currency ${penalty.toStringAsFixed(2)}',
+                      style: const TextStyle(color: Color(0xFFFF3B30), fontSize: 13),
+                    ),
+                  const SizedBox(height: 14),
+                ],
+                TextField(
+                  controller: reason,
+                  maxLines: 3,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Please tell the client why',
+                    hintStyle: TextStyle(color: LensColors.slate),
+                  ),
+                ),
+              ],
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancel booking'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep booking'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Cancel booking'),
+            ),
+          ],
+        );
+      },
     );
     final note = reason.text.trim();
     reason.dispose();

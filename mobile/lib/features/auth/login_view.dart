@@ -136,7 +136,7 @@ class _LoginViewState extends State<LoginView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const BrandHeader(height: 42),
+                const BrandHeader(),
                 const SizedBox(height: 18),
                 const Text(
                   'CREATIVE PEOPLE          CREATE · BOOK · BELONG',

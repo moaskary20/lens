@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\UserResource\Pages\EditUser;
+use App\Filament\Resources\ClientResource\Pages\EditClient;
 use App\Models\City;
 use App\Models\User;
 use App\Models\UserAddress;
@@ -71,7 +71,7 @@ class AppAccountTest extends TestCase
 
         $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
         $this->actingAs(User::query()->where('email', 'admin@lens.app')->firstOrFail())
-            ->get('/admin/users/'.$client->id.'/edit')
+            ->get('/admin/clients/'.$client->id.'/edit')
             ->assertOk()
             ->assertSee('Payment methods')
             ->assertSee('Addresses')
@@ -87,7 +87,7 @@ class AppAccountTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(EditUser::class, ['record' => $client->getRouteKey()])
+        Livewire::test(EditClient::class, ['record' => $client->getRouteKey()])
             ->fillForm([
                 'app_settings' => [
                     'push_notifications' => '0',
@@ -166,7 +166,7 @@ class AppAccountTest extends TestCase
         $this->assertSame('ar', $client->app_settings['language'] ?? null);
 
         $this->actingAs(User::query()->where('email', 'admin@lens.app')->firstOrFail())
-            ->get('/admin/users/'.$client->id.'/edit')
+            ->get('/admin/clients/'.$client->id.'/edit')
             ->assertOk()
             ->assertSee('Nora Adel')
             ->assertSee('01511112233');

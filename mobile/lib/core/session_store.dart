@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SessionAccount {
   const SessionAccount({
@@ -62,6 +66,23 @@ class SessionAccount {
     return letters;
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'email': email,
+      'role': role,
+      'vendor_id': vendorId,
+      'vendor_name': vendorName,
+      'phone': phone,
+      'avatar': avatarUrl,
+      'city_id': cityId,
+      'city': cityName,
+      'locale': locale,
+      'is_active': isActive,
+      'joined_at': joinedAt,
+    };
+  }
+
   SessionAccount copyWith({
     String? name,
     String? email,
@@ -98,9 +119,15 @@ class SessionStore extends ChangeNotifier {
 
   static final SessionStore instance = SessionStore._();
 
+  static const _accountKey = 'lens_session_account';
+  static const _localeKey = 'lens_session_locale';
+  static const _onboardingKey = 'lens_onboarding_done';
+
   SessionAccount? _account;
   ApiClient _api = ApiClient();
   String _locale = 'en';
+  bool _onboardingDone = false;
+  Future<void>? _restoreFuture;
 
   SessionAccount? get account => _account;
   bool get isGuest => _account == null;
@@ -108,11 +135,50 @@ class SessionStore extends ChangeNotifier {
   bool get isClient => _account?.isClient ?? false;
   String? get email => _account?.email;
   String get locale => _account?.locale ?? _locale;
+  bool get onboardingDone => _onboardingDone;
+  bool get shouldOpenHome => _account != null || _onboardingDone;
+
+  Future<void> restore() {
+    return _restoreFuture ??= _restoreFromDisk();
+  }
+
+  Future<void> _restoreFromDisk() async {
+    final prefs = await SharedPreferences.getInstance();
+    _locale = prefs.getString(_localeKey) ?? 'en';
+    _onboardingDone = prefs.getBool(_onboardingKey) ?? false;
+    final raw = prefs.getString(_accountKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          _account = SessionAccount.fromJson(decoded);
+          _locale = _account?.locale ?? _locale;
+          _onboardingDone = true;
+        } else if (decoded is Map) {
+          _account = SessionAccount.fromJson(Map<String, dynamic>.from(decoded));
+          _locale = _account?.locale ?? _locale;
+          _onboardingDone = true;
+        }
+      } catch (_) {
+        await prefs.remove(_accountKey);
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> markOnboardingDone() async {
+    _onboardingDone = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_onboardingKey, true);
+    notifyListeners();
+  }
 
   Future<void> login({required String email, required String password}) async {
     if (!LensConfig.useNetwork) {
       _account = _demoAccount(email.trim(), password);
       _locale = _account?.locale ?? 'en';
+      _onboardingDone = true;
+      await _persist();
       notifyListeners();
       return;
     }
@@ -123,6 +189,8 @@ class SessionStore extends ChangeNotifier {
       });
       _account = SessionAccount.fromJson(payload);
       _locale = _account?.locale ?? 'en';
+      _onboardingDone = true;
+      await _persist();
       notifyListeners();
     } on ApiException {
       _account = _tryDemo(email.trim(), password);
@@ -130,6 +198,8 @@ class SessionStore extends ChangeNotifier {
         rethrow;
       }
       _locale = _account?.locale ?? 'en';
+      _onboardingDone = true;
+      await _persist();
       notifyListeners();
     }
   }
@@ -144,6 +214,8 @@ class SessionStore extends ChangeNotifier {
   }) async {
     if (!LensConfig.useNetwork) {
       _account = SessionAccount(name: name.trim(), email: email.trim(), role: role, locale: _locale);
+      _onboardingDone = true;
+      await _persist();
       notifyListeners();
       return;
     }
@@ -159,21 +231,29 @@ class SessionStore extends ChangeNotifier {
           ? await _api.postJson('/app/auth/register', body)
           : await _api.postForm('/app/auth/register', body, files: files);
       _account = SessionAccount.fromJson(payload);
+      _onboardingDone = true;
+      await _persist();
       notifyListeners();
     } on ApiException {
       _account = SessionAccount(name: name.trim(), email: email.trim(), role: role);
+      _onboardingDone = true;
+      await _persist();
       notifyListeners();
     }
   }
 
-  void signOut() {
+  Future<void> signOut() async {
     _account = null;
+    BookedVendorsStore.instance.clear();
+    await _persist();
     notifyListeners();
   }
 
-  void applyAccount(SessionAccount account) {
+  Future<void> applyAccount(SessionAccount account) async {
     _account = account;
     _locale = account.locale;
+    _onboardingDone = true;
+    await _persist();
     notifyListeners();
   }
 
@@ -183,6 +263,7 @@ class SessionStore extends ChangeNotifier {
     if (_account != null) {
       _account = _account!.copyWith(locale: locale);
     }
+    await _persist();
     notifyListeners();
     if (LensConfig.useNetwork && isClient) {
       try {
@@ -191,6 +272,17 @@ class SessionStore extends ChangeNotifier {
         });
       } catch (_) {}
     }
+  }
+
+  Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_localeKey, _locale);
+    await prefs.setBool(_onboardingKey, _onboardingDone);
+    if (_account == null) {
+      await prefs.remove(_accountKey);
+      return;
+    }
+    await prefs.setString(_accountKey, jsonEncode(_account!.toJson()));
   }
 
   SessionAccount _demoAccount(String email, String password) {
@@ -257,10 +349,21 @@ class SessionStore extends ChangeNotifier {
   }
 
   @visibleForTesting
-  void reset() {
+  void clearMemoryOnly() {
     _account = null;
     _locale = 'en';
+    _onboardingDone = false;
+    _restoreFuture = null;
     _api = ApiClient();
     notifyListeners();
+  }
+
+  @visibleForTesting
+  Future<void> reset() async {
+    clearMemoryOnly();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_accountKey);
+    await prefs.remove(_localeKey);
+    await prefs.remove(_onboardingKey);
   }
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/features/home/category_catalog.dart';
 import 'package:lens/features/home/category_list_page.dart';
 import 'package:lens/features/home/filter_page.dart';
 
 Future<void> openClientCreateFlow(BuildContext context, HomeData home) async {
+  // Open immediately with the home already in memory — no bootstrap wait on +.
   final type = await showModalBottomSheet<VendorTypeItem>(
     context: context,
     isScrollControlled: true,
@@ -46,22 +48,26 @@ class _CategoryPicker extends StatelessWidget {
 
   final HomeData home;
 
-  static const _categoryIcons = <String, IconData>{
-    'photographer': Icons.photo_camera_outlined,
-    'videographer': Icons.videocam_outlined,
-    'reels': Icons.movie_creation_outlined,
-    'studio': Icons.weekend_outlined,
-    'model': Icons.face_retouching_natural_outlined,
-    'ugc': Icons.phone_iphone_rounded,
-    'food_stylist': Icons.restaurant_menu_rounded,
-  };
+  List<VendorTypeItem> get _types {
+    final seen = <String>{};
+    final items = <VendorTypeItem>[];
+    for (final type in home.vendorTypes) {
+      if (type.slug.isEmpty || !seen.add(type.slug)) {
+        continue;
+      }
+      items.add(type);
+    }
+    return items;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final types = _types;
+
     return DraggableScrollableSheet(
-      initialChildSize: 0.86,
-      minChildSize: 0.64,
-      maxChildSize: 0.94,
+      initialChildSize: 0.9,
+      minChildSize: 0.68,
+      maxChildSize: 0.96,
       expand: false,
       builder: (context, controller) => Container(
         decoration: const BoxDecoration(
@@ -81,7 +87,7 @@ class _CategoryPicker extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(22, 22, 16, 14),
+              padding: const EdgeInsets.fromLTRB(22, 22, 16, 10),
               child: Row(
                 children: [
                   Expanded(
@@ -108,7 +114,9 @@ class _CategoryPicker extends StatelessWidget {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          'Choose a department and we’ll find the right fit.',
+                          types.isEmpty
+                              ? 'No departments are available yet.'
+                              : 'All departments from Lens — pick one and we’ll find the right fit.',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.62),
                             fontSize: 13,
@@ -129,26 +137,40 @@ class _CategoryPicker extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: GridView.builder(
+              child: ListView(
                 controller: controller,
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 26),
-                itemCount: home.vendorTypes.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  mainAxisExtent: 126,
-                ),
-                itemBuilder: (context, index) {
-                  final type = home.vendorTypes[index];
-                  final icon =
-                      _categoryIcons[type.slug] ?? Icons.auto_awesome_outlined;
-                  return _CategoryTile(
-                    type: type,
-                    icon: icon,
-                    onTap: () => Navigator.of(context).pop(type),
-                  );
-                },
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+                children: [
+                  if (types.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Text(
+                        'Open the admin panel and enable vendor types to show them here.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13.5, height: 1.4),
+                      ),
+                    )
+                  else
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: types.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        mainAxisExtent: 132,
+                      ),
+                      itemBuilder: (context, index) {
+                        final type = types[index];
+                        return _CategoryTile(
+                          type: type,
+                          icon: CategoryCatalog.iconFor(type.slug, type.icon),
+                          onTap: () => Navigator.of(context).pop(type),
+                        );
+                      },
+                    ),
+                ],
               ),
             ),
           ],
@@ -203,17 +225,22 @@ class _CategoryTile extends StatelessWidget {
                 child: Icon(icon, color: LensColors.primary, size: 21),
               ),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
                     child: Text(
                       type.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
+                        height: 1.2,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
                   const Icon(
                     Icons.arrow_forward_rounded,
                     color: LensColors.primary,

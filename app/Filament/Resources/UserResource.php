@@ -31,6 +31,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 use UnitEnum;
@@ -51,6 +52,18 @@ class UserResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    /**
+     * Staff accounts only. Clients live under Clients; vendors under Vendors.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->whereIn('role', [
+            Roles::ADMIN,
+            Roles::SUPERVISOR,
+            Roles::SUPPORT,
+        ]);
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->columns(['default' => 1, 'lg' => 2])->components([
@@ -68,20 +81,9 @@ class UserResource extends Resource
                     ->required()
                     ->visible(fn (string $operation): bool => $operation === 'create'),
                 Select::make('role')->label('Role')->required()->live()
-                    ->options(fn (): array => (auth()->user()?->isAdmin() ?? false)
-                        ? [
-                            'admin' => 'Platform admin',
-                            'supervisor' => 'Supervisor',
-                            'support' => 'Support',
-                            'client' => 'Client (Customer)',
-                            'vendor' => 'Vendor (Creator / Studio)',
-                        ]
-                        : [
-                            'client' => 'Client (Customer)',
-                            'vendor' => 'Vendor (Creator / Studio)',
-                        ])
+                    ->options(self::roleOptions())
                     ->disabled(fn (?User $record): bool => (bool) $record && $record->isStaff() && ! (auth()->user()?->isAdmin() ?? false))
-                    ->helperText('Clients browse and book. Vendors onboard under a type. Supervisors handle operations. Support handles app issues, chat, and dispute follow-up. Admins own settings.')
+                    ->helperText('Users here are staff only. Manage clients on Clients and creators on Vendors.')
                     ->native(false)
                     ->visible(fn (string $operation): bool => $operation !== 'create'),
                 Select::make('city_id')->label('Governorate')->relationship('city', 'name_en')->searchable()->preload(),
@@ -203,8 +205,6 @@ class UserResource extends Resource
             Roles::ADMIN => 'Admin',
             Roles::SUPERVISOR => 'Supervisor',
             Roles::SUPPORT => 'Support',
-            Roles::CLIENT => 'Client',
-            Roles::VENDOR => 'Vendor',
         ];
     }
 
@@ -244,13 +244,11 @@ class UserResource extends Resource
                     'admin' => 'Admin',
                     'supervisor' => 'Supervisor',
                     'support' => 'Support',
-                    'client' => 'Client',
-                    'vendor' => 'Vendor',
                     default => $state,
                 })->color(fn (string $state): string => match ($state) {
                     'admin' => 'danger',
                     'supervisor' => 'warning',
-                    'vendor' => 'info',
+                    'support' => 'info',
                     default => 'gray',
                 }),
                 TextColumn::make('city.name_en')->label('Governorate'),

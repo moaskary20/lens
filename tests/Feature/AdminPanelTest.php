@@ -165,7 +165,8 @@ class AdminPanelTest extends TestCase
     public function test_user_list_tabs_filter_every_role(): void
     {
         $admin = User::query()->where('email', 'admin@lens.app')->firstOrFail();
-        $users = collect(UserResource::roleOptions())
+        $staffRoles = UserResource::roleOptions();
+        $users = collect($staffRoles)
             ->mapWithKeys(fn (string $label, string $role): array => [
                 $role => User::factory()->create([
                     'name' => $label.' filter test',
@@ -173,33 +174,40 @@ class AdminPanelTest extends TestCase
                 ]),
             ]);
 
+        // Marketplace accounts must stay off the Users page.
+        User::factory()->create(['name' => 'Client filter test', 'role' => 'client']);
+        User::factory()->create(['name' => 'Vendor filter test', 'role' => 'vendor']);
+
         $this->actingAs($admin);
 
-        $visibleRoles = collect(UserResource::roleOptions())
-            ->except(['client', 'vendor']);
-
         $tabs = Livewire::test(ListUsers::class)
-            ->assertSee('All users');
+            ->assertSee('All users')
+            ->assertDontSee('Client filter test')
+            ->assertDontSee('Vendor filter test');
 
         $this->assertSame(
-            ['all', ...$visibleRoles->keys()->all()],
+            ['all', ...array_keys($staffRoles)],
             array_keys($tabs->instance()->getTabs()),
         );
 
-        foreach ($visibleRoles as $label) {
+        foreach ($staffRoles as $label) {
             $tabs->assertSee($label);
         }
 
+        $staffCount = User::query()->whereIn('role', array_keys($staffRoles))->count();
+
         Livewire::test(ListUsers::class)
             ->set('activeTab', 'all')
-            ->assertCountTableRecords(User::query()->count());
+            ->assertCountTableRecords($staffCount);
 
-        foreach ($visibleRoles as $role => $_label) {
+        foreach ($staffRoles as $role => $_label) {
             $component = Livewire::test(ListUsers::class)->set('activeTab', $role);
             $query = $component->instance()->getFilteredTableQuery();
 
             $this->assertSame([$role], $query->pluck('role')->unique()->all());
             $this->assertTrue($query->whereKey($users[$role]->id)->exists());
+            $this->assertFalse($query->where('role', 'client')->exists());
+            $this->assertFalse($query->where('role', 'vendor')->exists());
         }
     }
 
@@ -434,7 +442,7 @@ class AdminPanelTest extends TestCase
         $vendor = Vendor::query()->firstOrFail();
         $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
 
-        $this->actingAs($admin)->get('/admin/users/'.$client->id.'/edit')
+        $this->actingAs($admin)->get('/admin/clients/'.$client->id.'/edit')
             ->assertOk()
             ->assertSee('Client projects', false);
 

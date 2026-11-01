@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
@@ -20,11 +22,49 @@ class _FavoritesPageState extends State<FavoritesPage> {
   @override
   void initState() {
     super.initState();
-    FavoritesStore.instance.refresh();
+    SessionStore.instance.addListener(_onSession);
+    _refreshIfSignedIn();
+  }
+
+  @override
+  void dispose() {
+    SessionStore.instance.removeListener(_onSession);
+    super.dispose();
+  }
+
+  void _onSession() {
+    if (!mounted) {
+      return;
+    }
+    setState(_refreshIfSignedIn);
+  }
+
+  void _refreshIfSignedIn() {
+    if (!SessionStore.instance.isGuest) {
+      FavoritesStore.instance.refresh();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (SessionStore.instance.isGuest) {
+      return Scaffold(
+        backgroundColor: LensColors.charcoal,
+        body: Stack(
+          children: [
+            LoginView(bootstrap: widget.home.registerCatalog),
+            SafeArea(
+              child: IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: LensColors.charcoal,
       bottomNavigationBar: AppShell.navBar(context, index: 0),
@@ -124,7 +164,7 @@ class _FavoriteRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(vendor.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                    Text(vendor.publicName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
                     const SizedBox(height: 3),
                     Text(vendor.vendorTypeName, style: const TextStyle(color: LensColors.slate, fontSize: 12)),
                     const SizedBox(height: 4),

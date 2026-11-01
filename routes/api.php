@@ -34,6 +34,7 @@ Route::post('app/bookings/quote', [BookingController::class, 'quote']);
 Route::post('app/bookings', [BookingController::class, 'store']);
 Route::get('app/bookings/{booking}/deliverables', [BookingController::class, 'deliverables']);
 Route::post('app/bookings/{booking}/deliverables', [BookingController::class, 'uploadDelivery']);
+Route::get('app/bookings/{booking}/cancellation-quote', [BookingController::class, 'cancellationQuote']);
 Route::post('app/bookings/{booking}/cancel', [BookingController::class, 'cancelByVendor']);
 Route::post('app/bookings/{booking}/request-edit', [BookingController::class, 'requestEdit']);
 Route::post('app/bookings/{booking}/approve', [BookingController::class, 'approve']);
@@ -53,6 +54,8 @@ Route::delete('app/favorites/{vendor}', [ClientInboxController::class, 'forget']
 Route::get('app/notifications', [ClientInboxController::class, 'notifications']);
 Route::post('app/notifications/read-all', [ClientInboxController::class, 'readAll']);
 Route::post('app/notifications/{notification}/read', [ClientInboxController::class, 'read']);
+Route::post('app/device-token', [ClientInboxController::class, 'registerDevice']);
+Route::delete('app/device-token', [ClientInboxController::class, 'forgetDevice']);
 
 Route::prefix('search')->group(function (): void {
     Route::get('catalog', [SearchController::class, 'catalog']);

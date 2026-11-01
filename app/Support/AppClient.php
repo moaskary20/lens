@@ -12,7 +12,7 @@ class AppClient
         $request ??= request();
         $email = trim((string) ($request->header('X-Lens-Client') ?: $request->query('client', '')));
         if ($email === '') {
-            $email = 'client@lens.app';
+            return null;
         }
 
         return User::query()->where('email', $email)->where('is_active', true)->first();

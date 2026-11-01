@@ -207,9 +207,22 @@ class AuthController extends Controller
         }
 
         $items = $query->orderByDesc('scheduled_at')->limit(80)->get()->map(fn (Booking $booking): array => $this->presentBooking($booking, $view));
+        $summary = [
+            'upcoming' => 0,
+            'completed' => 0,
+            'canceled' => 0,
+        ];
+        foreach ($items as $item) {
+            $group = (string) ($item['group'] ?? 'upcoming');
+            if (! array_key_exists($group, $summary)) {
+                $group = 'upcoming';
+            }
+            $summary[$group]++;
+        }
 
         return response()->json([
             'role' => $view,
+            'summary' => $summary,
             'bookings' => $items->values()->all(),
         ]);
     }

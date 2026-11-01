@@ -58,8 +58,10 @@ class AppBookingTest extends TestCase
 
         $booking = Booking::query()->where('project_name', 'Summer Menu Campaign')->firstOrFail();
         $this->assertSame('Food & drinks', $booking->project_type);
+        $this->assertSame('half_day', $booking->package_type);
         $this->assertSame('Zamalek, Cairo', $booking->location_text);
         $this->assertEquals(30.0626, (float) $booking->location_lat);
+        $this->assertEquals((float) $vendor->half_day_price, (float) $booking->session_price);
         $this->assertEquals(1800.0, (float) $booking->session_price);
         $this->assertSame('wallet', $booking->payment_method);
         $this->assertSame('Natural light', $booking->project_details['style']);
@@ -91,6 +93,50 @@ class AppBookingTest extends TestCase
             ->assertOk()
             ->assertJsonPath('contact_unlocked', false)
             ->assertJsonPath('contact_phone', null);
+    }
+
+    public function test_booking_uses_backend_half_and_full_day_prices(): void
+    {
+        $vendor = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();
+        $vendor->update(['half_day_price' => 2100, 'full_day_price' => 3900]);
+
+        $profile = $this->getJson('/api/app/vendors/'.$vendor->id)->assertOk();
+        $packages = collect($profile->json('packages'))->keyBy('key');
+        $this->assertEquals(2100.0, (float) $packages['half_day']['price']);
+        $this->assertEquals(3900.0, (float) $packages['full_day']['price']);
+        $projectLabels = collect($profile->json('project_types'))->pluck('label')->all();
+        $this->assertContains('Weddings & Parties', $projectLabels);
+        $this->assertContains('Food & Drinks', $projectLabels);
+        $this->assertContains('Products & E-Commerce', $projectLabels);
+
+        $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
+            ->postJson('/api/app/bookings', [
+                'vendor_id' => $vendor->id,
+                'project_name' => 'Half Day From Backend',
+                'project_type' => 'Wedding',
+                'client_brief' => 'Ceremony coverage only.',
+                'location_text' => 'Cairo, Egypt',
+                'package_type' => 'half_day',
+                'session_price' => 1,
+                'payment_method' => 'card',
+                'payment_details' => [
+                    'card_holder' => 'Client Lens',
+                    'card_last4' => '4242',
+                    'card_expiry' => '12/30',
+                    'card_brand' => 'Visa',
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('session_price', 2100);
+
+        $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
+            ->postJson('/api/app/bookings/quote', [
+                'vendor_id' => $vendor->id,
+                'package_type' => 'full_day',
+                'session_price' => 1,
+            ])
+            ->assertOk()
+            ->assertJsonPath('session_price', 3900);
     }
 
     public function test_quote_rejects_unknown_promo_code(): void
@@ -140,6 +186,50 @@ class AppBookingTest extends TestCase
             ->postJson('/api/app/bookings/'.$booking->id.'/approve')
             ->assertOk()
             ->assertJsonPath('status', 'approved');
+    }
+
+    public function test_client_cancel_uses_matching_cancellation_policy(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $vendor = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();
+
+        $booking = Booking::query()->create([
+            'reference' => 'LN-CLIENT-CANCEL',
+            'client_id' => $client->id,
+            'vendor_id' => $vendor->id,
+            'status' => 'accepted',
+            'scheduled_at' => now()->addHours(80),
+            'session_price' => 1800,
+            'total_paid' => 1800,
+            'escrow_status' => 'held',
+            'payout_status' => 'none',
+            'project_name' => 'Policy cancel test',
+            'package_type' => 'half_day',
+        ]);
+
+        $quote = $this->withHeaders($headers)
+            ->getJson('/api/app/bookings/'.$booking->id.'/cancellation-quote')
+            ->assertOk()
+            ->assertJsonPath('actor', 'client')
+            ->assertJsonPath('policy.name', 'Client cancel > 72 hours')
+            ->assertJsonPath('client_refund', 1800)
+            ->assertJsonPath('vendor_net', 0);
+
+        $this->assertGreaterThanOrEqual(72, (int) $quote->json('hours_notice'));
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/cancel', [
+                'reason' => 'Plans changed and I need to cancel.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'cancelled')
+            ->assertJsonPath('actor', 'client')
+            ->assertJsonPath('settlement.policy.name', 'Client cancel > 72 hours')
+            ->assertJsonPath('settlement.client_refund', 1800);
+
+        $this->assertSame('cancelled', $booking->fresh()->status);
+        $this->assertSame('client', $booking->fresh()->cancelled_by);
     }
 
     public function test_vendor_can_contact_client_deliver_cancel_and_open_booking_complaints(): void

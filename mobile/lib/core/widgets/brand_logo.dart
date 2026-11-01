@@ -6,8 +6,8 @@ class BrandLogo extends StatelessWidget {
     super.key,
     this.name = 'Lens',
     this.logoUrl,
-    this.width = 132,
-    this.height = 36,
+    this.width = BrandHeader.standardWidth,
+    this.height = BrandHeader.standardHeight,
     this.fontSize = 30,
     this.color = LensColors.primary,
     this.alignment = Alignment.centerLeft,
@@ -59,11 +59,15 @@ class BrandLogo extends StatelessWidget {
   );
 }
 
+/// Standard app logo — same size/asset as the home header.
 class BrandHeader extends StatelessWidget {
   const BrandHeader({
     super.key,
-    this.height = 34,
+    this.height = standardHeight,
   });
+
+  static const double standardHeight = 42;
+  static const double standardWidth = standardHeight * 3.6;
 
   final double height;
 

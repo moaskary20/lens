@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/auth/user_register_page.dart';
@@ -34,13 +35,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   bool get _isRoleStep => _index >= 2;
 
-  void _finish() {
+  Future<void> _finish() async {
+    await SessionStore.instance.markOnboardingDone();
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => AppShell(bootstrap: widget.bootstrap)),
     );
   }
 
-  void _openHome() {
+  Future<void> _openHome() async {
+    await SessionStore.instance.markOnboardingDone();
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => AppShell(bootstrap: widget.bootstrap)),
       (route) => false,
@@ -75,7 +84,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     final copy = _isRoleStep ? _copy.last : _copy[_index];
-    return Scaffold(
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _index == 0) {
+          return;
+        }
+        _pages.previousPage(
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOutCubic,
+        );
+      },
+      child: Scaffold(
       backgroundColor: LensColors.charcoal,
       body: Stack(
         fit: StackFit.expand,
@@ -89,15 +109,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
               SafeArea(
                 child: Column(
                   children: [
-                    Padding(
+                    const Padding(
                       padding: EdgeInsets.fromLTRB(20, 8, 16, 0),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: BrandHeader(height: 40),
-                          ),
-                          _StepMarks(),
-                        ],
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: BrandHeader(),
                       ),
                     ),
                     Expanded(
@@ -160,6 +176,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -186,29 +203,6 @@ class _MockupScene extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _StepMarks extends StatelessWidget {
-  const _StepMarks();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 22,
-          height: 4,
-          decoration: BoxDecoration(color: LensColors.primary, borderRadius: BorderRadius.circular(99)),
-        ),
-        const SizedBox(width: 6),
-        Container(
-          width: 22,
-          height: 4,
-          decoration: BoxDecoration(color: LensColors.primary, borderRadius: BorderRadius.circular(99)),
-        ),
-      ],
     );
   }
 }

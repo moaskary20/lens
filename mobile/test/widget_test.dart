@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lens/app.dart';
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
+import 'package:lens/core/push_alerts.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_theme.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
@@ -18,12 +20,16 @@ import 'package:lens/features/home/book_review_page.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
 import 'package:lens/features/home/category_list_page.dart';
+import 'package:lens/features/auth/login_view.dart';
+import 'package:lens/features/home/home_page.dart';
 import 'package:lens/features/home/search_page.dart';
 import 'package:lens/features/home/vendor_profile_page.dart';
 import 'package:lens/features/auth/user_register_page.dart';
 import 'package:lens/features/auth/vendor_register_page.dart';
 import 'package:lens/features/onboarding/onboarding_page.dart';
+import 'package:lens/features/profile/profile_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
@@ -54,11 +60,50 @@ void main() {
     expect(governorate.data, 'Giza');
   });
 
-  setUp(() {
+  testWidgets('search shows English governorates with vendors', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: Scaffold(
+          body: SearchPage(
+            data: HomeData.fromJson(
+              _bootstrap()
+                ..['cities'] = [
+                  {'id': 1, 'name': 'Cairo', 'name_en': 'Cairo', 'name_ar': 'القاهرة'},
+                  {'id': 2, 'name': 'Giza', 'name_en': 'Giza', 'name_ar': 'الجيزة'},
+                  {'id': 3, 'name': 'Matrouh', 'name_en': 'Matrouh', 'name_ar': 'مطروح'},
+                ],
+            ),
+            currentGovernorateResolver: () async => 'الجيزة',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('search-current-governorate'))).data,
+      'Giza',
+    );
+
+    await tester.tap(find.byKey(const Key('search-current-governorate')));
+    await tester.pumpAndSettle();
+    expect(find.text('Cairo'), findsWidgets);
+    expect(find.text('Giza'), findsWidgets);
+    expect(find.text('Matrouh'), findsNothing);
+    expect(find.text('القاهرة'), findsNothing);
+  });
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     LensConfig.useNetwork = false;
     FavoritesStore.instance.reset();
     NotificationsStore.instance.reset();
-    SessionStore.instance.reset();
+    BookedVendorsStore.instance.clear();
+    PushAlerts.instance.reset();
+    await SessionStore.instance.reset();
   });
 
   testWidgets('splash plays the video contained on black', (
@@ -77,8 +122,7 @@ void main() {
     expect(find.byKey(const Key('splash-video')), findsOneWidget);
     expect(find.byType(VideoPlayer), findsOneWidget);
     expect(fakePlatform.sources.single.asset, 'assit/splash.mp4');
-    final aspectRatio = tester.getSize(find.byKey(const Key('splash-video')));
-    expect(aspectRatio.width / aspectRatio.height, closeTo(16 / 9, 0.02));
+    expect(fakePlatform.looping, isFalse);
   });
 
   testWidgets('onboarding introduces the idea flow', (
@@ -132,6 +176,97 @@ void main() {
     await tester.tap(find.text('Continue as a guest'));
     await tester.pumpAndSettle();
     expect(find.byType(BrandLogo), findsWidgets);
+  });
+
+  testWidgets('system back returns to the previous tab', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: AppShell(bootstrap: _bootstrap()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(HomePage), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomAppBar),
+        matching: find.text('Search'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchPage), findsOneWidget);
+
+    final blocked = await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(blocked, isTrue);
+    expect(find.byType(HomePage), findsOneWidget);
+    expect(find.byType(SearchPage), findsNothing);
+    expect(find.byType(AppShell), findsOneWidget);
+  });
+
+  testWidgets('system back on home asks before exiting', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: AppShell(bootstrap: _bootstrap()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(HomePage), findsOneWidget);
+
+    final blocked = await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(blocked, isTrue);
+    expect(find.byKey(const Key('exit-app-dialog')), findsOneWidget);
+    expect(find.text('Exit Lens?'), findsOneWidget);
+    expect(find.byType(AppShell), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('exit-app-dialog')), findsNothing);
+    expect(find.byType(HomePage), findsOneWidget);
+    expect(find.byType(AppShell), findsOneWidget);
+  });
+
+  testWidgets('system back from last tab goes home then asks to exit', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LensTheme.dark(),
+        home: AppShell(bootstrap: _bootstrap()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomAppBar),
+        matching: find.text('Profile'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfilePage), findsOneWidget);
+
+    var blocked = await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(blocked, isTrue);
+    expect(find.byType(HomePage), findsOneWidget);
+    expect(find.byKey(const Key('exit-app-dialog')), findsNothing);
+
+    blocked = await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(blocked, isTrue);
+    expect(find.byKey(const Key('exit-app-dialog')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('exit-app-confirm')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('exit-app-dialog')), findsNothing);
   });
 
   testWidgets('navbar plus asks guests to sign in before creating', (
@@ -256,7 +391,7 @@ void main() {
     await tester.tap(find.byKey(const Key('view-all-photographer')));
     await tester.pumpAndSettle();
     expect(find.text('Photographers'), findsWidgets);
-    expect(find.text('F. L.'), findsWidgets);
+    expect(find.text('F••••T'), findsWidgets);
     expect(find.text('Fahad Studio Light'), findsNothing);
     expect(find.text('Sort'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.chevron_left_rounded));
@@ -267,7 +402,7 @@ void main() {
     await tester.tap(find.byKey(const Key('view-all-studio')));
     await tester.pumpAndSettle();
     expect(find.text('Studios'), findsWidgets);
-    expect(find.text('N. S.'), findsWidgets);
+    expect(find.text('N••••O'), findsWidgets);
     expect(find.text('Nile Loft Studio'), findsNothing);
     expect(find.text('Sort'), findsOneWidget);
   });
@@ -360,7 +495,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(CategoryListPage),
-        matching: find.text('F. L.'),
+        matching: find.text('F••••T'),
       ),
     );
     await tester.pumpAndSettle();
@@ -375,7 +510,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(VendorProfilePage),
-        matching: find.text('F. L.'),
+        matching: find.text('F••••T'),
       ),
       findsOneWidget,
     );
@@ -401,11 +536,13 @@ void main() {
     await tester.tap(find.byKey(const Key('view-all-categories')));
     await tester.pumpAndSettle();
     expect(find.text('All Categories'), findsOneWidget);
-    expect(find.text('Explore every department'), findsOneWidget);
+    expect(find.byKey(const Key('all-category-photographer')), findsOneWidget);
+    expect(find.byKey(const Key('all-category-videographer')), findsOneWidget);
+    expect(find.byKey(const Key('all-category-food_stylist')), findsOneWidget);
     expect(find.text('Photographers'), findsWidgets);
-    await tester.scrollUntilVisible(find.text('Videographers'), 280);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Videographers'));
+    expect(find.text('Videographers'), findsWidgets);
+    expect(find.text('Food Stylists'), findsWidgets);
+    await tester.tap(find.byKey(const Key('all-category-videographer')));
     await tester.pumpAndSettle();
     expect(find.text('Sort'), findsOneWidget);
     expect(find.text('Videographers'), findsWidgets);
@@ -497,30 +634,28 @@ void main() {
     expect(find.byKey(const Key('home-category-studio')), findsOneWidget);
     expect(find.byKey(const Key('home-category-ugc')), findsOneWidget);
     expect(find.byKey(const Key('home-category-food_stylist')), findsOneWidget);
-    expect(find.byKey(const Key('home-category-ai_video')), findsOneWidget);
-    expect(find.byKey(const Key('home-category-voiceover')), findsOneWidget);
-    expect(find.text('AI Videos & Motion'), findsOneWidget);
-    expect(find.text('VO (Voice Over)'), findsOneWidget);
-    expect(find.text('F. L.', skipOffstage: false), findsOneWidget);
+    expect(find.byKey(const Key('home-category-ai_video')), findsNothing);
+    expect(find.byKey(const Key('home-category-voiceover')), findsNothing);
+    expect(find.text('F••••T', skipOffstage: false), findsOneWidget);
     expect(find.text('Fahad Studio Light', skipOffstage: false), findsNothing);
     expect(find.text('Featured Studios', skipOffstage: false), findsOneWidget);
     expect(find.byIcon(Icons.favorite_border_rounded), findsWidgets);
     expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
     await tester.tap(find.byTooltip('Favorites'));
     await tester.pumpAndSettle();
-    expect(find.text('Favorites'), findsOneWidget);
-    expect(find.text('No saved creators yet'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.chevron_left_rounded));
+    expect(find.byType(LoginView), findsOneWidget);
+    expect(find.textContaining('Welcome'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(FavoriteHeart).first);
     await tester.pump();
-    expect(find.text('1'), findsWidgets);
+    // Guests must not get fake Favorites / Notifications badge counts.
+    expect(find.text('1'), findsNothing);
     await tester.tap(find.byTooltip('Notifications'));
     await tester.pumpAndSettle();
-    expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('Request accepted'), findsOneWidget);
-    expect(find.text('Mark all read'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.chevron_left_rounded));
+    expect(find.byType(LoginView), findsOneWidget);
+    expect(find.textContaining('Welcome'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Bookings'), findsOneWidget);
     await tester.tap(find.text('Bookings'));
@@ -619,15 +754,21 @@ void main() {
     expect(find.text('Filter'), findsOneWidget);
     expect(find.text('Map'), findsOneWidget);
     expect(find.text('Recommended'), findsOneWidget);
-    expect(find.text('Fahad Studio Light'), findsOneWidget);
-    await tester.tap(find.text('Fahad Studio Light'));
+    expect(find.text('F••••T'), findsOneWidget);
+    expect(find.text('Fahad Studio Light'), findsNothing);
+    await tester.tap(find.text('F••••T'));
     await tester.pumpAndSettle();
     expect(find.text('Book Now'), findsOneWidget);
     await tester.ensureVisible(find.text('Book Now'));
     await tester.tap(find.text('Book Now'));
     await tester.pumpAndSettle();
     expect(find.text('Choose Your Date'), findsOneWidget);
-    expect(find.text('September 2026'), findsOneWidget);
+    final now = DateTime.now();
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    expect(find.text('${months[now.month - 1]} ${now.year}'), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
     await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
@@ -866,7 +1007,7 @@ void main() {
   });
 
   testWidgets(
-    'home categories match the compact four-column grid with two new shortcuts',
+    'home categories mirror every bootstrap vendor type from admin',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -891,12 +1032,12 @@ void main() {
         find.byKey(const Key('home-category-food_stylist')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('home-category-ai_video')), findsOneWidget);
-      expect(find.byKey(const Key('home-category-voiceover')), findsOneWidget);
+      expect(find.byKey(const Key('home-category-ai_video')), findsNothing);
+      expect(find.byKey(const Key('home-category-voiceover')), findsNothing);
 
-      await tester.tap(find.byKey(const Key('home-category-voiceover')));
+      await tester.tap(find.byKey(const Key('home-category-food_stylist')));
       await tester.pumpAndSettle();
-      expect(find.text('VO (Voice Over)'), findsOneWidget);
+      expect(find.text('Food Stylists'), findsWidgets);
     },
   );
 
@@ -939,6 +1080,9 @@ void main() {
     expect(find.text('Sign in to manage bookings'), findsOneWidget);
     expect(find.text('Sign in'), findsWidgets);
     expect(find.text('Upcoming'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Canceled'), findsOneWidget);
+    expect(find.text('0'), findsNWidgets(3));
     expect(find.text('Language'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
     expect(find.text('Arabic'), findsOneWidget);
@@ -1295,24 +1439,53 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    CategoryFilters? resetResult;
     await tester.pumpWidget(
       MaterialApp(
         theme: LensTheme.dark(),
-        home: const FilterPage(title: 'Models', vendorTypeSlug: 'model'),
+        home: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () async {
+                    resetResult = await Navigator.of(context).push<CategoryFilters>(
+                      MaterialPageRoute(
+                        builder: (_) => const FilterPage(
+                          title: 'Models',
+                          vendorTypeSlug: 'model',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open Filters'),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
+    await tester.tap(find.text('Open Filters'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Filter Models (Men)'), findsOneWidget);
+    expect(find.text('Filter Models'), findsOneWidget);
     expect(find.text('Reset All'), findsOneWidget);
     expect(find.text('Women'), findsOneWidget);
     expect(find.text('Kids'), findsOneWidget);
+    expect(find.text('18 - 50 years'), findsOneWidget);
+    await tester.tap(find.text('Kids'));
+    await tester.pumpAndSettle();
+    expect(find.text('Filter Models (Kids)'), findsOneWidget);
+    expect(find.text('0 - 17 years'), findsOneWidget);
+    expect(find.text('Under 18'), findsOneWidget);
+    await tester.ensureVisible(find.text('Fashion'));
+    await tester.tap(find.text('Fashion'));
+    await tester.pumpAndSettle();
     expect(find.text('Category'), findsOneWidget);
-    expect(find.text('Fashion'), findsOneWidget);
     expect(find.text('Educational'), findsOneWidget);
     expect(find.text('Social Media'), findsOneWidget);
     expect(find.text('Age Range'), findsOneWidget);
-    expect(find.text('Under 18'), findsOneWidget);
     expect(find.text('Height (cm)'), findsOneWidget);
     expect(find.text('Under 160'), findsOneWidget);
     expect(find.text('Size (Clothes & Shoes)'), findsOneWidget);
@@ -1324,11 +1497,19 @@ void main() {
     expect(find.text('Cairo'), findsOneWidget);
     expect(find.text('6th of October'), findsOneWidget);
     expect(find.text('10th of Ramadan'), findsOneWidget);
-    expect(find.text('500'), findsOneWidget);
+    expect(find.text('EGP 500'), findsWidgets);
     expect(find.text('4.0+'), findsOneWidget);
     expect(find.text('Any Date'), findsOneWidget);
     expect(find.text('Apply Filters'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('filter-reset-all')));
+    await tester.pumpAndSettle();
+    expect(find.text('Open Filters'), findsOneWidget);
+    expect(resetResult, isNotNull);
+    expect(resetResult!.isClearedFor('model'), isTrue);
+    expect(resetResult!.services, isEmpty);
+    expect(resetResult!.gender, 'All');
   });
 
   testWidgets('studios filter shows the admin catalog', (
@@ -1360,7 +1541,8 @@ void main() {
     expect(find.text('Nasr City'), findsOneWidget);
     expect(find.text('Price Range (EGP/hour)'), findsOneWidget);
     expect(find.text('Under 100'), findsOneWidget);
-    expect(find.text('2,000+'), findsOneWidget);
+    expect(find.text('2,000+'), findsWidgets);
+    expect(find.textContaining('EGP '), findsWidgets);
     expect(find.text('Studio Size (m²)'), findsOneWidget);
     expect(find.text('Under 50'), findsOneWidget);
     expect(find.text('Features & Equipment'), findsOneWidget);
@@ -1470,7 +1652,7 @@ Map<String, dynamic> _bootstrap() {
     'ai_helper':
         'Describe your idea and let AI find the right creatives for you.',
     'search_placeholder': 'Search photographers, studios, models...',
-    'unread_notifications': 3,
+    'unread_notifications': 0,
     'features': {
       'ai_assistant': true,
       'bookings': true,
@@ -1491,6 +1673,14 @@ Map<String, dynamic> _bootstrap() {
       {'slug': 'studio', 'label': 'Studios'},
       {'slug': 'ugc', 'label': 'UGC Creators'},
       {'slug': 'food_stylist', 'label': 'Food Stylists'},
+    ],
+    'categories': [
+      {'slug': 'fnb', 'label': 'Food & Drinks'},
+      {'slug': 'wedding', 'label': 'Weddings & Parties'},
+      {'slug': 'events', 'label': 'Events'},
+      {'slug': 'product', 'label': 'Products & E-Commerce'},
+      {'slug': 'photosession', 'label': 'Personal Photoshoot'},
+      {'slug': 'corporate', 'label': 'Corporate & Business'},
     ],
     'cities': [
       {'id': 1, 'name': 'Cairo'},
@@ -1520,6 +1710,9 @@ Map<String, dynamic> _bootstrap() {
             'initials': 'FS',
             'tags': ['F&B', 'Events', 'Product'],
             'starting_from': 2500,
+            'hourly_price': 900,
+            'half_day_price': 2500,
+            'full_day_price': 4250,
             'verified': true,
           },
         ],
@@ -1550,6 +1743,7 @@ class _FakeSplashVideoPlatform extends VideoPlayerPlatform {
   int _nextPlayerId = 0;
   final Map<int, StreamController<VideoEvent>> _streams = {};
   final List<DataSource> sources = [];
+  bool looping = true;
 
   @override
   Future<void> init() async {}
@@ -1563,8 +1757,8 @@ class _FakeSplashVideoPlatform extends VideoPlayerPlatform {
         _streams[id]!.add(
           VideoEvent(
             eventType: VideoEventType.initialized,
-            duration: const Duration(seconds: 3),
-            size: const Size(1920, 1080),
+            duration: const Duration(milliseconds: 4938),
+            size: const Size(2160, 3840),
           ),
         );
       },
@@ -1576,7 +1770,9 @@ class _FakeSplashVideoPlatform extends VideoPlayerPlatform {
   Stream<VideoEvent> videoEventsFor(int playerId) => _streams[playerId]!.stream;
 
   @override
-  Future<void> setLooping(int playerId, bool looping) async {}
+  Future<void> setLooping(int playerId, bool looping) async {
+    this.looping = looping;
+  }
 
   @override
   Future<void> setVolume(int playerId, double volume) async {}

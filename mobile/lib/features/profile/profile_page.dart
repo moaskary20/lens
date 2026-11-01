@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/session_store.dart';
@@ -377,20 +378,124 @@ class _LanguagePicker extends StatelessWidget {
   }
 }
 
-class _StatsRow extends StatelessWidget {
+class _StatsRow extends StatefulWidget {
   const _StatsRow();
 
   @override
+  State<_StatsRow> createState() => _StatsRowState();
+}
+
+class _StatsRowState extends State<_StatsRow> {
+  int _upcoming = 0;
+  int _completed = 0;
+  int _canceled = 0;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SessionStore.instance.addListener(_onSession);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    SessionStore.instance.removeListener(_onSession);
+    super.dispose();
+  }
+
+  void _onSession() {
+    if (!mounted) {
+      return;
+    }
+    _load();
+  }
+
+  Future<void> _load() async {
+    final session = SessionStore.instance;
+    if (session.isGuest) {
+      setState(() {
+        _upcoming = 0;
+        _completed = 0;
+        _canceled = 0;
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    if (!LensConfig.useNetwork) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _upcoming = 0;
+        _completed = 0;
+        _canceled = 0;
+        _loading = false;
+      });
+      return;
+    }
+
+    try {
+      final payload = await ApiClient().getJson('/app/bookings');
+      final summary = payload['summary'];
+      var upcoming = 0;
+      var completed = 0;
+      var canceled = 0;
+      if (summary is Map) {
+        upcoming = (summary['upcoming'] as num?)?.toInt() ?? 0;
+        completed = (summary['completed'] as num?)?.toInt() ?? 0;
+        canceled = (summary['canceled'] as num?)?.toInt() ?? 0;
+      } else {
+        for (final item in (payload['bookings'] as List<dynamic>? ?? const [])) {
+          if (item is! Map) {
+            continue;
+          }
+          switch (item['group']?.toString()) {
+            case 'completed':
+              completed += 1;
+            case 'canceled':
+              canceled += 1;
+            default:
+              upcoming += 1;
+          }
+        }
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _upcoming = upcoming;
+        _completed = completed;
+        _canceled = canceled;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _upcoming = 0;
+        _completed = 0;
+        _canceled = 0;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
-          _Stat(value: '12', label: 'Upcoming'),
-          _Divider(),
-          _Stat(value: '8', label: 'Completed'),
-          _Divider(),
-          _Stat(value: '3', label: 'Canceled'),
+          _Stat(value: _loading ? '…' : '$_upcoming', label: 'Upcoming'),
+          const _Divider(),
+          _Stat(value: _loading ? '…' : '$_completed', label: 'Completed'),
+          const _Divider(),
+          _Stat(value: _loading ? '…' : '$_canceled', label: 'Canceled'),
         ],
       ),
     );

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppScreen;
+use App\Models\Category;
 use App\Models\City;
 use App\Models\Setting;
 use App\Models\Vendor;
@@ -32,7 +33,12 @@ class AppController extends Controller
         $logoPath = Setting::getValue('platform.logo');
         $logoUrl = is_string($logoPath) ? $this->publicUrl($logoPath) : null;
 
-        $types = VendorType::query()->marketplace()->orderBy('sort_order')->get();
+        $types = VendorType::query()->marketplace()->orderBy('sort_order')->orderBy('name_en')->get();
+        $categories = Category::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name_en')
+            ->get(['slug', 'name_en', 'name_ar', 'icon', 'sort_order']);
 
         return response()->json([
             'name' => Setting::getValue('platform.app_name', 'Lens'),
@@ -64,13 +70,29 @@ class AppController extends Controller
                 'name' => $type->name_en,
                 'label' => $this->typeLabel($type->slug, $type->name_en),
                 'icon' => $type->icon,
+                'name_ar' => $type->name_ar,
+                'sort_order' => (int) $type->sort_order,
+            ])->values()->all(),
+            'categories' => $categories->map(fn (Category $category): array => [
+                'slug' => $category->slug,
+                'name' => $category->name_en,
+                'label' => $category->name_en,
+                'name_ar' => $category->name_ar,
+                'icon' => $category->icon,
+                'sort_order' => (int) $category->sort_order,
             ])->values()->all(),
             'popular' => $this->popular($types),
             'filter_catalog' => SearchEngine::appFilters(),
-            'cities' => City::query()->where('is_active', true)->orderBy('name_en')->get(['id', 'name_en'])
+            'cities' => City::query()
+                ->where('is_active', true)
+                ->whereHas('vendors', fn ($query) => $query->where('is_active', true))
+                ->orderBy('name_en')
+                ->get(['id', 'name_en', 'name_ar'])
                 ->map(fn (City $city): array => [
                     'id' => $city->id,
                     'name' => $city->name_en,
+                    'name_en' => $city->name_en,
+                    'name_ar' => $city->name_ar,
                 ])->values()->all(),
             'banks' => collect(Egypt::banks())
                 ->map(fn (string $label, string $id): array => ['id' => $id, 'label' => $label])
@@ -89,8 +111,19 @@ class AppController extends Controller
     public function vendors(Request $request): JsonResponse
     {
         $slug = trim((string) $request->query('vendor_type', ''));
+        $filterTags = array_values(array_filter(array_map(
+            static fn ($item): string => trim((string) $item),
+            explode(',', (string) $request->query('filter_tags', '')),
+        )));
         $results = $this->search->search(SearchQuery::fromArray([
+            'brief' => $request->query('q', $request->query('brief')),
             'vendor_type_slugs' => $slug === '' ? [] : [$slug],
+            'filter_tag_slugs' => $filterTags,
+            'city_id' => $request->query('city_id'),
+            'verified' => $request->boolean('verified'),
+            'top_rated' => $request->boolean('top_rated'),
+            'min_price' => $request->query('min_price'),
+            'max_price' => $request->query('max_price'),
             'limit' => max(1, min(50, (int) $request->query('limit', 40))),
         ]));
 
@@ -106,9 +139,17 @@ class AppController extends Controller
 
     public function show(Vendor $vendor): JsonResponse
     {
+        return response()->json($this->publicProfile($vendor));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function publicProfile(Vendor $vendor, bool $forApp = true): array
+    {
         abort_unless($vendor->is_active, 404);
 
-        $vendor->loadMissing(['portfolios', 'city', 'badges', 'categories', 'vendorType', 'reviews.client']);
+        $vendor->loadMissing(['portfolios', 'city', 'badges', 'categories', 'vendorType', 'reviews.client', 'user']);
         $slug = $vendor->vendorType?->slug;
         $payload = $this->card(['vendor' => $vendor, 'score' => 0, 'matched_tags' => [], 'reasons' => []]);
         $filters = VendorPhotos::filters($slug);
@@ -143,19 +184,42 @@ class AppController extends Controller
         }
 
         $packages = $vendor->bookablePackages();
-
-        $projects = (int) ($vendor->completed_sessions ?: max(24, (int) $vendor->rating_count));
-
+        $projectTypes = $vendor->categories
+            ->sortBy('sort_order')
+            ->values()
+            ->map(fn ($category): array => [
+                'slug' => $category->slug,
+                'label' => $category->name_en,
+            ])
+            ->all();
+        if ($projectTypes === []) {
+            $projectTypes = Category::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->get(['slug', 'name_en'])
+                ->map(fn (Category $category): array => [
+                    'slug' => $category->slug,
+                    'label' => $category->name_en,
+                ])
+                ->all();
+        }
+        $projects = (int) ($vendor->completed_sessions ?? 0);
+        $booked = (int) ($vendor->booked_sessions ?? 0);
         $client = AppClient::user();
-        $contactUnlocked = $client && $vendor->bookings()
+        $contactUnlocked = $forApp && $client && $vendor->bookings()
             ->where('client_id', $client->id)
             ->whereNotIn('status', ['cancelled', 'rejected', 'failed'])
             ->exists();
-        $vendor->loadMissing('user');
         $contactPhone = $vendor->contact_phone ?: $vendor->user?->phone;
+        $location = $payload['location'] ?: 'Cairo, Egypt';
+        $bio = trim((string) $vendor->bio);
+        if ($bio === '') {
+            $tags = $payload['tags'] === [] ? 'campaigns' : implode(', ', $payload['tags']);
+            $bio = ($payload['display_name'] ?? 'This creative').' is a '.strtolower((string) ($vendor->vendorType?->name_en ?: 'creator')).' based in '.$location.', creating booked work across '.$tags.'.';
+        }
 
-        return response()->json(array_merge($payload, [
-            'bio' => $vendor->bio,
+        return array_merge($payload, [
+            'bio' => $bio,
             'profession' => $vendor->profession ?: $vendor->vendorType?->name_en,
             'tagline' => match ($slug) {
                 'food_stylist' => "Good Food\nBetter Stories",
@@ -166,19 +230,38 @@ class AppController extends Controller
             },
             'response_minutes' => (int) ($vendor->response_minutes ?: 45),
             'completed_sessions' => $projects,
-            'assisted_sessions' => (int) round($projects * 0.7),
-            'years_experience' => max(3, (int) floor($projects / 15)),
-            'client_satisfaction' => min(99, (int) round(((float) $vendor->rating_avg) * 20)),
+            'assisted_sessions' => max(0, $booked - $projects),
+            'years_experience' => $projects > 0 ? max(1, (int) floor($projects / 15)) : 1,
+            'client_satisfaction' => (float) $vendor->rating_avg > 0
+                ? min(99, max(0, (int) round(((float) $vendor->rating_avg) * 20)))
+                : 0,
             'available_weekend' => true,
             'equipment' => $equipment,
             'specialties' => $payload['tags'] ?: array_slice($categories, 0, 3),
+            'project_types' => $projectTypes,
             'packages' => $packages,
             'portfolio' => $portfolio,
             'portfolio_filters' => $filters,
+            'reviews' => $vendor->reviews
+                ->where('is_visible', true)
+                ->sortByDesc('created_at')
+                ->take(8)
+                ->values()
+                ->map(fn ($review): array => [
+                    'rating' => (int) $review->rating,
+                    'comment' => $review->comment,
+                    'client' => $review->client?->name ?: 'Client',
+                ])
+                ->all(),
+            'social' => collect([
+                ['label' => 'Instagram', 'url' => $vendor->instagram, 'followers' => $vendor->instagram_followers],
+                ['label' => 'TikTok', 'url' => $vendor->tiktok_url, 'followers' => $vendor->tiktok_followers],
+                ['label' => 'Facebook', 'url' => $vendor->facebook_url, 'followers' => $vendor->facebook_followers],
+            ])->filter(fn (array $row): bool => filled($row['url']))->values()->all(),
             'contact_unlocked' => $contactUnlocked,
             'contact_phone' => $contactUnlocked ? $contactPhone : null,
             'whatsapp' => $contactUnlocked ? ($vendor->whatsapp ?: $contactPhone) : null,
-        ]));
+        ]);
     }
 
     /**
@@ -192,7 +275,7 @@ class AppController extends Controller
         foreach ($types as $type) {
             $results = $this->search->search(SearchQuery::fromArray([
                 'vendor_type_slugs' => [$type->slug],
-                'limit' => 5,
+                'limit' => 10,
             ]));
 
             if ($results['vendors'] === []) {

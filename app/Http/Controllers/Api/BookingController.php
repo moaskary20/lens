@@ -8,11 +8,13 @@ use App\Models\City;
 use App\Models\Coupon;
 use App\Models\Vendor;
 use App\Models\Dispute;
+use App\Services\CancellationService;
 use App\Services\DeliveryService;
 use App\Services\DisputeService;
 use App\Services\PromoService;
 use App\Support\Feature;
 use App\Support\AppClient;
+use App\Support\Pricing;
 use App\Support\Roles;
 use App\Support\Finance;
 use App\Support\StorageQuota;
@@ -30,7 +32,9 @@ class BookingController extends Controller
     {
         $data = $request->validate([
             'vendor_id' => ['required', 'integer', 'exists:vendors,id'],
-            'session_price' => ['required', 'numeric', 'min:1'],
+            'package_type' => ['nullable', 'string', 'max:64'],
+            'session_price' => ['nullable', 'numeric', 'min:1'],
+            'duration_hours' => ['nullable', 'numeric', 'min:1'],
             'promo_code' => ['nullable', 'string', 'max:40'],
             'location_text' => ['nullable', 'string', 'max:255'],
         ]);
@@ -39,7 +43,7 @@ class BookingController extends Controller
         abort_unless($user->canUseClientApp(), 403, 'Only clients can quote a booking.');
         Roles::abortUnlessCan($user, 'book_sessions', 'Booking is disabled for this role.');
 
-        $vendor = Vendor::query()->with(['city', 'vendorType', 'travelRates'])->findOrFail($data['vendor_id']);
+        $vendor = Vendor::query()->with(['city', 'vendorType.pricingModel.fields', 'travelRates'])->findOrFail($data['vendor_id']);
         $city = $this->cityFromLocation((string) ($data['location_text'] ?? '')) ?? $vendor->city;
         $travel = $this->travelFee($vendor, $city);
         $coupon = $this->couponFromCode($data['promo_code'] ?? null);
@@ -48,8 +52,21 @@ class BookingController extends Controller
             return response()->json(['message' => 'This promo code is not valid.', 'errors' => ['promo_code' => ['This promo code is not valid.']]], 422);
         }
 
+        $sessionPrice = $this->resolveSessionPrice(
+            $vendor,
+            $data['package_type'] ?? null,
+            isset($data['duration_hours']) ? (float) $data['duration_hours'] : null,
+            isset($data['session_price']) ? (float) $data['session_price'] : null,
+        );
+        if ($sessionPrice === null) {
+            return response()->json([
+                'message' => 'This package is not available for this vendor.',
+                'errors' => ['package_type' => ['This package is not available for this vendor.']],
+            ], 422);
+        }
+
         $quote = app(PromoService::class)->quotePrice(
-            (float) $data['session_price'],
+            $sessionPrice,
             $travel,
             $coupon,
             $user,
@@ -58,6 +75,7 @@ class BookingController extends Controller
 
         return response()->json([
             ...$quote,
+            'session_price' => $sessionPrice,
             'currency' => Finance::currency(),
             'promo_code' => $coupon?->code,
             'travel_fee' => $travel,
@@ -89,13 +107,26 @@ class BookingController extends Controller
         abort_unless($user->canUseClientApp(), 403, 'Only clients can create a booking.');
         Roles::abortUnlessCan($user, 'book_sessions', 'Booking is disabled for this role.');
 
-        $vendor = Vendor::query()->with(['city', 'vendorType', 'travelRates'])->findOrFail($data['vendor_id']);
+        $vendor = Vendor::query()->with(['city', 'vendorType.pricingModel.fields', 'travelRates'])->findOrFail($data['vendor_id']);
         $city = $this->cityFromLocation($data['location_text']) ?? $vendor->city;
         $travel = $this->travelFee($vendor, $city);
         $coupon = $this->couponFromCode($data['promo_code'] ?? null);
 
         if (filled($data['promo_code'] ?? null) && ! $coupon) {
             return response()->json(['message' => 'This promo code is not valid.', 'errors' => ['promo_code' => ['This promo code is not valid.']]], 422);
+        }
+
+        $sessionPrice = $this->resolveSessionPrice(
+            $vendor,
+            $data['package_type'],
+            isset($data['duration_hours']) ? (float) $data['duration_hours'] : null,
+            (float) $data['session_price'],
+        );
+        if ($sessionPrice === null) {
+            return response()->json([
+                'message' => 'This package is not available for this vendor.',
+                'errors' => ['package_type' => ['This package is not available for this vendor.']],
+            ], 422);
         }
 
         $booking = Booking::query()->create([
@@ -110,7 +141,7 @@ class BookingController extends Controller
             'location_text' => $data['location_text'],
             'location_lat' => $data['location_lat'] ?? null,
             'location_lng' => $data['location_lng'] ?? null,
-            'session_price' => $data['session_price'],
+            'session_price' => $sessionPrice,
             'travel_fee' => $travel,
             'payment_method' => $data['payment_method'],
             'payment_details' => $this->safePaymentDetails($data['payment_method'], $data['payment_details'] ?? []),
@@ -235,25 +266,58 @@ class BookingController extends Controller
         ], 201);
     }
 
+    public function cancellationQuote(Booking $booking): JsonResponse
+    {
+        abort_unless(Feature::enabled('cancellation_policies'), 404);
+
+        $user = AppClient::requireUser();
+        [$booking, $actor] = $this->cancellableBooking($booking, $user);
+
+        try {
+            $quote = app(CancellationService::class)->quote($booking, $actor);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json($this->presentCancellationQuote($booking, $actor, $quote));
+    }
+
     public function cancelByVendor(Request $request, Booking $booking): JsonResponse
     {
+        abort_unless(Feature::enabled('cancellation_policies'), 404);
+
         $user = AppClient::requireUser();
-        $booking = $this->ownedVendorBooking($booking, $user);
-        Roles::abortUnlessCan($user, 'receive_bookings', 'Booking actions are disabled for this role.');
-        abort_unless(in_array($booking->status, ['pending', 'accepted', 'checked_in', 'in_progress'], true), 422, 'This booking can no longer be cancelled.');
+        [$booking, $actor] = $this->cancellableBooking($booking, $user);
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
         try {
-            $updated = app(\App\Services\CancellationService::class)->cancel($booking, 'vendor', $data['reason']);
+            $quote = app(CancellationService::class)->quote($booking, $actor);
+            $updated = app(CancellationService::class)->cancel($booking, $actor, $data['reason']);
         } catch (LogicException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
+        $settlement = $this->presentCancellationQuote($booking, $actor, $quote);
+        $currency = Finance::currency();
+        $message = $actor === 'client'
+            ? sprintf(
+                'Booking cancelled under %s. Refund %s %s.',
+                $quote['policy']->name,
+                number_format((float) $quote['client_refund'], 2),
+                $currency,
+            )
+            : sprintf(
+                'Booking cancelled under %s. Cancellation terms have been applied.',
+                $quote['policy']->name,
+            );
+
         return response()->json([
             'status' => $updated->status,
-            'message' => 'Booking cancelled. Cancellation terms have been applied.',
+            'actor' => $actor,
+            'message' => $message,
+            'settlement' => $settlement,
         ]);
     }
 
@@ -411,6 +475,63 @@ class BookingController extends Controller
         return $booking;
     }
 
+    /**
+     * @return array{0: Booking, 1: string}
+     */
+    protected function cancellableBooking(Booking $booking, \App\Models\User $user): array
+    {
+        if ($user->canUseClientApp() && (int) $booking->client_id === (int) $user->id) {
+            Roles::abortUnlessCan($user, 'book_sessions', 'Booking actions are disabled for this role.');
+            abort_unless($booking->isCancellable(), 422, 'This booking can no longer be cancelled.');
+            abort_unless(in_array($booking->status, ['pending', 'accepted', 'checked_in', 'in_progress'], true), 422, 'This booking can no longer be cancelled.');
+
+            return [$booking, 'client'];
+        }
+
+        if ($user->isVendor() && $user->vendor && (int) $booking->vendor_id === (int) $user->vendor->id) {
+            Roles::abortUnlessCan($user, 'receive_bookings', 'Booking actions are disabled for this role.');
+            abort_unless($booking->isCancellable(), 422, 'This booking can no longer be cancelled.');
+            abort_unless(in_array($booking->status, ['pending', 'accepted', 'checked_in', 'in_progress'], true), 422, 'This booking can no longer be cancelled.');
+
+            return [$booking, 'vendor'];
+        }
+
+        abort(403, 'This booking is not yours.');
+    }
+
+    /**
+     * @param  array{policy: \App\Models\CancellationPolicy, hours_notice: int, client_refund: float, vendor_net: float, platform_fee: float, vendor_penalty: float}  $quote
+     * @return array<string, mixed>
+     */
+    protected function presentCancellationQuote(Booking $booking, string $actor, array $quote): array
+    {
+        $policy = $quote['policy'];
+
+        return [
+            'actor' => $actor,
+            'booking_id' => $booking->id,
+            'reference' => $booking->reference,
+            'currency' => Finance::currency(),
+            'session_price' => (float) $booking->session_price,
+            'hours_notice' => (int) $quote['hours_notice'],
+            'policy' => [
+                'id' => $policy->id,
+                'name' => $policy->name,
+                'description' => $policy->description,
+                'min_hours' => $policy->min_hours,
+                'max_hours' => $policy->max_hours,
+                'client_refund_percent' => (float) $policy->client_refund_percent,
+                'vendor_payout_percent' => (float) $policy->vendor_payout_percent,
+                'platform_fee_percent' => (float) $policy->platform_fee_percent,
+                'vendor_penalty_percent' => (float) $policy->vendor_penalty_percent,
+            ],
+            'client_refund' => (float) $quote['client_refund'],
+            'vendor_net' => (float) $quote['vendor_net'],
+            'platform_fee' => (float) $quote['platform_fee'],
+            'vendor_penalty' => (float) $quote['vendor_penalty'],
+        ];
+    }
+
     protected function authorizedBooking(Booking $booking): Booking
     {
         $user = AppClient::requireUser();
@@ -461,6 +582,30 @@ class BookingController extends Controller
         } catch (LogicException) {
             return 0.0;
         }
+    }
+
+    protected function resolveSessionPrice(
+        Vendor $vendor,
+        ?string $packageType,
+        ?float $hours = null,
+        ?float $fallback = null,
+    ): ?float {
+        if (filled($packageType)) {
+            $amount = Pricing::sessionAmount($vendor, $packageType, $hours);
+            if ($amount !== null && $amount > 0) {
+                return round($amount, 2);
+            }
+
+            foreach ($vendor->bookablePackages() as $package) {
+                if (($package['key'] ?? null) === $packageType && (float) ($package['price'] ?? 0) > 0) {
+                    return round((float) $package['price'], 2);
+                }
+            }
+
+            return null;
+        }
+
+        return $fallback !== null && $fallback > 0 ? round($fallback, 2) : null;
     }
 
     /**

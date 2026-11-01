@@ -1,3 +1,4 @@
+import 'package:lens/core/booked_vendors_store.dart';
 import 'package:lens/core/session_store.dart';
 
 class HomeData {
@@ -6,6 +7,7 @@ class HomeData {
     required this.name,
     required this.logoUrl,
     required this.vendorTypes,
+    this.categories = const [],
     required this.popular,
     required this.aiPrompt,
     required this.aiHelper,
@@ -32,6 +34,12 @@ class HomeData {
       vendorTypes: (json['vendor_types'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map((item) => VendorTypeItem.fromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.slug.isNotEmpty)
+          .toList(),
+      categories: (json['categories'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => ProjectCategoryItem.fromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.slug.isNotEmpty)
           .toList(),
       popular: (json['popular'] as List<dynamic>? ?? const [])
           .whereType<Map>()
@@ -65,6 +73,7 @@ class HomeData {
   final String name;
   final String? logoUrl;
   final List<VendorTypeItem> vendorTypes;
+  final List<ProjectCategoryItem> categories;
   final List<PopularSection> popular;
   final String aiPrompt;
   final String aiHelper;
@@ -140,17 +149,37 @@ class FilterOptionItem {
 }
 
 class VendorTypeItem {
-  const VendorTypeItem({required this.slug, required this.label});
+  const VendorTypeItem({required this.slug, required this.label, this.icon});
 
   factory VendorTypeItem.fromJson(Map<String, dynamic> json) {
     return VendorTypeItem(
       slug: json['slug']?.toString() ?? '',
       label: json['label']?.toString() ?? json['name']?.toString() ?? '',
+      icon: json['icon']?.toString(),
     );
   }
 
   final String slug;
   final String label;
+  final String? icon;
+}
+
+class ProjectCategoryItem {
+  const ProjectCategoryItem({required this.slug, required this.label, this.icon, this.nameAr});
+
+  factory ProjectCategoryItem.fromJson(Map<String, dynamic> json) {
+    return ProjectCategoryItem(
+      slug: json['slug']?.toString() ?? '',
+      label: json['label']?.toString() ?? json['name']?.toString() ?? json['name_en']?.toString() ?? '',
+      icon: json['icon']?.toString(),
+      nameAr: json['name_ar']?.toString(),
+    );
+  }
+
+  final String slug;
+  final String label;
+  final String? icon;
+  final String? nameAr;
 }
 
 class PopularSection {
@@ -192,6 +221,11 @@ class VendorCard {
     required this.latitude,
     required this.longitude,
     this.filterTags = const [],
+    this.completedSessions = 0,
+    this.halfDayPrice,
+    this.fullDayPrice,
+    this.hourlyPrice,
+    this.perVideoPrice,
   });
 
   factory VendorCard.fromJson(Map<String, dynamic> json) {
@@ -214,6 +248,11 @@ class VendorCard {
       latitude: json['latitude'] == null ? null : _asDouble(json['latitude']),
       longitude: json['longitude'] == null ? null : _asDouble(json['longitude']),
       filterTags: (json['filter_tags'] as List<dynamic>? ?? const []).map((item) => '$item').toList(),
+      completedSessions: _asInt(json['completed_sessions']),
+      halfDayPrice: json['half_day_price'] == null ? null : _asDouble(json['half_day_price']),
+      fullDayPrice: json['full_day_price'] == null ? null : _asDouble(json['full_day_price']),
+      hourlyPrice: json['hourly_price'] == null ? null : _asDouble(json['hourly_price']),
+      perVideoPrice: json['per_video_price'] == null ? null : _asDouble(json['per_video_price']),
     );
   }
 
@@ -235,25 +274,35 @@ class VendorCard {
   final double? latitude;
   final double? longitude;
   final List<String> filterTags;
+  final int completedSessions;
+  final double? halfDayPrice;
+  final double? fullDayPrice;
+  final double? hourlyPrice;
+  final double? perVideoPrice;
 
   double get mapLatitude => latitude ?? LensCities.latitude(city);
 
   double get mapLongitude => longitude ?? LensCities.longitude(city);
 
-  /// First letter of the first and last name, used when the visitor is a guest.
+  /// First and last letter of the vendor name (browse privacy).
   String get maskedName {
-    final parts = displayName.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
-    if (parts.isEmpty) {
+    final letters = displayName
+        .trim()
+        .replaceAll(RegExp(r'[^A-Za-z\u0600-\u06FF]'), '');
+    if (letters.isEmpty) {
       return 'C.';
     }
-    String letter(String part) => part.substring(0, 1).toUpperCase();
-    if (parts.length == 1) {
-      return '${letter(parts.first)}.';
+    final first = letters[0].toUpperCase();
+    if (letters.length == 1) {
+      return '$first.';
     }
-    return '${letter(parts.first)}. ${letter(parts.last)}.';
+    final last = letters[letters.length - 1].toUpperCase();
+    return '$first••••$last';
   }
 
-  String get publicName => SessionStore.instance.isGuest ? maskedName : displayName;
+  /// Browse / discovery name — full only after this client booked the vendor.
+  String get publicName =>
+      BookedVendorsStore.instance.has(id) ? displayName : maskedName;
 }
 
 class LensCities {

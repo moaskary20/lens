@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/book_checkout_page.dart';
 import 'package:lens/features/home/book_draft.dart';
 import 'package:lens/features/home/book_project_catalog.dart';
@@ -98,6 +101,10 @@ class BookReviewPage extends StatelessWidget {
                   _projectCard(context),
                   const SizedBox(height: 10),
                   _briefCard(context),
+                  if (draft.hasMoodboard) ...[
+                    const SizedBox(height: 10),
+                    _moodboardCard(context),
+                  ],
                   const SizedBox(height: 10),
                   _pricing(),
                   const SizedBox(height: 10),
@@ -167,7 +174,7 @@ class BookReviewPage extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.chevron_left_rounded, color: LensColors.cream, size: 32),
           ),
-          const Expanded(child: Center(child: _LensMark())),
+          const Expanded(child: Center(child: BrandHeader(height: 36))),
           const SizedBox(width: 48),
         ],
       ),
@@ -413,6 +420,65 @@ class BookReviewPage extends StatelessWidget {
     );
   }
 
+  Widget _moodboardCard(BuildContext context) {
+    final board = draft.moodboard!;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: LensColors.primary, size: 16),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text('Lens AI Moodboard', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
+              _edit(() => _popPages(context, 2)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            board.title.isEmpty ? board.summaryLine : board.title,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14.5),
+          ),
+          if (board.mood.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(board.mood, style: const TextStyle(color: Color(0xFFB0ABA3), fontSize: 12.5, height: 1.35)),
+          ],
+          if (board.colors.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 28,
+              child: Row(
+                children: [
+                  for (var i = 0; i < board.colors.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 6),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: board.colors[i].color,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0x33FFFFFF)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          if (board.hasImages) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${board.images.length} reference image${board.images.length == 1 ? '' : 's'} attached',
+              style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _briefCard(BuildContext context) {
     final gallery = _gallery;
     final extra = math.max(0, gallery.length - 3);
@@ -489,15 +555,20 @@ class BookReviewPage extends StatelessWidget {
     );
   }
 
-  Widget _shot(String url) {
+  Widget _shot(String path) {
+    const fallback = ColoredBox(color: LensColors.graphite);
+    final image = path.startsWith('http://') || path.startsWith('https://')
+        ? Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback)
+        : kIsWeb
+            ? fallback
+            : Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback);
+
     return AspectRatio(
       aspectRatio: 1,
       child: Container(
         decoration: BoxDecoration(color: LensColors.graphite, borderRadius: BorderRadius.circular(12)),
         clipBehavior: Clip.antiAlias,
-        child: LensConfig.useNetwork
-            ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite))
-            : const ColoredBox(color: LensColors.graphite),
+        child: image,
       ),
     );
   }
@@ -581,54 +652,4 @@ class BookReviewPage extends StatelessWidget {
     }
     return buffer.toString();
   }
-}
-
-class _LensMark extends StatelessWidget {
-  const _LensMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: -2,
-            child: CustomPaint(size: const Size(22, 14), painter: _SunburstPainter()),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              'lens',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 0.2, height: 1),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SunburstPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = LensColors.primary
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    final origin = Offset(size.width / 2, size.height);
-    for (var i = 0; i < 7; i++) {
-      final angle = -math.pi + (i * math.pi / 6);
-      canvas.drawLine(
-        origin + Offset(math.cos(angle) * 2, math.sin(angle) * 2),
-        origin + Offset(math.cos(angle) * 9, math.sin(angle) * 9),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -5,6 +5,7 @@ import 'package:lens/core/config.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/vendor_photos.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/bookings/bookings_page.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
@@ -52,7 +53,7 @@ class BookConfirmedPage extends StatelessWidget {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Center(child: _LensMark()),
+              child: Center(child: BrandHeader(height: 36)),
             ),
             Expanded(
               child: ListView(
@@ -513,50 +514,6 @@ class _EscrowLockPainter extends CustomPainter {
         ..cubicTo(w * 0.40, h * 0.32, w * 0.60, h * 0.32, w * 0.60, h * 0.46),
       lock,
     );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _LensMark extends StatelessWidget {
-  const _LensMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(top: -2, child: CustomPaint(size: const Size(22, 14), painter: _SunburstPainter())),
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text('lens', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 0.2, height: 1)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SunburstPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = LensColors.primary
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    final origin = Offset(size.width / 2, size.height);
-    for (var i = 0; i < 7; i++) {
-      final angle = -math.pi + (i * math.pi / 6);
-      canvas.drawLine(
-        origin + Offset(math.cos(angle) * 2, math.sin(angle) * 2),
-        origin + Offset(math.cos(angle) * 9, math.sin(angle) * 9),
-        paint,
-      );
-    }
   }
 
   @override

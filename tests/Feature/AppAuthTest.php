@@ -36,6 +36,13 @@ class AppAuthTest extends TestCase
         $this->assertNotEmpty($clientBookings->json('bookings'));
         $this->assertEquals('Fahad Studio Light', $clientBookings->json('bookings.0.counterpart'));
         $this->assertContains($clientBookings->json('bookings.0.group'), ['upcoming', 'completed', 'canceled']);
+        $this->assertIsArray($clientBookings->json('summary'));
+        $this->assertEquals(
+            count($clientBookings->json('bookings')),
+            (int) $clientBookings->json('summary.upcoming')
+            + (int) $clientBookings->json('summary.completed')
+            + (int) $clientBookings->json('summary.canceled'),
+        );
 
         $this->postJson('/api/app/auth/login', [
             'email' => 'vendor@lens.app',

@@ -177,6 +177,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->belongsToMany(Vendor::class, 'favorites')->withTimestamps();
     }
 
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function avatarUrl(): ?string
     {
         if (! filled($this->avatar)) {

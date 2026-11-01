@@ -178,7 +178,8 @@ class RoleAccessTest extends TestCase
         $this->actingAs($support)->get('/admin/conversations')->assertOk();
         $this->actingAs($support)->get('/admin/disputes')->assertOk();
         $this->actingAs($support)->get('/admin/users/create')->assertForbidden();
-        $this->actingAs($support)->get('/admin/users/'.User::query()->where('role', 'client')->value('id').'/edit')->assertForbidden();
+        $this->actingAs($support)->get('/admin/users/'.User::query()->where('role', 'client')->value('id').'/edit')->assertNotFound();
+        $this->actingAs($support)->get('/admin/clients/'.User::query()->where('role', 'client')->value('id').'/edit')->assertForbidden();
         $this->actingAs($support)->get('/admin/vendors')->assertForbidden();
         $this->actingAs($support)->get('/admin/bookings')->assertForbidden();
         $this->actingAs($support)->get('/admin/wallets')->assertForbidden();

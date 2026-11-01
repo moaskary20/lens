@@ -33,7 +33,7 @@ class _RoleChoicePageState extends State<RoleChoicePage> {
               child: Row(
                 children: [
                   const Expanded(
-                    child: BrandHeader(height: 36),
+                    child: BrandHeader(),
                   ),
                   Row(
                     children: [

@@ -120,4 +120,71 @@ class VendorPricingTest extends TestCase
             ->assertOk()
             ->assertSee('Vendor type');
     }
+
+    public function test_sync_vendor_pricing_aligns_vendors_to_models(): void
+    {
+        $studio = Vendor::query()->where('display_name', 'Noor Cyclorama')->firstOrFail();
+        $studio->update([
+            'half_day_price' => 999,
+            'full_day_price' => 1999,
+            'hourly_price' => null,
+            'extras' => [],
+        ]);
+
+        $this->artisan('lens:sync-vendor-pricing')->assertSuccessful();
+
+        $studio->refresh();
+        $this->assertNull($studio->half_day_price);
+        $this->assertNull($studio->full_day_price);
+        $this->assertNotNull($studio->hourly_price);
+        $this->assertGreaterThan(0, (float) $studio->hourly_price);
+        $this->assertSame(
+            (int) VendorType::query()->where('slug', 'studio')->value('pricing_model_id'),
+            (int) data_get($studio->extras, 'pricing_model_id'),
+        );
+        $this->assertNotEmpty($studio->bookablePackages());
+        $this->assertSame(['hourly'], collect($studio->bookablePackages())->pluck('key')->all());
+    }
+
+    public function test_sync_vendor_pricing_does_not_clear_type_expected_prices_when_model_mismatch(): void
+    {
+        $photographerType = VendorType::query()->where('slug', 'photographer')->firstOrFail();
+        $halfFullModelId = (int) PricingModel::query()->where('slug', 'half_full_day')->value('id');
+
+        $wrongModel = PricingModel::query()->create([
+            'slug' => 'per_min_test',
+            'name_en' => 'Per minute test',
+            'is_active' => true,
+            'sort_order' => 99,
+        ]);
+        $wrongModel->fields()->create([
+            'key' => 'custom',
+            'storage_key' => 'voice',
+            'label' => 'Voice rate',
+            'package_type' => 'per min',
+            'unit' => 'minute',
+            'duration_hours' => null,
+            'helper_text' => 'Test-only custom field',
+            'sort_order' => 0,
+        ]);
+
+        $photographerType->update(['pricing_model_id' => $wrongModel->id]);
+
+        $vendor = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();
+        $vendor->update([
+            'half_day_price' => 2100,
+            'full_day_price' => 3600,
+            'hourly_price' => null,
+        ]);
+
+        $this->artisan('lens:sync-vendor-pricing')->assertSuccessful();
+
+        $vendor->refresh();
+        $photographerType->refresh();
+
+        $this->assertEquals(2100.0, (float) $vendor->half_day_price);
+        $this->assertEquals(3600.0, (float) $vendor->full_day_price);
+        $this->assertNotEmpty($vendor->bookablePackages());
+        $this->assertSame($halfFullModelId, (int) $photographerType->pricing_model_id);
+    }
 }

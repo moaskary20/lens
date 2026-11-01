@@ -35,6 +35,13 @@ class AppBootstrapTest extends TestCase
 
         $this->assertNotEmpty($payload->json('popular.0.vendors.0.cover_url'));
         $this->assertGreaterThan(1, count($payload->json('vendor_types')));
+        $this->assertSame(
+            ['photographer', 'videographer', 'reels', 'model', 'studio', 'ugc', 'food_stylist'],
+            collect($payload->json('vendor_types'))->pluck('slug')->all()
+        );
+        $this->assertNotEmpty($payload->json('categories'));
+        $this->assertContains('wedding', collect($payload->json('categories'))->pluck('slug')->all());
+        $this->assertContains('fnb', collect($payload->json('categories'))->pluck('slug')->all());
         $this->assertNotEmpty($payload->json('cities'));
         $this->assertNotEmpty($payload->json('banks'));
         $this->assertNotEmpty($payload->json('telecom_wallets'));
@@ -140,12 +147,39 @@ class AppBootstrapTest extends TestCase
         $this->assertNotEmpty($profile->json('portfolio'));
         $this->assertNotEmpty($profile->json('portfolio_filters'));
         $this->assertNotEmpty($profile->json('tagline'));
+        $this->assertNotEmpty($profile->json('packages'));
+        $packageKeys = collect($profile->json('packages'))->pluck('key')->all();
+        $this->assertNotEmpty(array_intersect($packageKeys, ['half_day', 'full_day', 'hourly', 'per_video']));
+        foreach ($profile->json('packages') as $package) {
+            $this->assertGreaterThan(0, (float) $package['price']);
+        }
+        $this->assertNotEmpty($profile->json('project_types'));
+        foreach ($profile->json('project_types') as $type) {
+            $this->assertNotEmpty($type['slug'] ?? null);
+            $this->assertNotEmpty($type['label'] ?? null);
+        }
 
         Setting::setValue('features.ai_assistant', false);
-        Setting::setValue('features.vendor_videographers', false);
 
-        $hidden = $this->getJson('/api/app/bootstrap')->assertOk();
-        $hidden->assertJsonPath('features.ai_assistant', false);
-        $this->assertFalse(collect($hidden->json('vendor_types'))->contains(fn ($type) => $type['slug'] === 'videographer'));
+        $hiddenFeatures = $this->getJson('/api/app/bootstrap')->assertOk();
+        $hiddenFeatures->assertJsonPath('features.ai_assistant', false);
+
+        // App categories follow Admin → Vendor Types → Enabled (is_active).
+        \App\Models\VendorType::query()->where('slug', 'videographer')->update(['is_active' => false]);
+        $hiddenType = $this->getJson('/api/app/bootstrap')->assertOk();
+        $this->assertFalse(collect($hiddenType->json('vendor_types'))->contains(fn ($type) => $type['slug'] === 'videographer'));
+
+        \App\Models\VendorType::query()->create([
+            'slug' => 'drone_pilot',
+            'name_en' => 'Drone Pilots',
+            'name_ar' => 'طيارون درون',
+            'is_active' => true,
+            'sort_order' => 99,
+            'pricing_model' => 'half_full_day',
+            'pricing_model_id' => \App\Models\PricingModel::query()->where('slug', 'half_full_day')->value('id'),
+        ]);
+        $withCustom = $this->getJson('/api/app/bootstrap')->assertOk();
+        $this->assertTrue(collect($withCustom->json('vendor_types'))->contains(fn ($type) => $type['slug'] === 'drone_pilot'));
+        $this->assertContains('Drone Pilots', collect($withCustom->json('vendor_types'))->pluck('label')->all());
     }
 }

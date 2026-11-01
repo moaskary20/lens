@@ -1,11 +1,26 @@
 import 'package:flutter/widgets.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:lens/core/egypt_governorates.dart';
+
+class DevicePlace {
+  const DevicePlace({
+    required this.label,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String label;
+  final double latitude;
+  final double longitude;
+}
 
 class DeviceLocation {
   const DeviceLocation._();
 
-  static Future<String> currentGovernorate() async {
+  static Future<Position> _position({
+    LocationAccuracy accuracy = LocationAccuracy.low,
+  }) async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const DeviceLocationException('Location services are turned off.');
     }
@@ -23,16 +38,21 @@ class DeviceLocation {
       );
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.low,
-        timeLimit: Duration(seconds: 12),
+    return Geolocator.getCurrentPosition(
+      locationSettings: LocationSettings(
+        accuracy: accuracy,
+        timeLimit: const Duration(seconds: 12),
       ),
     );
+  }
+
+  static Future<String> currentGovernorate() async {
+    final position = await _position();
     final placemarks = await Geocoding(locale: const Locale('en'))
         .placemarkFromCoordinates(
       position.latitude,
       position.longitude,
+      locale: const Locale('en'),
     );
     if (placemarks.isEmpty) {
       throw const DeviceLocationException(
@@ -52,7 +72,57 @@ class DeviceLocation {
         'Could not determine a governorate for your location.',
       );
     }
-    return governorate;
+    return EgyptGovernorates.toEnglish(governorate);
+  }
+
+  static Future<DevicePlace> currentPlace() async {
+    final position = await _position(accuracy: LocationAccuracy.high);
+    var label =
+        '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+    try {
+      final placemarks = await Geocoding(locale: const Locale('en'))
+          .placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+        locale: const Locale('en'),
+      );
+      if (placemarks.isNotEmpty) {
+        final formatted = _formatPlace(placemarks.first);
+        if (formatted.isNotEmpty) {
+          label = formatted;
+        }
+      }
+    } catch (_) {}
+
+    return DevicePlace(
+      label: label,
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+  }
+
+  static String _formatPlace(Placemark place) {
+    final parts = <String>[];
+    for (final value in [
+      place.name,
+      place.street,
+      place.subLocality,
+      place.locality,
+      place.subAdministrativeArea,
+      place.administrativeArea,
+      place.country,
+    ]) {
+      final cleaned = value?.trim() ?? '';
+      if (cleaned.isEmpty) {
+        continue;
+      }
+      if (parts.isNotEmpty &&
+          parts.last.toLowerCase() == cleaned.toLowerCase()) {
+        continue;
+      }
+      parts.add(cleaned);
+    }
+    return parts.join(', ');
   }
 
   static String? _cleanGovernorate(String? value) {
@@ -64,6 +134,7 @@ class DeviceLocation {
     return cleaned
         .replaceFirst(RegExp(r'\s+Governorate$', caseSensitive: false), '')
         .replaceFirst(RegExp(r'\s+Province$', caseSensitive: false), '')
+        .replaceFirst(RegExp(r'\s+محافظة$', caseSensitive: false), '')
         .trim();
   }
 }

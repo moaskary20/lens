@@ -11,11 +11,13 @@ import 'package:lens/features/profile/edit_profile_page.dart';
 import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/payment_methods_page.dart';
 import 'package:lens/features/profile/report_issue_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     LensConfig.useNetwork = false;
-    SessionStore.instance.reset();
+    await SessionStore.instance.reset();
   });
 
   HomeData home() => HomeData.fromJson(DemoBootstrap.payload());
