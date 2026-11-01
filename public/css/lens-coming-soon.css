@@ -98,8 +98,8 @@ body.coming-soon {
     display: block;
     width: min(240px, 58vw);
     height: auto;
-    mix-blend-mode: lighten;
-    filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.45));
+    background: transparent;
+    filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.35));
 }
 
 .cs-kicker {

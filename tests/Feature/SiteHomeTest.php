@@ -28,7 +28,7 @@ class SiteHomeTest extends TestCase
             ->assertOk()
             ->assertSee('Coming Soon')
             ->assertSee('Launching November 8')
-            ->assertSee('branding/lenslogo.png', false)
+            ->assertSee('branding/lenslogo_clear.png', false)
             ->assertSee('branding/hero-pyramids.jpg', false)
             ->assertSee('data-launch-at="2026-11-08T00:00:00+02:00"', false)
             ->assertSee('Notify me')

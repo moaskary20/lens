@@ -22,7 +22,7 @@
         <header class="cs-brand">
             <img
                 class="cs-logo"
-                src="{{ asset('branding/lenslogo.png') }}"
+                src="{{ asset('branding/lenslogo_clear.png') }}"
                 alt="Lens"
                 width="220"
                 height="64"
