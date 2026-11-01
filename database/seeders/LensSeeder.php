@@ -227,11 +227,17 @@ class LensSeeder extends Seeder
             ['slug' => 'studio', 'name_ar' => 'استوديو', 'name_en' => 'Studio', 'pricing_model' => 'hourly', 'pricing_model_id' => $hourly->id, 'escrow_on_checkin' => true],
             ['slug' => 'ugc', 'name_ar' => 'صانع UGC', 'name_en' => 'UGC Creator', 'pricing_model' => 'per_video', 'pricing_model_id' => $perVideo->id, 'escrow_on_checkin' => false],
             ['slug' => 'food_stylist', 'name_ar' => 'منسق طعام', 'name_en' => 'Food Stylist', 'pricing_model' => 'half_full_day', 'pricing_model_id' => $halfFull->id, 'escrow_on_checkin' => false],
+            ['slug' => 'voice', 'name_ar' => 'فويس أوفر', 'name_en' => 'Voice Over', 'icon' => 'record_voice_over', 'pricing_model' => 'half_full_day', 'pricing_model_id' => $halfFull->id, 'escrow_on_checkin' => false],
+            ['slug' => 'ai_motion', 'name_ar' => 'فيديو بالذكاء الاصطناعي', 'name_en' => 'AI Videos & Motion', 'icon' => 'auto_awesome_motion', 'pricing_model' => 'per_video', 'pricing_model_id' => $perVideo->id, 'escrow_on_checkin' => false],
+            ['slug' => 'bloggers', 'name_ar' => 'مدونون ومؤثرون', 'name_en' => 'Bloggers & Influencers', 'icon' => 'campaign', 'pricing_model' => 'half_full_day', 'pricing_model_id' => $halfFull->id, 'escrow_on_checkin' => false],
         ];
 
         foreach ($types as $i => $type) {
             VendorType::query()->updateOrCreate(['slug' => $type['slug']], [...$type, 'is_active' => true, 'sort_order' => $i]);
         }
+
+        // Normalize older/admin-created slugs so Home / Categories icons stay indicative.
+        $this->normalizeMarketplaceVendorTypeSlugs();
 
         $halfFull->update(['vendor_type_id' => VendorType::query()->where('slug', 'photographer')->value('id')]);
         $hourly->update(['vendor_type_id' => VendorType::query()->where('slug', 'studio')->value('id')]);
@@ -1507,6 +1513,44 @@ class LensSeeder extends Seeder
                     FilterTag::query()->whereIn('slug', $foodTags[$row['display']])->pluck('id')
                 );
             }
+        }
+    }
+
+    /**
+     * Repair admin-created marketplace type slugs so app icons resolve cleanly.
+     */
+    protected function normalizeMarketplaceVendorTypeSlugs(): void
+    {
+        $aliases = [
+            'voive' => ['slug' => 'voice', 'name_en' => 'Voice Over', 'name_ar' => 'فويس أوفر', 'icon' => 'record_voice_over'],
+            'voice over' => ['slug' => 'voice', 'name_en' => 'Voice Over', 'name_ar' => 'فويس أوفر', 'icon' => 'record_voice_over'],
+            'voiceover' => ['slug' => 'voice', 'name_en' => 'Voice Over', 'name_ar' => 'فويس أوفر', 'icon' => 'record_voice_over'],
+            'Ai & Motion videos' => ['slug' => 'ai_motion', 'name_en' => 'AI Videos & Motion', 'name_ar' => 'فيديو بالذكاء الاصطناعي', 'icon' => 'auto_awesome_motion'],
+            'ai & motion videos' => ['slug' => 'ai_motion', 'name_en' => 'AI Videos & Motion', 'name_ar' => 'فيديو بالذكاء الاصطناعي', 'icon' => 'auto_awesome_motion'],
+            'bloggers and influencers' => ['slug' => 'bloggers', 'name_en' => 'Bloggers & Influencers', 'name_ar' => 'مدونون ومؤثرون', 'icon' => 'campaign'],
+        ];
+
+        foreach ($aliases as $from => $to) {
+            $type = VendorType::query()->where('slug', $from)->first();
+            if (! $type) {
+                continue;
+            }
+            if (VendorType::query()->where('slug', $to['slug'])->whereKeyNot($type->id)->exists()) {
+                $type->forceFill([
+                    'name_en' => $to['name_en'],
+                    'name_ar' => $to['name_ar'],
+                    'icon' => $to['icon'],
+                    'is_active' => true,
+                ])->save();
+                continue;
+            }
+            $type->forceFill([
+                'slug' => $to['slug'],
+                'name_en' => $to['name_en'],
+                'name_ar' => $to['name_ar'],
+                'icon' => $to['icon'],
+                'is_active' => true,
+            ])->save();
         }
     }
 

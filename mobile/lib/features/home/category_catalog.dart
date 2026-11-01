@@ -32,14 +32,16 @@ class CategoryCatalog {
           HomeCategoryEntry(
             slug: type.slug,
             label: type.label.isNotEmpty ? type.label : type.slug,
-            icon: iconFor(type.slug, type.icon),
+            icon: iconFor(type.slug, type.icon, type.label),
             type: type,
           ),
     ];
   }
 
-  static IconData iconFor(String slug, [String? remote]) {
-    final mapped = switch (slug) {
+  static IconData iconFor(String slug, [String? remote, String? label]) {
+    final key = normalizeKey(slug);
+    final labelKey = normalizeKey(label ?? '');
+    final mapped = switch (key) {
       'photographer' => Icons.photo_camera_outlined,
       'videographer' => Icons.videocam_outlined,
       'reels' => Icons.phone_iphone,
@@ -47,21 +49,61 @@ class CategoryCatalog {
       'studio' => Icons.home_outlined,
       'ugc' => Icons.groups_2_outlined,
       'food_stylist' => Icons.restaurant,
-      'ai_video' => Icons.smart_display_outlined,
-      'voiceover' => Icons.mic_none_rounded,
+      'ai_video' ||
+      'ai_motion' ||
+      'ai_and_motion_videos' ||
+      'ai_motion_videos' ||
+      'ai_videos_motion' ||
+      'ai_videos_and_motion' =>
+        Icons.auto_awesome_motion,
+      'voice' ||
+      'voive' ||
+      'voiceover' ||
+      'voice_over' ||
+      'vo' ||
+      'vo_voice_over' =>
+        Icons.record_voice_over_rounded,
+      'bloggers' ||
+      'blogger' ||
+      'influencer' ||
+      'influencers' ||
+      'bloggers_and_influencers' ||
+      'blogers_and_infrance' ||
+      'bloggers_and_infrance' =>
+        Icons.campaign_outlined,
       _ => null,
     };
     if (mapped != null) {
       return mapped;
     }
+    if (labelKey.contains('voice') || labelKey.contains('voive')) {
+      return Icons.record_voice_over_rounded;
+    }
+    if (labelKey.contains('motion') ||
+        (labelKey.contains('ai') && labelKey.contains('video'))) {
+      return Icons.auto_awesome_motion;
+    }
+    if (labelKey.contains('blog') || labelKey.contains('influenc')) {
+      return Icons.campaign_outlined;
+    }
     return _iconFromName(remote) ?? Icons.category_outlined;
+  }
+
+  static String normalizeKey(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('&', ' and ')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
   }
 
   static IconData? _iconFromName(String? name) {
     if (name == null || name.trim().isEmpty) {
       return null;
     }
-    final key = name.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    final key = normalizeKey(name);
     return switch (key) {
       'camera' || 'photo_camera' || 'photo' => Icons.photo_camera_outlined,
       'video' || 'videocam' || 'film' => Icons.videocam_outlined,
@@ -70,8 +112,17 @@ class CategoryCatalog {
       'home' || 'studio' || 'building' => Icons.home_outlined,
       'users' || 'group' || 'groups' || 'ugc' => Icons.groups_2_outlined,
       'restaurant' || 'food' || 'utensils' => Icons.restaurant,
-      'mic' || 'microphone' || 'voice' => Icons.mic_none_rounded,
-      'sparkles' || 'ai' || 'display' => Icons.smart_display_outlined,
+      'mic' || 'microphone' || 'voice' || 'record_voice_over' =>
+        Icons.record_voice_over_rounded,
+      'sparkles' ||
+      'ai' ||
+      'display' ||
+      'auto_awesome' ||
+      'auto_awesome_motion' ||
+      'motion' =>
+        Icons.auto_awesome_motion,
+      'campaign' || 'megaphone' || 'influencer' || 'blogger' =>
+        Icons.campaign_outlined,
       _ => null,
     };
   }

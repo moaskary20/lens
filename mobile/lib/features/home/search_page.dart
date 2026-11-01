@@ -11,6 +11,7 @@ import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/core/vendor_photos.dart';
 import 'package:lens/features/home/ai_search_page.dart';
+import 'package:lens/features/home/category_catalog.dart';
 import 'package:lens/features/home/category_list_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/inbox.dart';
@@ -171,14 +172,24 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   /// Current location + governorates that already have vendors, in English.
+  ///
+  /// On network, bootstrap `cities` is already limited to places with active
+  /// vendors — do not shrink that list to the city-filtered vendor page.
+  /// Offline/demo still derives the list from bootstrap vendor cards.
   List<String> get _cities {
+    final catalog = _catalogCities;
     final vendorCities = <String>{};
-    for (final vendor in _allVendors) {
-      final english = EgyptGovernorates.toEnglish(vendor.city);
-      if (english.isEmpty) {
-        continue;
+
+    if (_remoteVendors == null) {
+      for (final vendor in _bootstrapVendors) {
+        final english = EgyptGovernorates.toEnglish(vendor.city);
+        if (english.isEmpty) {
+          continue;
+        }
+        vendorCities.add(_matchConfiguredCity(english, catalog: catalog));
       }
-      vendorCities.add(_matchConfiguredCity(english, catalog: _catalogCities));
+    } else {
+      vendorCities.addAll(catalog);
     }
 
     final selected = <String>{
@@ -186,7 +197,7 @@ class _SearchPageState extends State<SearchPage> {
       if (_isSelectableCity(_city)) EgyptGovernorates.toEnglish(_city),
     };
 
-    final ordered = _catalogCities
+    final ordered = catalog
         .where((city) => selected.any((item) => _normalizeCity(item) == _normalizeCity(city)))
         .toList();
     if (ordered.isNotEmpty) {
@@ -195,7 +206,18 @@ class _SearchPageState extends State<SearchPage> {
     if (selected.isNotEmpty) {
       return selected.toList()..sort();
     }
-    return _catalogCities;
+    return catalog;
+  }
+
+  void _selectCity(String city) {
+    if (!_isSelectableCity(city)) {
+      return;
+    }
+    setState(() {
+      _manualCitySelection = true;
+      _city = EgyptGovernorates.toEnglish(city);
+    });
+    _loadVendors();
   }
 
   bool _isSelectableCity(String city) =>
@@ -396,11 +418,7 @@ class _SearchPageState extends State<SearchPage> {
               if (value == '__current_location__') {
                 _detectGovernorate(force: true);
               } else {
-                setState(() {
-                  _manualCitySelection = true;
-                  _city = value;
-                });
-                _loadVendors();
+                _selectCity(value);
               }
             },
             itemBuilder: (context) => [
@@ -408,9 +426,11 @@ class _SearchPageState extends State<SearchPage> {
                 value: '__current_location__',
                 child: Text('Use current location'),
               ),
-              for (final city in {..._cities, _city})
-                if (city != 'Getting location...' && city != 'Select location')
-                  PopupMenuItem(value: city, child: Text(city)),
+              for (final city in {
+                ..._cities,
+                if (_isSelectableCity(_city)) EgyptGovernorates.toEnglish(_city),
+              })
+                PopupMenuItem(value: city, child: Text(city)),
             ],
             child: Row(
               children: [
@@ -1167,18 +1187,7 @@ class _ExploreMapPainter extends CustomPainter {
 }
 
 IconData _iconFor(String slug) {
-  return switch (slug) {
-    'photographer' => Icons.photo_camera_outlined,
-    'videographer' => Icons.videocam_outlined,
-    'reels' => Icons.movie_creation_outlined,
-    'model' => Icons.person_outline_rounded,
-    'studio' => Icons.apartment_outlined,
-    'ugc' => Icons.groups_outlined,
-    'food_stylist' => Icons.restaurant_outlined,
-    'ai_motion' || 'ai_video' => Icons.auto_awesome_outlined,
-    'voice' || 'voiceover' => Icons.mic_none_outlined,
-    _ => Icons.category_outlined,
-  };
+  return CategoryCatalog.iconFor(slug);
 }
 
 String _egp(double? value) {

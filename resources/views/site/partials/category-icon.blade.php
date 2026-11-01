@@ -25,10 +25,17 @@
         <svg viewBox="0 0 24 24"><path d="M8 4v7M6.2 4v6.2A1.8 1.8 0 0 0 10 10.2V4M16 4v16M16 4h2.4a2.4 2.4 0 0 1 0 4.8H16"/></svg>
         @break
     @case('ai_motion')
-        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m10 9 6 3-6 3z"/></svg>
+    @case('ai_video')
+        <svg viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><path d="m10 9.2 5 2.8-5 2.8z"/><path d="m16.2 4.8.9 1.8 1.9.4-1.3 1.4.2 2-1.7-.9-1.7.9.2-2-1.3-1.4 1.9-.4z"/></svg>
         @break
     @case('voice')
-        <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="10" rx="3"/><path d="M7 12a5 5 0 0 0 10 0M12 17v3M9.5 20h5"/></svg>
+    @case('voiceover')
+    @case('voive')
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2"/><path d="M3.8 19c.7-2.8 2.5-4.2 5.2-4.2S13.5 16.2 14.2 19"/><path d="M16 8.2v5.2M18.2 6.8v8M20.4 8.8v4"/></svg>
+        @break
+    @case('bloggers')
+    @case('blogger')
+        <svg viewBox="0 0 24 24"><path d="M4 10.5v7.2a1.8 1.8 0 0 0 1.8 1.8h3.4"/><path d="M20 9.2 11.2 18H8.5v-2.7L17.3 6.9a1.9 1.9 0 0 1 2.7 2.3z"/><circle cx="17.8" cy="5.2" r="1.5"/></svg>
         @break
     @default
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>
