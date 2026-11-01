@@ -21,6 +21,22 @@ class HomeController extends Controller
 
     public function home(): View
     {
+        if (config('lens.coming_soon')) {
+            return $this->comingSoon();
+        }
+
+        return $this->marketplace();
+    }
+
+    public function comingSoon(): View
+    {
+        return view('site.coming-soon', [
+            'launchAt' => (string) config('lens.launch_at'),
+        ]);
+    }
+
+    public function marketplace(): View
+    {
         $data = $this->bootstrap();
 
         return view('site.home', [
