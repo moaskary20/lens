@@ -2,74 +2,75 @@
 
 @section('content')
 @php
-    $types = collect($data['vendor_types'] ?? []);
+    // Categories = Admin → Vendor Types (enabled / marketplace), same as the app bootstrap.
+    $types = collect($data['vendor_types'] ?? [])->values();
     $popular = collect($data['popular'] ?? [])->keyBy('slug');
-    $order = ['photographer', 'videographer', 'studio', 'reels', 'model', 'ugc', 'food_stylist'];
-    $extra = [
-        ['slug' => 'ai_motion', 'label' => 'AI Videos & Motion'],
-        ['slug' => 'voice', 'label' => 'VO (Voice Over)'],
-    ];
+    $typeSlugs = $types->pluck('slug')->filter()->all();
 @endphp
 
-<section class="hero" data-slider>
-    <div class="hero-track">
-        @foreach($slides as $index => $slide)
-            <article class="hero-slide {{ $index === 0 ? 'is-active' : '' }}" style="background-image: url('{{ $slide['image'] }}')">
-                <div class="hero-copy wrap">
-                    <p class="kicker">{{ $slide['kicker'] }}</p>
-                    <h1>{{ $slide['title'] }}</h1>
-                    <p>{{ $slide['body'] }}</p>
-                </div>
-            </article>
-        @endforeach
-    </div>
-    <button class="hero-nav prev" type="button" data-prev aria-label="Previous slide">‹</button>
-    <button class="hero-nav next" type="button" data-next aria-label="Next slide">›</button>
-    <div class="hero-dots" data-dots>
-        @foreach($slides as $index => $slide)
-            <button type="button" class="{{ $index === 0 ? 'is-active' : '' }}" data-dot="{{ $index }}" aria-label="Slide {{ $index + 1 }}"></button>
-        @endforeach
-    </div>
-</section>
+<div class="home-shell" data-home-motion>
+    <div class="home-fg">
+    <section class="hero swiper swiper-hero" data-hero-swiper>
+        <div class="hero-bg3d" data-home-bg3d="hero" aria-hidden="true"></div>
+        <div class="swiper-wrapper">
+            @foreach($slides as $slide)
+                <article class="swiper-slide">
+                    <div class="hero-media" style="background-image: url('{{ $slide['image'] }}')" aria-hidden="true"></div>
+                    <div class="hero-copy wrap">
+                        <p class="kicker" data-hero-line>{{ $slide['kicker'] }}</p>
+                        <h1 data-hero-line>{{ $slide['title'] }}</h1>
+                        <p data-hero-line>{{ $slide['body'] }}</p>
+                    </div>
+                </article>
+            @endforeach
+        </div>
+        <div class="swiper-button-prev" aria-label="Previous slide"></div>
+        <div class="swiper-button-next" aria-label="Next slide"></div>
+        <div class="swiper-pagination"></div>
+    </section>
 
-<section class="ai-search wrap" id="ai-search">
-    <a class="ai-prompt" href="{{ route('site.search', ['ai' => 1]) }}">
-        <span class="ai-prompt-copy">
-            <strong>✨ What will you create today?</strong>
-            <small>{{ $data['ai_helper'] ?? 'Describe your idea and let AI find the right creatives for you.' }}</small>
-        </span>
-        <span class="ai-btn">✨ AI Search →</span>
-    </a>
-</section>
+    <section class="ai-search wrap" id="ai-search" data-home-ai>
+        <a class="ai-prompt" href="{{ route('site.ai') }}" data-magnetic>
+            <span class="ai-prompt-copy">
+                <strong>✨ What will you create today?</strong>
+                <small>{{ $data['ai_helper'] ?? 'Describe your idea and let AI find the right creatives for you.' }}</small>
+            </span>
+            <span class="ai-btn" data-magnetic-child>✨ AI Search →</span>
+        </a>
+    </section>
 
-<section class="wrap block">
-    <div class="block-head">
-        <h2>Categories</h2>
-        <a href="{{ route('site.explore') }}">View all →</a>
+    <section class="home-stage3d" aria-label="Lens 3D stage">
+        <div class="home-stage3d-mount" data-home-bg3d="stage"></div>
+        <div class="wrap home-stage3d-copy">
+            <p class="kicker">Lens space</p>
+            <h2>Creative world in motion</h2>
+            <p class="lede">Move your cursor — the Lens field reacts in real time.</p>
+        </div>
+    </section>
+
+    <section class="wrap block" data-home-cats>
+        <div class="block-head">
+            <h2>Categories</h2>
+        </div>
+        <div class="cats cats--home">
+            @foreach($types as $type)
+                @include('site.partials.category-card', [
+                    'type' => $type,
+                    'href' => route('site.search', ['vendor_type' => $type['slug'] ?? '']),
+                ])
+            @endforeach
+        </div>
+    </section>
+
+    @foreach($types as $type)
+        @include('site.partials.popular-section', ['section' => $popular->get($type['slug'] ?? '')])
+    @endforeach
+
+    @foreach($popular as $slug => $section)
+        @if(! in_array($slug, $typeSlugs, true))
+            @include('site.partials.popular-section', ['section' => $section])
+        @endif
+    @endforeach
     </div>
-    <div class="cats">
-        @foreach($types as $type)
-            @include('site.partials.category-card', [
-                'type' => $type,
-                'href' => route('site.search', ['vendor_type' => $type['slug']]),
-            ])
-        @endforeach
-        @foreach($extra as $type)
-            @include('site.partials.category-card', [
-                'type' => $type,
-                'href' => route('site.search', ['q' => $type['label']]),
-            ])
-        @endforeach
-    </div>
-</section>
-
-@foreach($order as $slug)
-    @include('site.partials.popular-section', ['section' => $popular->get($slug)])
-@endforeach
-
-@foreach($popular as $slug => $section)
-    @if(! in_array($slug, $order, true))
-        @include('site.partials.popular-section', ['section' => $section])
-    @endif
-@endforeach
+</div>
 @endsection

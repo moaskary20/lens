@@ -11,5 +11,6 @@ void openNotifications(BuildContext context, HomeData home) {
   if (!home.on('notifications')) {
     return;
   }
+  // The page owns the load — avoid a second competing openAndClear here.
   Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NotificationsPage(home: home)));
 }

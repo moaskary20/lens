@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:lens/core/config.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
@@ -81,6 +83,48 @@ class _LoginViewState extends State<LoginView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$label is coming soon.'), backgroundColor: const Color(0xFF1A1B1F)),
     );
+  }
+
+  static bool _googleReady = false;
+
+  Future<void> _ensureGoogle() async {
+    if (_googleReady) {
+      return;
+    }
+    await GoogleSignIn.instance.initialize(serverClientId: LensConfig.googleWebClientId);
+    _googleReady = true;
+  }
+
+  Future<void> _continueWithGoogle() async {
+    if (_busy) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _ensureGoogle();
+      final account = await GoogleSignIn.instance.authenticate(scopeHint: const ['email', 'profile']);
+      final idToken = account.authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Google did not return an ID token. Add the app SHA-1 in Firebase.');
+      }
+      await SessionStore.instance.loginWithGoogle(idToken: idToken, role: _role);
+      widget.onSuccess?.call();
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        // User dismissed the picker — no error banner.
+      } else {
+        setState(() => _error = 'Google sign-in failed. Check Firebase SHA-1 and try again.');
+      }
+    } catch (error) {
+      setState(() => _error = error.toString().replaceFirst('Exception: ', '').replaceFirst('ApiException: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
   }
 
   Future<void> _openRoleChoice() async {
@@ -221,7 +265,7 @@ class _LoginViewState extends State<LoginView> {
                       child: _social(
                         leading: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w800, fontSize: 18)),
                         label: 'Continue with Google',
-                        onTap: () => _soon('Google sign in'),
+                        onTap: _busy ? () {} : _continueWithGoogle,
                       ),
                     ),
                   ],

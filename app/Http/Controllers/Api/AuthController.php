@@ -10,6 +10,7 @@ use App\Models\Vendor;
 use App\Models\VendorType;
 use Illuminate\Http\UploadedFile;
 use App\Support\AppClient;
+use App\Support\AppPassword;
 use App\Support\Egypt;
 use App\Support\Roles;
 use App\Support\VendorAppProfile;
@@ -17,6 +18,8 @@ use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -29,7 +32,11 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::query()->where('email', $data['email'])->first();
+        $email = trim((string) $data['email']);
+        $user = User::query()->where('email', $email)->first()
+            ?? (mb_strtolower($email) !== $email
+                ? User::query()->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])->first()
+                : null);
         if (! $user || ! Hash::check($data['password'], $user->password) || ! $user->is_active) {
             throw ValidationException::withMessages([
                 'email' => 'Invalid email or password.',
@@ -39,82 +46,147 @@ class AuthController extends Controller
         return response()->json($this->presentUser($user->load('vendor.vendorType')));
     }
 
-    public function register(Request $request): JsonResponse
+    public function google(Request $request): JsonResponse
     {
         $data = $request->validate([
+            'id_token' => ['required', 'string'],
+            'role' => ['nullable', Rule::in(['client', 'vendor'])],
+        ]);
+
+        $google = $this->verifyGoogleIdToken($data['id_token']);
+        $email = mb_strtolower(trim((string) ($google['email'] ?? '')));
+        $googleId = (string) ($google['sub'] ?? '');
+        $name = trim((string) ($google['name'] ?? ''));
+        if ($email === '' || $googleId === '') {
+            throw ValidationException::withMessages([
+                'id_token' => 'Google account is missing an email.',
+            ]);
+        }
+
+        $user = User::query()->where('google_id', $googleId)->first()
+            ?? User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+
+        if ($user && ! $user->is_active) {
+            throw ValidationException::withMessages([
+                'id_token' => 'This account is disabled.',
+            ]);
+        }
+
+        if (! $user) {
+            $role = ($data['role'] ?? 'client') === 'vendor' ? 'vendor' : 'client';
+            $user = User::query()->create([
+                'name' => $name !== '' ? $name : Str::before($email, '@'),
+                'email' => $email,
+                'google_id' => $googleId,
+                'password' => Str::password(32),
+                'role' => $role,
+                'is_active' => true,
+                'locale' => 'en',
+                'email_verified_at' => now(),
+            ]);
+
+            if ($role === 'vendor') {
+                $type = VendorType::query()->where('slug', 'photographer')->first()
+                    ?? VendorType::query()->orderBy('sort_order')->first();
+                Vendor::query()->create([
+                    'user_id' => $user->id,
+                    'vendor_type_id' => $type?->id,
+                    'display_name' => $user->name,
+                    'verification_status' => 'pending',
+                    'is_active' => true,
+                    'contact_email' => $email,
+                ]);
+            }
+        } else {
+            $updates = [];
+            if (! filled($user->google_id)) {
+                $updates['google_id'] = $googleId;
+            }
+            if (! filled($user->email_verified_at)) {
+                $updates['email_verified_at'] = now();
+            }
+            if ($name !== '' && $user->name === '') {
+                $updates['name'] = $name;
+            }
+            if ($updates !== []) {
+                $user->update($updates);
+            }
+        }
+
+        return response()->json($this->presentUser($user->fresh()->load('vendor.vendorType')));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function verifyGoogleIdToken(string $idToken): array
+    {
+        $response = Http::timeout(12)->get('https://oauth2.googleapis.com/tokeninfo', [
+            'id_token' => $idToken,
+        ]);
+
+        if (! $response->successful()) {
+            throw ValidationException::withMessages([
+                'id_token' => 'Invalid Google sign-in token.',
+            ]);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = $response->json() ?: [];
+        $aud = (string) ($payload['aud'] ?? '');
+        $allowed = array_values(array_filter([
+            (string) config('services.google.client_id'),
+        ]));
+
+        if ($allowed !== [] && ! in_array($aud, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'id_token' => 'Google token was issued for another app.',
+            ]);
+        }
+
+        $verified = $payload['email_verified'] ?? false;
+        if ($verified !== true && $verified !== 'true') {
+            throw ValidationException::withMessages([
+                'id_token' => 'Google email is not verified.',
+            ]);
+        }
+
+        return $payload;
+    }
+
+    public function register(Request $request): JsonResponse
+    {
+        $isVendor = $request->input('role') === 'vendor';
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:6'],
+            'password' => AppPassword::rule(),
             'role' => ['required', Rule::in(['client', 'vendor'])],
             'phone' => ['required', 'string', Egypt::mobileRule()],
             'locale' => ['nullable', Rule::in(['en', 'ar'])],
-            'city_id' => ['nullable', 'integer', 'exists:cities,id'],
-            'vendor_type' => ['nullable', 'string'],
-            'display_name' => ['nullable', 'string', 'max:255'],
-            'date_of_birth' => ['nullable', 'date'],
-            'profession' => ['nullable', 'string', 'max:255'],
-            'bio' => ['nullable', 'string'],
-            'contact_phone' => ['nullable', Egypt::mobileRule()],
-            'contact_email' => ['nullable', 'email'],
-            'whatsapp' => ['nullable', Egypt::mobileRule()],
-            'instagram' => ['nullable', 'string', 'max:255'],
-            'instagram_followers' => ['nullable', 'integer', 'min:0'],
-            'tiktok_url' => ['nullable', 'string', 'max:255'],
-            'tiktok_followers' => ['nullable', 'integer', 'min:0'],
-            'facebook_url' => ['nullable', 'string', 'max:255'],
-            'facebook_followers' => ['nullable', 'integer', 'min:0'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'profile_photo' => ['nullable', 'image', 'max:4096'],
-            'national_id_image' => ['nullable', 'image', 'max:4096'],
-            'cover_image' => ['nullable', 'image', 'max:8192'],
-            'payout_method' => ['nullable', Rule::in(['bank', 'wallet', 'paypal'])],
-            'bank_name' => ['nullable', 'string', 'max:255'],
-            'bank_account_holder' => ['nullable', 'string', 'max:255'],
-            'bank_account_number' => ['nullable', 'string', 'max:64'],
-            'bank_iban' => ['nullable', 'string', 'max:64'],
-            'bank_swift' => ['nullable', 'string', 'max:32'],
-            'bank_branch' => ['nullable', 'string', 'max:255'],
-            'bank_branch_code' => ['nullable', 'string', 'max:32'],
-            'bank_account_type' => ['nullable', Rule::in(['current', 'savings'])],
-            'wallet_network_type' => ['nullable', Rule::in(['telecom', 'bank'])],
-            'wallet_telecom' => ['nullable', 'string', 'max:64'],
-            'wallet_bank_name' => ['nullable', 'string', 'max:255'],
-            'wallet_phone' => ['nullable', 'required_if:payout_method,wallet', Egypt::mobileRule()],
-            'paypal_email' => ['nullable', 'email'],
-            'paypal_name' => ['nullable', 'string', 'max:255'],
-            'transfer_notes' => ['nullable', 'string'],
-            'specialties' => ['nullable', 'array'],
-            'specialties.*' => ['string', 'max:64'],
-            'filter_tags' => ['nullable', 'array'],
-            'filter_tags.*' => ['string', 'max:80'],
-            'delivery_formats' => ['nullable', 'array'],
-            'delivery_formats.*' => ['string', 'max:64'],
-            'extras' => ['nullable', 'array'],
-            'half_day_price' => ['nullable', 'numeric', 'min:0'],
-            'full_day_price' => ['nullable', 'numeric', 'min:0'],
-            'hourly_price' => ['nullable', 'numeric', 'min:0'],
-            'per_video_price' => ['nullable', 'numeric', 'min:0'],
-            'turnaround_hours' => ['nullable', 'numeric', 'min:1'],
-            'pricing_model_id' => ['nullable', 'integer', 'exists:pricing_models,id'],
-            'projects' => ['nullable', 'array', 'max:20'],
-            'projects.*.type' => ['required', Rule::in(['image', 'video', 'link'])],
-            'projects.*.title' => ['required', 'string', 'max:255'],
-            'projects.*.completed_on' => ['nullable', 'string', 'max:40'],
-            'projects.*.external_url' => ['nullable', 'url', 'max:500'],
-            'projects.*.description' => ['nullable', 'string'],
-            'projects.*.is_featured' => ['nullable', 'boolean'],
-            'projects.*.files' => ['nullable', 'array', 'max:20'],
-            'projects.*.files.*' => ['file', 'max:51200'],
-        ], [
+            'city_id' => ['required', 'integer', 'exists:cities,id'],
+        ];
+        if ($isVendor) {
+            $rules = array_merge($rules, VendorAppProfile::rules(true));
+            $rules['wallet_phone'] = ['nullable', 'required_if:payout_method,wallet', Egypt::mobileRule()];
+        }
+
+        $data = $request->validate($rules, array_merge(AppPassword::messages(), [
             'phone.required' => Egypt::mobileMessage(),
             'phone.regex' => Egypt::mobileMessage(),
             'contact_phone.regex' => Egypt::mobileMessage(),
+            'whatsapp.required' => 'Enter a WhatsApp number.',
             'whatsapp.regex' => Egypt::mobileMessage(),
             'wallet_phone.regex' => Egypt::mobileMessage(),
             'wallet_phone.required_if' => Egypt::mobileMessage(),
-        ]);
+            'city_id.required' => 'Choose your governorate.',
+            'date_of_birth.required' => 'Enter your date of birth.',
+            'profile_photo.required' => 'Add a personal photo.',
+        ]));
+
+        if ($isVendor) {
+            VendorAppProfile::assertIdentityImages($request);
+        }
 
         $user = User::query()->create([
             'name' => $data['name'],
@@ -137,6 +209,7 @@ class AuthController extends Controller
                 'display_name' => ($data['display_name'] ?? null) ?: $user->name,
                 'date_of_birth' => $data['date_of_birth'] ?? null,
                 'profession' => $data['profession'] ?? null,
+                'years_experience' => max(0, (int) ($data['years_experience'] ?? 0)),
                 'bio' => $data['bio'] ?? null,
                 'contact_phone' => $data['contact_phone'] ?? $data['phone'] ?? null,
                 'contact_email' => $data['contact_email'] ?? $user->email,
@@ -182,6 +255,9 @@ class AuthController extends Controller
             $vendor->save();
             $this->storeProjects($request, $vendor, $data['projects'] ?? []);
             $this->syncFilterTags($vendor, $data['filter_tags'] ?? []);
+            if (array_key_exists('availabilities', $data)) {
+                VendorAppProfile::syncAvailabilities($vendor, $data['availabilities'] ?? []);
+            }
         }
 
         return response()->json($this->presentUser($user->load('vendor.vendorType')), 201);
@@ -196,7 +272,7 @@ class AuthController extends Controller
     {
         $user = AppClient::requireUser()->load('vendor');
 
-        $query = Booking::query()->with(['vendor.vendorType', 'vendor.city', 'vendor.badges', 'client', 'category', 'dispute']);
+        $query = Booking::query()->with(['vendor.vendorType', 'vendor.city', 'vendor.badges', 'vendor.user', 'client', 'category', 'dispute']);
         if ($user->isVendor() && $user->vendor) {
             $query->where('vendor_id', $user->vendor->id);
             $view = 'vendor';
@@ -329,7 +405,7 @@ class AuthController extends Controller
     /**
      * @return array<string, mixed>
      */
-    protected function presentBooking(Booking $booking, string $view): array
+    public function presentBooking(Booking $booking, string $view): array
     {
         $vendor = $booking->vendor;
         $slug = $vendor?->vendorType?->slug ?? 'photographer';
@@ -376,10 +452,10 @@ class AuthController extends Controller
             'project_name' => $booking->project_name ?: ($booking->category?->name_en ? $booking->category->name_en.' session' : 'Creative session'),
             'phone' => $view === 'vendor'
                 ? (preg_replace('/\D+/', '', (string) ($booking->client?->phone ?? '')) ?: null)
-                : (preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: '')) ?: null),
+                : (preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: $vendor?->user?->phone ?: '')) ?: null),
             'whatsapp' => $view === 'vendor'
                 ? (preg_replace('/\D+/', '', (string) ($booking->client?->phone ?? '')) ?: null)
-                : (preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendor?->contact_phone ?: '')) ?: null),
+                : (preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendor?->contact_phone ?: $vendor?->user?->phone ?: '')) ?: null),
             'vendor_id' => $vendor?->id,
             'client_id' => $view === 'vendor' ? $booking->client_id : null,
             'dispute' => $booking->dispute?->toApp(),

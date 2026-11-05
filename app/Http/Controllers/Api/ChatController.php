@@ -42,6 +42,11 @@ class ChatController extends Controller
             abort_unless($user->canUseClientApp(), 403, 'Only clients and vendors can open a booking chat.');
             $vendor = Vendor::query()->findOrFail($data['vendor_id']);
             $booking = $this->resolveBooking($user->id, $vendor->id, $data['booking_id'] ?? null);
+            abort_unless(
+                $vendor->isMarketplaceVisible() || $booking !== null,
+                404,
+                'This vendor is not available yet.',
+            );
             $clientId = $user->id;
         }
 

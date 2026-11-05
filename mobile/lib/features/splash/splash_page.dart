@@ -1,9 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/bootstrap_cache.dart';
 import 'package:lens/core/demo_bootstrap.dart';
+import 'package:lens/core/force_update.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/features/onboarding/onboarding_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
@@ -20,20 +23,27 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   static const _holdDuration = Duration(milliseconds: 4940);
+  static const _webHoldDuration = Duration(milliseconds: 900);
   static const _secureWindow = MethodChannel('lens/secure_window');
 
   Timer? _hold;
-  Map<String, dynamic> _payload = DemoBootstrap.payload();
+  Map<String, dynamic> _payload = BootstrapCache.withFastTypes(DemoBootstrap.payload());
   VideoPlayerController? _videoController;
   var _opened = false;
   var _videoReady = false;
+  Future<void>? _bootstrapFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadBootstrap();
-    _startVideo();
-    _hold = Timer(_holdDuration, _openOnboarding);
+    _bootstrapFuture = _loadBootstrap();
+    if (kIsWeb) {
+      // Video splash frequently leaves a black frame on Chrome — skip it.
+      _hold = Timer(_webHoldDuration, _openOnboarding);
+    } else {
+      _startVideo();
+      _hold = Timer(_holdDuration, _openOnboarding);
+    }
   }
 
   @override
@@ -107,6 +117,12 @@ class _SplashPageState extends State<SplashPage> {
 
   Future<void> _loadBootstrap() async {
     await SessionStore.instance.restore();
+    // Full category grid from the first frame (demo + last cache), never a short list.
+    final cachedTypes = await BootstrapCache.loadVendorTypes();
+    _payload = BootstrapCache.withFastTypes(
+      DemoBootstrap.payload(),
+      cached: cachedTypes,
+    );
     try {
       final remote = await (widget.api ?? ApiClient()).getJson(
         '/app/bootstrap',
@@ -123,12 +139,23 @@ class _SplashPageState extends State<SplashPage> {
         final payload = DemoBootstrap.payload();
         payload['name'] = remote['name']?.toString() ?? payload['name'];
         payload['logo'] = remote['logo'];
-        _payload = payload;
+        _payload = BootstrapCache.withFastTypes(payload, cached: cachedTypes);
       } else {
-        _payload = remote;
+        final merged = Map<String, dynamic>.from(remote);
+        merged['vendor_types'] = BootstrapCache.bestTypes(
+          remote: types,
+          cached: cachedTypes,
+        );
+        _payload = BootstrapCache.withFastTypes(merged, cached: cachedTypes);
+        if (types is List && types.isNotEmpty) {
+          unawaited(BootstrapCache.saveVendorTypes(types));
+        }
       }
     } catch (_) {
-      _payload = DemoBootstrap.payload();
+      _payload = BootstrapCache.withFastTypes(
+        DemoBootstrap.payload(),
+        cached: cachedTypes,
+      );
     }
   }
 
@@ -138,16 +165,49 @@ class _SplashPageState extends State<SplashPage> {
     }
     _opened = true;
     _hold?.cancel();
-    await SessionStore.instance.restore();
+
     try {
-      await _secureWindow.invokeMethod<void>('enable');
+      await (_bootstrapFuture ?? _loadBootstrap())
+          .timeout(const Duration(seconds: 8));
     } catch (_) {}
+
+    await SessionStore.instance.restore();
+    if (!kIsWeb) {
+      try {
+        await _secureWindow.invokeMethod<void>('enable');
+      } catch (_) {}
+    }
     if (!mounted) {
       return;
     }
-    final next = SessionStore.instance.shouldOpenHome
-        ? AppShell(bootstrap: _payload)
-        : OnboardingPage(bootstrap: _payload);
+
+    // Never block Chrome / web on store update checks.
+    if (!kIsWeb) {
+      try {
+        final blocked = await ForceUpdate.enforce(
+          context,
+          bootstrap: _payload,
+          fetchLive: false,
+        );
+        if (blocked || !mounted) {
+          return;
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    Widget next;
+    try {
+      next = SessionStore.instance.shouldOpenHome
+          ? AppShell(bootstrap: _payload)
+          : OnboardingPage(bootstrap: _payload);
+    } catch (_) {
+      next = AppShell(bootstrap: DemoBootstrap.payload());
+    }
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => next),
     );
@@ -155,6 +215,22 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0D0D0F),
+        body: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              color: Color(0xFFFF5A1F),
+            ),
+          ),
+        ),
+      );
+    }
+
     final controller = _videoController;
     return Scaffold(
       backgroundColor: Colors.black,

@@ -4,8 +4,8 @@
     $vendors = array_values($section['vendors'] ?? []);
 @endphp
 @if($vendors !== [])
-<section class="wrap block" data-card-slider>
-    <div class="block-head">
+<section class="wrap block" data-card-slider data-home-rail>
+    <div class="block-head" data-rail-head>
         <h2>{{ $section['title'] }}</h2>
         <div class="block-head-actions">
             <div class="card-nav">
@@ -17,7 +17,7 @@
     </div>
     <div class="card-rail" data-card-rail>
         @foreach($vendors as $vendor)
-            @include('site.partials.vendor-card', ['vendor' => $vendor])
+            @include('site.partials.vendor-card', ['vendor' => $vendor, 'reveal' => false])
         @endforeach
     </div>
 </section>

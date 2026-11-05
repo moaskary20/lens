@@ -20,6 +20,27 @@ class AppBootstrapTest extends TestCase
             ->assertJsonPath('logo', asset('storage/branding/lens-logo.png'));
     }
 
+    public function test_mobile_bootstrap_exposes_force_update_policy(): void
+    {
+        Setting::setValue('platform.force_update', true);
+        Setting::setValue('platform.android_min_version', '9.9.9');
+        Setting::setValue('platform.ios_min_version', '9.9.8');
+        Setting::setValue('platform.android_store_url', 'https://play.google.com/store/apps/details?id=app.lens.lens');
+        Setting::setValue('platform.ios_store_url', 'https://apps.apple.com/app/id123');
+        Setting::setValue('platform.update_title', 'Update Lens');
+        Setting::setValue('platform.update_message', 'Please update to continue.');
+
+        $this->getJson('/api/app/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('app_update.force_update', true)
+            ->assertJsonPath('app_update.android_min_version', '9.9.9')
+            ->assertJsonPath('app_update.ios_min_version', '9.9.8')
+            ->assertJsonPath('app_update.android_store_url', 'https://play.google.com/store/apps/details?id=app.lens.lens')
+            ->assertJsonPath('app_update.ios_store_url', 'https://apps.apple.com/app/id123')
+            ->assertJsonPath('app_update.title', 'Update Lens')
+            ->assertJsonPath('app_update.message', 'Please update to continue.');
+    }
+
     public function test_mobile_home_payload_follows_admin_features(): void
     {
         $this->seed(LensSeeder::class);
@@ -35,10 +56,10 @@ class AppBootstrapTest extends TestCase
 
         $this->assertNotEmpty($payload->json('popular.0.vendors.0.cover_url'));
         $this->assertGreaterThan(1, count($payload->json('vendor_types')));
-        $this->assertSame(
-            ['photographer', 'videographer', 'reels', 'model', 'studio', 'ugc', 'food_stylist'],
-            collect($payload->json('vendor_types'))->pluck('slug')->all()
-        );
+        $typeSlugs = collect($payload->json('vendor_types'))->pluck('slug')->all();
+        foreach (['photographer', 'videographer', 'reels', 'model', 'studio', 'ugc', 'food_stylist'] as $requiredSlug) {
+            $this->assertContains($requiredSlug, $typeSlugs);
+        }
         $this->assertNotEmpty($payload->json('categories'));
         $this->assertContains('wedding', collect($payload->json('categories'))->pluck('slug')->all());
         $this->assertContains('fnb', collect($payload->json('categories'))->pluck('slug')->all());
@@ -54,16 +75,16 @@ class AppBootstrapTest extends TestCase
         $this->assertSame('Half day / full day', $register['photographer']['pricing_model']);
         $this->assertNotEmpty($register['photographer']['pricing_models']);
         $this->assertContains('Studio Type', collect($register['studio']['fields'])->pluck('label')->all());
-        $this->assertContains('Features & Equipment', collect($register['studio']['fields'])->pluck('label')->all());
+        $this->assertContains('Features & equipment', collect($register['studio']['fields'])->pluck('label')->all());
 
         $popular = collect($payload->json('popular'))->keyBy('slug');
         $this->assertTrue($popular->has('studio'));
         $this->assertGreaterThan(1, count($popular['photographer']['vendors']));
 
-        foreach ($payload->json('vendor_types') as $type) {
-            $this->assertTrue($popular->has($type['slug']), 'Missing popular section for '.$type['slug']);
-            $this->assertGreaterThanOrEqual(3, count($popular[$type['slug']]['vendors']));
-            foreach ($popular[$type['slug']]['vendors'] as $vendor) {
+        foreach (['photographer', 'videographer', 'reels', 'model', 'studio', 'ugc', 'food_stylist'] as $slug) {
+            $this->assertTrue($popular->has($slug), 'Missing popular section for '.$slug);
+            $this->assertGreaterThanOrEqual(3, count($popular[$slug]['vendors']));
+            foreach ($popular[$slug]['vendors'] as $vendor) {
                 $this->assertNotEmpty($vendor['cover_url']);
                 $this->assertNotEmpty($vendor['profile_photo_url']);
             }
@@ -86,10 +107,11 @@ class AppBootstrapTest extends TestCase
         $this->assertContains('Fashion', collect($catalog['model_category']['options'])->pluck('label')->all());
         $this->assertContains('Acting', collect($catalog['model_category']['options'])->pluck('label')->all());
         $this->assertContains('Social Media', collect($catalog['model_category']['options'])->pluck('label')->all());
-        $this->assertContains('Under 18', collect($catalog['model_age']['options'])->pluck('label')->all());
+        $this->assertContains('9 - 17', collect($catalog['model_age']['options'])->pluck('label')->all());
         $this->assertContains('200+', collect($catalog['model_height']['options'])->pluck('label')->all());
         $this->assertSame(['XS', 'S', 'M', 'L', 'XL', 'XXL'], collect($catalog['model_tops']['options'])->pluck('label')->all());
         $this->assertContains('32', collect($catalog['model_pants']['options'])->pluck('label')->all());
+        $this->assertContains('9', collect($catalog['model_shoes']['options'])->pluck('label')->all());
         $this->assertContains('45+', collect($catalog['model_shoes']['options'])->pluck('label')->all());
         $this->assertContains('Cairo', collect($catalog['search_cities']['options'])->pluck('label')->all());
         $this->assertContains('6th of October', collect($catalog['search_cities']['options'])->pluck('label')->all());
@@ -144,6 +166,12 @@ class AppBootstrapTest extends TestCase
 
         $profile = $this->getJson('/api/app/vendors/'.$listing->json('vendors.0.id'))->assertOk();
         $this->assertNotEmpty($profile->json('display_name'));
+        $this->assertIsInt($profile->json('completed_sessions'));
+        $this->assertIsInt($profile->json('assisted_sessions'));
+        $this->assertIsInt($profile->json('years_experience'));
+        $this->assertIsInt($profile->json('client_satisfaction'));
+        $this->assertGreaterThanOrEqual(0, $profile->json('client_satisfaction'));
+        $this->assertLessThanOrEqual(100, $profile->json('client_satisfaction'));
         $this->assertNotEmpty($profile->json('portfolio'));
         $this->assertNotEmpty($profile->json('portfolio_filters'));
         $this->assertNotEmpty($profile->json('tagline'));

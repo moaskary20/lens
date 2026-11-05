@@ -121,7 +121,7 @@ class VendorChecklistTest extends TestCase
         $this->actingAs($studio)->get('/vendor/my-profile')
             ->assertOk()
             ->assertSee('Studio Type')
-            ->assertSee('Features & Equipment')
+            ->assertSee('Features & equipment')
             ->assertSee('Pending review by Lens staff.');
         $this->actingAs($studio)->get('/vendor/availability')
             ->assertOk()

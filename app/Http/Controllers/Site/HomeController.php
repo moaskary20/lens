@@ -3,12 +3,21 @@
 namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Api\AppController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
+use App\Models\NewsletterSubscriber;
+use App\Models\User;
 use App\Models\Vendor;
 use App\Services\AiAssistant;
 use App\Services\VendorSearch;
 use App\Support\SearchQuery;
+use App\Support\SiteAuth;
+use App\Support\VendorPhotos;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class HomeController extends Controller
@@ -161,12 +170,85 @@ class HomeController extends Controller
         };
     }
 
-    public function bookings(): View
+    public function bookings(Request $request): View
     {
+        $user = $this->webUser();
+        $tab = in_array($request->query('tab'), ['upcoming', 'completed', 'canceled'], true)
+            ? (string) $request->query('tab')
+            : 'upcoming';
+        $bookings = [];
+        $summary = ['upcoming' => 0, 'completed' => 0, 'canceled' => 0];
+        $role = 'guest';
+
+        if ($user) {
+            $auth = app(AuthController::class);
+            $query = Booking::query()->with(['vendor.vendorType', 'vendor.city', 'vendor.badges', 'vendor.user', 'client', 'category', 'dispute']);
+            if ($user->isVendor() && $user->vendor) {
+                $query->where('vendor_id', $user->vendor->id);
+                $role = 'vendor';
+            } else {
+                $query->where('client_id', $user->id);
+                $role = 'client';
+            }
+
+            $items = $query->orderByDesc('scheduled_at')->limit(80)->get()
+                ->map(fn (Booking $booking): array => $auth->presentBooking($booking, $role));
+
+            foreach ($items as $item) {
+                $group = (string) ($item['group'] ?? 'upcoming');
+                if (! array_key_exists($group, $summary)) {
+                    $group = 'upcoming';
+                }
+                $summary[$group]++;
+            }
+
+            $bookings = $items
+                ->filter(fn (array $item): bool => ($item['group'] ?? 'upcoming') === $tab)
+                ->values()
+                ->all();
+        }
+
         return view('site.bookings', [
             'data' => $this->bootstrap(),
             'active' => 'bookings',
+            'user' => $user,
+            'role' => $role,
+            'tab' => $tab,
+            'summary' => $summary,
+            'bookings' => $bookings,
         ]);
+    }
+
+    public function bookingsLogin(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $user = User::query()->where('email', $data['email'])->first();
+        if (! $user || ! Hash::check($data['password'], $user->password) || ! $user->is_active) {
+            throw ValidationException::withMessages([
+                'email' => 'Invalid email or password.',
+            ]);
+        }
+
+        if (! $user->canUseClientApp() && ! $user->isVendor()) {
+            throw ValidationException::withMessages([
+                'email' => 'This account cannot open bookings.',
+            ]);
+        }
+
+        SiteAuth::login($user, $request);
+
+        return redirect()->route('site.bookings');
+    }
+
+    public function bookingsLogout(Request $request): RedirectResponse
+    {
+        SiteAuth::logout($request);
+
+        return redirect()->route('site.bookings');
     }
 
     public function explore(): View
@@ -176,7 +258,14 @@ class HomeController extends Controller
         return view('site.explore', [
             'data' => $data,
             'active' => 'explore',
+            'types' => $data['vendor_types'] ?? [],
+            'popular' => $data['popular'] ?? [],
         ]);
+    }
+
+    protected function webUser(): ?User
+    {
+        return SiteAuth::user();
     }
 
     public function page(string $slug): View
@@ -202,19 +291,55 @@ class HomeController extends Controller
 
     public function newsletter(Request $request)
     {
-        $request->validate(['email' => ['required', 'email', 'max:255']]);
+        $data = $request->validate(['email' => ['required', 'email', 'max:255']]);
+        NewsletterSubscriber::query()->firstOrCreate(
+            ['email' => mb_strtolower(trim($data['email']))],
+            ['source' => 'site_footer'],
+        );
 
         return back()->with('newsletter_ok', true);
     }
 
     public function vendor(Vendor $vendor): View
     {
-        abort_unless($vendor->is_active, 404);
+        abort_unless($vendor->isMarketplaceVisible(), 404);
+
+        $profile = $this->app->publicProfile($vendor, false);
+        $slug = $vendor->vendorType?->slug;
+        if (($profile['portfolio'] ?? []) === []) {
+            $profile['portfolio'] = array_map(
+                fn (array $shot): array => $shot + ['id' => null],
+                array_slice(VendorPhotos::gallery($slug, (int) $vendor->id), 0, 9),
+            );
+            $profile['portfolio_is_showcase'] = true;
+        }
+
+        $rating = (float) ($profile['rating_avg'] ?? 0);
+        $ratingCount = (int) ($profile['rating_count'] ?? 0);
+        $years = (int) ($profile['years_experience'] ?? 0);
+        $satisfaction = (int) ($profile['client_satisfaction'] ?? 0);
+        $completed = (int) ($profile['completed_sessions'] ?? 0);
+        $assisted = (int) ($profile['assisted_sessions'] ?? 0);
+
+        if ($years <= 0 && $completed > 0) {
+            $years = max(1, (int) ceil($completed / 8));
+        }
+        if ($satisfaction <= 0 && $ratingCount > 0) {
+            $satisfaction = (int) round(min(99, max(80, $rating * 20)));
+        }
+
+        $stats = array_values(array_filter([
+            ['value' => (string) $completed, 'label' => 'Projects Completed', 'show' => $completed > 0],
+            ['value' => (string) $assisted, 'label' => 'Assisted', 'show' => $assisted > 0],
+            ['value' => $years > 0 ? $years.'+' : null, 'label' => 'Years Experience', 'show' => $years > 0],
+            ['value' => $satisfaction > 0 ? $satisfaction.'%' : null, 'label' => 'Client Satisfaction', 'show' => $satisfaction > 0],
+        ], fn (array $row): bool => $row['show']));
 
         return view('site.vendor', [
             'data' => $this->bootstrap(),
             'active' => 'explore',
-            'vendor' => $this->app->publicProfile($vendor, false),
+            'vendor' => $profile,
+            'stats' => $stats,
         ]);
     }
 

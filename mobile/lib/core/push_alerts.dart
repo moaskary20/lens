@@ -1,21 +1,31 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
+import 'package:lens/core/io_stub.dart' if (dart.library.io) 'dart:io';
 import 'package:lens/core/notifications_store.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Shows Lens inbox alerts in the Android / iOS system tray.
+@pragma('vm:entry-point')
+Future<void> lensFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+}
+
+/// Shows Lens inbox alerts in the Android / iOS system tray (FCM + local poll).
 class PushAlerts {
   PushAlerts._();
 
   static final PushAlerts instance = PushAlerts._();
 
-  static const _channelId = 'lens_alerts';
+  // v2 channel: Android locks sound/importance on first create; bump id to restore sound.
+  static const _channelId = 'lens_alerts_v2';
   static const _channelName = 'Lens alerts';
   static const _prefsEnabled = 'lens_push_alerts_enabled';
   static const _prefsDevice = 'lens_device_token';
@@ -29,20 +39,32 @@ class PushAlerts {
   bool _started = false;
   bool _enabled = true;
   bool _announcedLoaded = false;
+  bool _firebaseReady = false;
+  StreamSubscription<RemoteMessage>? _foregroundSub;
+  StreamSubscription<String>? _tokenRefreshSub;
   Timer? _poll;
   String? _deviceToken;
   VoidCallback? _onOpenInbox;
+  bool _openInboxPending = false;
+  bool _messageOpenedBound = false;
 
   bool get enabled => _enabled;
+  bool get firebaseReady => _firebaseReady;
 
-  /// Warm up the plugin + Android permission as early as possible.
+  /// Warm up Firebase + local notifications as early as possible.
   Future<void> bootstrap() async {
     await _loadPrefs();
+    await _initFirebase();
     await ensureReady();
   }
 
   Future<void> start({VoidCallback? onOpenInbox}) async {
     _onOpenInbox = onOpenInbox;
+    if (_openInboxPending) {
+      _openInboxPending = false;
+      // Defer one frame so navigation context is ready.
+      scheduleMicrotask(_openInbox);
+    }
     if (_started) {
       _restartPoll();
       unawaited(syncFromInbox(NotificationsStore.instance.items));
@@ -52,10 +74,12 @@ class PushAlerts {
     SessionStore.instance.addListener(_onSession);
     NotificationsStore.instance.addListener(_onInboxChanged);
     await _loadPrefs();
+    await _initFirebase();
     await ensureReady();
     await syncDeviceToken();
+    _listenForeground();
+    await _consumeInitialMessage();
     _restartPoll();
-    // Show any unread already in memory, then refresh from API.
     await syncFromInbox(NotificationsStore.instance.items);
     unawaited(NotificationsStore.instance.refresh());
   }
@@ -63,6 +87,10 @@ class PushAlerts {
   void stop() {
     _poll?.cancel();
     _poll = null;
+    _foregroundSub?.cancel();
+    _foregroundSub = null;
+    _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = null;
     if (!_started) {
       return;
     }
@@ -124,6 +152,16 @@ class PushAlerts {
         await androidPlugin?.requestNotificationsPermission();
       }
     }
+
+    if (_firebaseReady) {
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(alert: true, badge: true, sound: true);
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
   }
 
   Future<void> syncFromInbox(List<AppNotice> items) async {
@@ -143,7 +181,7 @@ class PushAlerts {
       }
       _announced.add(item.id);
       changed = true;
-      await _show(item);
+      await _show(item.title, item.body, payload: 'inbox', noticeId: item.id);
     }
     if (changed) {
       await _persistAnnounced();
@@ -161,7 +199,6 @@ class PushAlerts {
       return;
     }
     final latest = unread.first;
-    // Allow re-showing the latest unread once when user enables pushes.
     _announced.remove(latest.id);
     await syncFromInbox(NotificationsStore.instance.items);
   }
@@ -173,7 +210,11 @@ class PushAlerts {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return;
     }
-    final token = await _deviceId();
+    final token = await _resolvePushToken();
+    if (token == null || token.isEmpty || token.startsWith('lens-local-')) {
+      // Don't register placeholder tokens — FCM must be ready for remote push.
+      return;
+    }
     try {
       await ApiClient().postJson('/app/device-token', {
         'token': token,
@@ -184,6 +225,10 @@ class PushAlerts {
 
   Future<void> clearDeviceToken() async {
     if (!LensConfig.useNetwork || _deviceToken == null) {
+      return;
+    }
+    if (_deviceToken!.startsWith('lens-local-')) {
+      _deviceToken = null;
       return;
     }
     try {
@@ -205,8 +250,95 @@ class PushAlerts {
     _ready = false;
     _started = false;
     _enabled = true;
+    _firebaseReady = false;
     _deviceToken = null;
     _onOpenInbox = null;
+    _openInboxPending = false;
+    _messageOpenedBound = false;
+  }
+
+  Future<void> _initFirebase() async {
+    if (kIsWeb || _firebaseReady) {
+      return;
+    }
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return;
+    }
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
+      FirebaseMessaging.onBackgroundMessage(lensFirebaseMessagingBackgroundHandler);
+      _firebaseReady = true;
+      _tokenRefreshSub?.cancel();
+      _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+        _deviceToken = token;
+        unawaited(_persistDeviceToken(token));
+        unawaited(syncDeviceToken());
+      });
+    } catch (error, stack) {
+      debugPrint('Firebase init failed: $error\n$stack');
+      _firebaseReady = false;
+    }
+  }
+
+  void _listenForeground() {
+    if (!_firebaseReady) {
+      return;
+    }
+    _foregroundSub?.cancel();
+    _foregroundSub = FirebaseMessaging.onMessage.listen((message) async {
+      if (!_enabled) {
+        return;
+      }
+      final title = message.notification?.title ?? message.data['title']?.toString() ?? 'Lens';
+      final body = message.notification?.body ?? message.data['body']?.toString() ?? '';
+      final event = message.data['event']?.toString() ?? 'app_notice';
+      final id = message.messageId ?? '${title}_$body';
+      NotificationsStore.instance.ingestPush(title: title, body: body, id: id, event: event);
+      await _show(title, body, payload: 'inbox', noticeId: id);
+    });
+    if (!_messageOpenedBound) {
+      _messageOpenedBound = true;
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        _ingestRemoteMessage(message);
+        _openInbox();
+      });
+    }
+  }
+
+  Future<void> _consumeInitialMessage() async {
+    if (!_firebaseReady) {
+      return;
+    }
+    try {
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial == null) {
+        return;
+      }
+      _ingestRemoteMessage(initial);
+      _openInbox();
+    } catch (error) {
+      debugPrint('FCM getInitialMessage failed: $error');
+    }
+  }
+
+  void _ingestRemoteMessage(RemoteMessage message) {
+    final title = message.notification?.title ?? message.data['title']?.toString() ?? 'Lens';
+    final body = message.notification?.body ?? message.data['body']?.toString() ?? '';
+    final event = message.data['event']?.toString() ?? 'app_notice';
+    final id = message.messageId ?? message.data['notification_id']?.toString();
+    NotificationsStore.instance.ingestPush(title: title, body: body, id: id, event: event);
+  }
+
+  void _openInbox() {
+    unawaited(NotificationsStore.instance.openAndClear());
+    final open = _onOpenInbox;
+    if (open == null) {
+      _openInboxPending = true;
+      return;
+    }
+    open();
   }
 
   Future<void> _loadPrefs() async {
@@ -232,23 +364,38 @@ class PushAlerts {
     await prefs.setStringList(_prefsAnnounced, _announced.toList(growable: false));
   }
 
-  Future<String> _deviceId() async {
-    if (_deviceToken != null && _deviceToken!.isNotEmpty) {
-      return _deviceToken!;
-    }
+  Future<void> _persistDeviceToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(_prefsDevice);
-    if (existing != null && existing.isNotEmpty) {
-      _deviceToken = existing;
-      return existing;
-    }
-    final created = 'lens-local-${DateTime.now().microsecondsSinceEpoch}';
-    await prefs.setString(_prefsDevice, created);
-    _deviceToken = created;
-    return created;
+    await prefs.setString(_prefsDevice, token);
   }
 
-  Future<void> _show(AppNotice item) async {
+  Future<String?> _resolvePushToken() async {
+    if (_deviceToken != null &&
+        _deviceToken!.isNotEmpty &&
+        !_deviceToken!.startsWith('lens-local-')) {
+      return _deviceToken;
+    }
+    if (_firebaseReady) {
+      try {
+        final token = await FirebaseMessaging.instance.getToken();
+        if (token != null && token.isNotEmpty) {
+          _deviceToken = token;
+          await _persistDeviceToken(token);
+          return token;
+        }
+      } catch (error) {
+        debugPrint('FCM getToken failed: $error');
+      }
+    }
+    return null;
+  }
+
+  Future<void> _show(
+    String title,
+    String body, {
+    String payload = 'inbox',
+    String? noticeId,
+  }) async {
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         _channelId,
@@ -261,11 +408,11 @@ class PushAlerts {
         category: AndroidNotificationCategory.message,
         visibility: NotificationVisibility.public,
         styleInformation: BigTextStyleInformation(
-          item.body.isEmpty ? item.title : item.body,
-          contentTitle: item.title,
+          body.isEmpty ? title : body,
+          contentTitle: title,
           summaryText: 'Lens',
         ),
-        ticker: item.title,
+        ticker: title,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,
@@ -274,19 +421,20 @@ class PushAlerts {
       ),
     );
 
-    final id = item.id.hashCode & 0x7fffffff;
+    final raw = (noticeId ?? title).hashCode & 0x7fffffff;
     await _plugin.show(
-      id: id == 0 ? item.title.hashCode & 0x7fffffff : id,
-      title: item.title,
-      body: item.body,
+      id: raw == 0 ? title.hashCode & 0x7fffffff : raw,
+      title: title,
+      body: body,
       notificationDetails: details,
-      payload: 'inbox',
+      payload: payload,
     );
   }
 
   void _onTap(NotificationResponse response) {
     if (response.payload == 'inbox') {
-      _onOpenInbox?.call();
+      unawaited(_plugin.cancelAll());
+      _openInbox();
     }
   }
 
@@ -306,7 +454,25 @@ class PushAlerts {
   }
 
   void _onInboxChanged() {
-    unawaited(syncFromInbox(NotificationsStore.instance.items));
+    unawaited(_syncInboxAndClearRead());
+  }
+
+  Future<void> _syncInboxAndClearRead() async {
+    final items = NotificationsStore.instance.items;
+    await syncFromInbox(items);
+    if (!_ready) {
+      return;
+    }
+    for (final item in items) {
+      if (!item.read || item.id.isEmpty) {
+        continue;
+      }
+      final id = item.id.hashCode & 0x7fffffff;
+      await _plugin.cancel(id: id == 0 ? item.title.hashCode & 0x7fffffff : id);
+    }
+    if (NotificationsStore.instance.unread == 0) {
+      await _plugin.cancelAll();
+    }
   }
 
   void _restartPoll() {

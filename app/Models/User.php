@@ -24,6 +24,7 @@ class User extends Authenticatable implements FilamentUser
     protected $fillable = [
         'name',
         'email',
+        'google_id',
         'phone',
         'password',
         'role',
@@ -184,15 +185,21 @@ class User extends Authenticatable implements FilamentUser
 
     public function avatarUrl(): ?string
     {
-        if (! filled($this->avatar)) {
+        $path = $this->avatar;
+        if (! filled($path) && $this->isVendor()) {
+            $this->loadMissing('vendor');
+            $path = $this->vendor?->profile_photo;
+        }
+
+        if (! filled($path)) {
             return null;
         }
 
-        if (str_starts_with((string) $this->avatar, 'http://') || str_starts_with((string) $this->avatar, 'https://')) {
-            return $this->avatar;
+        if (str_starts_with((string) $path, 'http://') || str_starts_with((string) $path, 'https://')) {
+            return $path;
         }
 
-        return asset('storage/'.$this->avatar);
+        return asset('storage/'.$path);
     }
 
     protected static function booted(): void

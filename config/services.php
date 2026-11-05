@@ -34,7 +34,15 @@ return [
     ],
 
     'fcm' => [
+        // Preferred: Firebase service account JSON for HTTP v1.
+        'credentials' => env('FCM_CREDENTIALS', storage_path('app/firebase/service-account.json')),
+        // Legacy fallback (deprecated Cloud Messaging API).
         'server_key' => env('FCM_SERVER_KEY'),
+    ],
+
+    'google' => [
+        // Web OAuth client ID from Firebase / Google Cloud (aud check for ID tokens).
+        'client_id' => env('GOOGLE_CLIENT_ID', '165894637736-lil7v98s08ndt4munuj7885iv8nmsos1.apps.googleusercontent.com'),
     ],
 
     'slack' => [

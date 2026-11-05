@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/booked_vendors_store.dart';
+import 'package:lens/core/bootstrap_cache.dart';
 import 'package:lens/core/favorites_store.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
@@ -29,38 +30,47 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        SessionStore.instance,
-        BookedVendorsStore.instance,
-      ]),
-      builder: (context, _) => SafeArea(
-        child: CustomScrollView(
-          cacheExtent: 1200,
-          slivers: [
-            SliverToBoxAdapter(
-              child: _Header(data: data, onOpenMenu: onOpenMenu),
+    return SafeArea(
+      child: CustomScrollView(
+        cacheExtent: 1200,
+        slivers: [
+          SliverToBoxAdapter(
+            child: _Header(data: data, onOpenMenu: onOpenMenu),
+          ),
+          SliverToBoxAdapter(
+            child: _SearchBar(data: data, onOpenSearch: onOpenSearch),
+          ),
+          if (data.on('ai_assistant'))
+            SliverToBoxAdapter(child: _AiBanner(data: data)),
+          SliverToBoxAdapter(
+            child: HomeCategoriesSection(
+              // Floor to the full demo set so the grid never paints short then grows.
+              types: BootstrapCache.bestTypes(
+                remote: [
+                  for (final type in data.vendorTypes)
+                    {
+                      'slug': type.slug,
+                      'label': type.label,
+                      if (type.icon != null) 'icon': type.icon,
+                    },
+                ],
+              ).map(VendorTypeItem.fromJson).toList(),
+              home: data,
             ),
-            SliverToBoxAdapter(
-              child: _SearchBar(data: data, onOpenSearch: onOpenSearch),
-            ),
-            if (data.on('ai_assistant'))
-              SliverToBoxAdapter(child: _AiBanner(data: data)),
-            if (data.vendorTypes.isNotEmpty)
-              SliverToBoxAdapter(
-                child: HomeCategoriesSection(
-                  types: data.vendorTypes,
-                  home: data,
-                ),
+          ),
+          ...data.popular.map(
+            (section) => SliverToBoxAdapter(
+              child: ListenableBuilder(
+                listenable: Listenable.merge([
+                  SessionStore.instance,
+                  BookedVendorsStore.instance,
+                ]),
+                builder: (context, _) => _PopularBlock(section: section, data: data),
               ),
-            ...data.popular.map(
-              (section) => SliverToBoxAdapter(
-                child: _PopularBlock(section: section, data: data),
-              ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 96)),
-          ],
-        ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 96)),
+        ],
       ),
     );
   }

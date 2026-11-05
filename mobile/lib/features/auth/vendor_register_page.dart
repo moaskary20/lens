@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/app_password.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/egypt_phone.dart';
 import 'package:lens/core/session_store.dart';
@@ -31,12 +32,13 @@ class VendorRegisterPage extends StatefulWidget {
 }
 
 class _VendorRegisterPageState extends State<VendorRegisterPage> {
-  static const _titles = ['Identity', 'Type profile', 'Previous projects', 'Pricing', 'Bank & payouts'];
+  static const _titles = ['Identity', 'Type profile', 'Previous projects', 'Pricing', 'Calendar', 'Bank & payouts'];
   static const _subtitles = [
     'Account, vendor type, and identity fields from Create Vendor.',
     'Choosing a vendor type loads the matching profile fields.',
     'Past jobs already delivered — photos, reels, UGC clips, or social links.',
     'Admin-defined price fields for the selected vendor type.',
+    'Open and blocked slots — same calendar availability as admin and the vendor panel.',
     'The same payout options as Create Vendor in admin.',
   ];
 
@@ -46,6 +48,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   final _phone = TextEditingController();
   final _displayName = TextEditingController();
   final _profession = TextEditingController();
+  final _yearsExperience = TextEditingController();
   final _bio = TextEditingController();
   final _contactEmail = TextEditingController();
   final _whatsapp = TextEditingController();
@@ -69,6 +72,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   final Map<String, TextEditingController> _texts = {};
   final Map<String, List<String>> _lists = {};
   final List<_ProjectDraft> _projects = [];
+  final List<_SlotDraft> _slots = [];
   late final RegisterCatalog _catalog;
   final _api = ApiClient();
   int _step = 0;
@@ -123,7 +127,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   @override
   void dispose() {
     for (final controller in [
-      _name, _email, _password, _phone, _displayName, _profession, _bio, _contactEmail, _whatsapp,
+      _name, _email, _password, _phone, _displayName, _profession, _yearsExperience, _bio, _contactEmail, _whatsapp,
       _instagram, _instagramFollowers, _tiktok, _tiktokFollowers, _facebook, _facebookFollowers,
       _address, _holder, _accountNumber, _iban, _swift, _branch, _branchCode, _walletPhone,
       _paypalEmail, _paypalName, _transferNotes,
@@ -135,6 +139,9 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     }
     for (final project in _projects) {
       project.dispose();
+    }
+    for (final slot in _slots) {
+      slot.dispose();
     }
     super.dispose();
   }
@@ -182,6 +189,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     _vendorType = 'photographer';
     _displayName.text = SessionStore.instance.account?.vendorName ?? 'Fahad Studio Light';
     _profession.text = 'Wedding & product photographer';
+    _yearsExperience.text = '8';
     _bio.text = 'Product and wedding photography with portrait lenses and strobe lighting.';
     _whatsapp.text = _phone.text;
     _contactEmail.text = _email.text;
@@ -228,6 +236,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     _vendorType = vendor['vendor_type']?.toString() ?? _vendorType;
     _displayName.text = vendor['display_name']?.toString() ?? _displayName.text;
     _profession.text = vendor['profession']?.toString() ?? '';
+    _yearsExperience.text = vendor['years_experience']?.toString() ?? '';
     _bio.text = vendor['bio']?.toString() ?? '';
     _contactEmail.text = vendor['contact_email']?.toString() ?? _email.text;
     _whatsapp.text = vendor['whatsapp']?.toString() ?? '';
@@ -298,6 +307,16 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
             .whereType<Map>()
             .map((item) => _ProjectDraft.fromJson(Map<String, dynamic>.from(item))),
       );
+    for (final slot in _slots) {
+      slot.dispose();
+    }
+    _slots
+      ..clear()
+      ..addAll(
+        (vendor['availabilities'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((item) => _SlotDraft.fromJson(Map<String, dynamic>.from(item))),
+      );
     final models = _spec.resolvedModels;
     if (_pricingModelId == null && models.length == 1) {
       _pricingModelId = models.first.id;
@@ -325,6 +344,196 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     return double.tryParse(raw?.toString() ?? '');
   }
 
+  String? _identityError({required bool requirePassword}) {
+    if (_name.text.trim().isEmpty || _email.text.trim().isEmpty) {
+      return 'Enter your full name and email.';
+    }
+    if (requirePassword) {
+      final passwordError = AppPassword.validate(_password.text);
+      if (passwordError != null) {
+        return passwordError;
+      }
+    }
+    if (!EgyptPhone.isValid(_phone.text, required: true)) {
+      return EgyptPhone.message;
+    }
+    if ((_vendorType ?? '').isEmpty) {
+      return 'Choose a vendor type to load the matching Type profile.';
+    }
+    if (_displayName.text.trim().isEmpty) {
+      _displayName.text = _name.text.trim();
+    }
+    if (_profilePhoto == null && (_profilePhotoUrl == null || _profilePhotoUrl!.trim().isEmpty)) {
+      return 'Add your personal photo.';
+    }
+    if (_nationalId == null && (_nationalIdUrl == null || _nationalIdUrl!.trim().isEmpty)) {
+      return 'Upload your national ID card.';
+    }
+    if (_dob == null) {
+      return 'Enter your date of birth / age.';
+    }
+    if (_profession.text.trim().isEmpty) {
+      return 'Enter your profession / job title.';
+    }
+    final years = int.tryParse(_yearsExperience.text.trim());
+    if (years == null || years < 0) {
+      return 'Enter your years of experience.';
+    }
+    if (_bio.text.trim().isEmpty) {
+      return 'Write a short About section.';
+    }
+    if (_contactEmail.text.trim().isEmpty) {
+      return 'Enter your contact email.';
+    }
+    if (!EgyptPhone.isValid(_whatsapp.text, required: true)) {
+      return 'Enter a valid WhatsApp number.';
+    }
+    if (_instagram.text.trim().isEmpty || _instagramFollowers.text.trim().isEmpty) {
+      return 'Enter your Instagram link and followers count.';
+    }
+    if (_tiktok.text.trim().isEmpty || _tiktokFollowers.text.trim().isEmpty) {
+      return 'Enter your TikTok link and followers count.';
+    }
+    if (_facebook.text.trim().isEmpty || _facebookFollowers.text.trim().isEmpty) {
+      return 'Enter your Facebook link and followers count.';
+    }
+    if (_cityId == null || _cityId!.isEmpty) {
+      return 'Choose your home governorate.';
+    }
+    if (_address.text.trim().isEmpty || _latitude == null || _longitude == null) {
+      return 'Pin your map address.';
+    }
+    if (_coverImage == null && (_coverImageUrl == null || _coverImageUrl!.trim().isEmpty)) {
+      return 'Add a cover image.';
+    }
+    return null;
+  }
+
+  String? _typeProfileError() {
+    if ((_vendorType ?? '').isEmpty) {
+      return 'Choose a vendor type on Identity first.';
+    }
+    const optionalGear = {
+      'extras.camera_type',
+      'extras.lenses_available',
+      'extras.lighting_gear',
+      'extras.photo_extras',
+      'extras.video_quality',
+      'extras.video_gear',
+      'extras.delivery_formats_notes',
+      'extras.reels_setup',
+      'extras.studio_features',
+      'extras.studio_sets',
+      'extras.studio_amenities',
+      'extras.studio_equipment',
+      'extras.model_sizes_notes',
+      'extras.model_experience_notes',
+      'extras.ugc_content_notes',
+      'extras.ugc_gear_notes',
+      'extras.food_expertise_notes',
+      'extras.food_content_notes',
+      'extras.addon_notes',
+    };
+    for (final field in _spec.fields) {
+      if (optionalGear.contains(field.key)) {
+        continue;
+      }
+      if (field.isList) {
+        if (_list(field.key).isEmpty) {
+          return 'Complete every Type profile field (${field.label}).';
+        }
+      } else if (_text(field.key).text.trim().isEmpty) {
+        return 'Complete every Type profile field (${field.label}).';
+      }
+    }
+    return null;
+  }
+
+  String? _projectsError() {
+    final filled = _projects.where((project) => project.title.text.trim().isNotEmpty).toList();
+    if (filled.isEmpty) {
+      return 'Add at least one previous project.';
+    }
+    for (final project in filled) {
+      if (project.type == 'link' && project.url.text.trim().isEmpty) {
+        return 'Add a link for project “${project.title.text.trim()}”.';
+      }
+      if (project.type != 'link' && project.files.isEmpty && project.ids.isEmpty && project.existing.isEmpty) {
+        return 'Upload media for project “${project.title.text.trim()}”.';
+      }
+    }
+    return null;
+  }
+
+  String? _calendarError() {
+    for (var index = 0; index < _slots.length; index++) {
+      final slot = _slots[index];
+      if (slot.locked) {
+        continue;
+      }
+      if (slot.startsAt == null || slot.endsAt == null) {
+        return 'Slot ${index + 1}: choose start and end times.';
+      }
+      if (!slot.endsAt!.isAfter(slot.startsAt!)) {
+        return 'Slot ${index + 1}: end must be after start.';
+      }
+      if (slot.status != 'open' && slot.status != 'blocked') {
+        return 'Slot ${index + 1}: status must be open or blocked.';
+      }
+    }
+    return null;
+  }
+
+  String? _pricingError() {
+    final model = _selectedPricing;
+    if (model == null) {
+      return 'Choose the pricing model assigned to this vendor type.';
+    }
+    for (final field in model.fields) {
+      if (_text(field.key).text.trim().isEmpty) {
+        return 'Fill every price field from ${model.name}.';
+      }
+    }
+    return null;
+  }
+
+  String? _payoutError() {
+    if ((_payoutMethod ?? '').isEmpty) {
+      return 'Choose a payout method.';
+    }
+    if (_payoutMethod == 'bank') {
+      if ((_bankName ?? '').isEmpty || (_accountType ?? '').isEmpty) {
+        return 'Choose bank and account type.';
+      }
+      if (_holder.text.trim().isEmpty ||
+          _accountNumber.text.trim().isEmpty ||
+          _iban.text.trim().isEmpty ||
+          _swift.text.trim().isEmpty ||
+          _branch.text.trim().isEmpty ||
+          _branchCode.text.trim().isEmpty) {
+        return 'Fill every bank payout field.';
+      }
+    } else if (_payoutMethod == 'wallet') {
+      if (!EgyptPhone.isValid(_walletPhone.text, required: true)) {
+        return EgyptPhone.message;
+      }
+      if ((_walletNetwork ?? '').isEmpty) {
+        return 'Choose whether the wallet is telecom or bank issued.';
+      }
+      if (_walletNetwork == 'telecom' && (_walletTelecom ?? '').isEmpty) {
+        return 'Choose the telecom company.';
+      }
+      if (_walletNetwork == 'bank' && (_walletBank ?? '').isEmpty) {
+        return 'Choose the wallet bank.';
+      }
+    } else if (_payoutMethod == 'paypal') {
+      if (_paypalEmail.text.trim().isEmpty || _paypalName.text.trim().isEmpty) {
+        return 'Enter PayPal email and account name.';
+      }
+    }
+    return null;
+  }
+
   Future<void> _continue() async {
     setState(() => _error = null);
     if (_editing) {
@@ -332,49 +541,53 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
       return;
     }
     if (_step == 0) {
-      if (_name.text.trim().isEmpty || _email.text.trim().isEmpty || _password.text.length < 6) {
-        setState(() => _error = 'Enter your name, email, and a password of at least 6 characters.');
+      final error = _identityError(requirePassword: true);
+      if (error != null) {
+        setState(() => _error = error);
         return;
-      }
-      if (!EgyptPhone.isValid(_phone.text, required: true) || !EgyptPhone.isValid(_whatsapp.text)) {
-        setState(() => _error = EgyptPhone.message);
-        return;
-      }
-      if ((_vendorType ?? '').isEmpty) {
-        setState(() => _error = 'Choose a vendor type to load the matching Type profile.');
-        return;
-      }
-      if (_displayName.text.trim().isEmpty) {
-        _displayName.text = _name.text.trim();
       }
       setState(() => _step = 1);
       return;
     }
-    if (_step == 3) {
-      final model = _selectedPricing;
-      if (model == null) {
-        setState(() => _error = 'Choose the pricing model assigned to this vendor type.');
+    if (_step == 1) {
+      final error = _typeProfileError();
+      if (error != null) {
+        setState(() => _error = error);
         return;
       }
-      for (final field in model.fields) {
-        if (_text(field.key).text.trim().isEmpty) {
-          setState(() => _error = 'Fill every price field from ${model.name}.');
-          return;
-        }
+      setState(() => _step = 2);
+      return;
+    }
+    if (_step == 2) {
+      final error = _projectsError();
+      if (error != null) {
+        setState(() => _error = error);
+        return;
+      }
+      setState(() => _step = 3);
+      return;
+    }
+    if (_step == 3) {
+      final error = _pricingError();
+      if (error != null) {
+        setState(() => _error = error);
+        return;
       }
       setState(() => _step = 4);
       return;
     }
-    if (_step < 4) {
-      setState(() => _step += 1);
+    if (_step == 4) {
+      final error = _calendarError();
+      if (error != null) {
+        setState(() => _error = error);
+        return;
+      }
+      setState(() => _step = 5);
       return;
     }
-    if ((_payoutMethod ?? '').isEmpty) {
-      setState(() => _error = 'Choose a payout method.');
-      return;
-    }
-    if (_payoutMethod == 'wallet' && !EgyptPhone.isValid(_walletPhone.text, required: true)) {
-      setState(() => _error = EgyptPhone.message);
+    final payoutError = _payoutError();
+    if (payoutError != null) {
+      setState(() => _error = payoutError);
       return;
     }
     setState(() => _busy = true);
@@ -402,36 +615,34 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   }
 
   Future<void> _saveEdit() async {
-    if (_name.text.trim().isEmpty || _email.text.trim().isEmpty) {
-      setState(() => _error = 'Name and email are required.');
+    final identityError = _identityError(requirePassword: false);
+    if (identityError != null) {
+      setState(() => _error = identityError);
       return;
     }
-    if (!EgyptPhone.isValid(_phone.text, required: true) || !EgyptPhone.isValid(_whatsapp.text)) {
-      setState(() => _error = EgyptPhone.message);
+    final typeError = _typeProfileError();
+    if (typeError != null) {
+      setState(() => _error = typeError);
       return;
     }
-    if ((_vendorType ?? '').isEmpty) {
-      setState(() => _error = 'Choose a vendor type to load the matching Type profile.');
+    final projectsError = _projectsError();
+    if (projectsError != null) {
+      setState(() => _error = projectsError);
       return;
     }
-    if (_displayName.text.trim().isEmpty) {
-      _displayName.text = _name.text.trim();
-    }
-    final model = _selectedPricing;
-    if (model != null) {
-      for (final field in model.fields) {
-        if (_text(field.key).text.trim().isEmpty) {
-          setState(() => _error = 'Fill every price field from ${model.name}.');
-          return;
-        }
-      }
-    }
-    if ((_payoutMethod ?? '').isEmpty) {
-      setState(() => _error = 'Choose a payout method.');
+    final pricingError = _pricingError();
+    if (pricingError != null) {
+      setState(() => _error = pricingError);
       return;
     }
-    if (_payoutMethod == 'wallet' && !EgyptPhone.isValid(_walletPhone.text, required: true)) {
-      setState(() => _error = EgyptPhone.message);
+    final calendarError = _calendarError();
+    if (calendarError != null) {
+      setState(() => _error = calendarError);
+      return;
+    }
+    final payoutError = _payoutError();
+    if (payoutError != null) {
+      setState(() => _error = payoutError);
       return;
     }
 
@@ -457,12 +668,24 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         final payload = files.isEmpty
             ? await _api.postJson('/app/account/profile', body)
             : await _api.postForm('/app/account/profile', body, files: files);
+        final vendor = payload['vendor'] is Map ? Map<String, dynamic>.from(payload['vendor'] as Map) : null;
+        final avatar = payload['avatar']?.toString();
+        final vendorPhoto = vendor?['profile_photo']?.toString();
         SessionStore.instance.applyAccount(SessionAccount.fromJson(payload).copyWith(
           vendorId: next.vendorId,
           vendorName: payload['vendor_name']?.toString() ?? next.vendorName,
+          avatarUrl: (avatar != null && avatar.isNotEmpty)
+              ? avatar
+              : (vendorPhoto != null && vendorPhoto.isNotEmpty ? vendorPhoto : next.avatarUrl),
         ));
+        if (vendorPhoto != null && vendorPhoto.isNotEmpty) {
+          _profilePhotoUrl = vendorPhoto;
+          _profilePhoto = null;
+        }
       } else {
-        SessionStore.instance.applyAccount(next);
+        SessionStore.instance.applyAccount(next.copyWith(
+          avatarUrl: _profilePhoto?.path ?? _profilePhotoUrl ?? next.avatarUrl,
+        ));
       }
       if (!mounted) {
         return;
@@ -492,6 +715,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
       'display_name': _displayName.text.trim(),
       'date_of_birth': _dob?.toIso8601String().split('T').first,
       'profession': _profession.text.trim(),
+      'years_experience': int.tryParse(_yearsExperience.text.trim()) ?? 0,
       'bio': _bio.text.trim(),
       'contact_phone': EgyptPhone.digits(_phone.text),
       'contact_email': (_contactEmail.text.trim().isEmpty ? _email.text : _contactEmail.text).trim(),
@@ -533,6 +757,17 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
               'external_url': project.url.text.trim(),
               'description': project.description.text.trim(),
               'is_featured': project.featured,
+            },
+      ],
+      'availabilities': [
+        for (final slot in _slots)
+          if (slot.startsAt != null && slot.endsAt != null)
+            {
+              if (slot.id != null) 'id': slot.id,
+              'starts_at': slot.startsAt!.toIso8601String(),
+              'ends_at': slot.endsAt!.toIso8601String(),
+              'status': slot.status,
+              if (slot.notes.text.trim().isNotEmpty) 'notes': slot.notes.text.trim(),
             },
       ],
     };
@@ -628,7 +863,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
               const Padding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: Text(
-                  'Same Identity, Type profile, Previous projects, Pricing, and Bank & payouts tabs as the admin vendor page.',
+                  'Same Identity, Type profile, Previous projects, Pricing, Calendar, and Bank & payouts tabs as the admin vendor page.',
                   style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12.5, height: 1.35),
                 ),
               ),
@@ -649,6 +884,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
                     _scroll(_typeProfile()),
                     _scroll(_projectsStep()),
                     _scroll(_pricing()),
+                    _scroll(_calendarStep()),
                     _scroll(_payout()),
                   ],
                 ),
@@ -687,7 +923,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
       title: _step == 1 ? _spec.profileTitle : _titles[_step],
       subtitle: _step == 1 ? _spec.profileDescription : _subtitles[_step],
       step: _step,
-      total: 5,
+      total: 6,
       busy: _busy,
       error: _error,
       onBack: () {
@@ -703,6 +939,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         1 => _typeProfile(),
         2 => _projectsStep(),
         3 => _pricing(),
+        4 => _calendarStep(),
         _ => _payout(),
       },
     );
@@ -753,13 +990,13 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RegisterField(controller: _name, hint: 'Full name', icon: Icons.person_outline_rounded),
+        RegisterField(controller: _name, hint: 'Full name *', icon: Icons.person_outline_rounded),
         const SizedBox(height: 12),
-        RegisterField(controller: _email, hint: 'Email', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
+        RegisterField(controller: _email, hint: 'Email *', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
         const SizedBox(height: 12),
         RegisterField(
           controller: _phone,
-          hint: 'Phone 010 / 011 / 012 / 015',
+          hint: 'Phone 010 / 011 / 012 / 015 *',
           icon: Icons.phone_outlined,
           keyboard: TextInputType.phone,
           digitsOnly: true,
@@ -769,7 +1006,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           const SizedBox(height: 12),
           RegisterField(
             controller: _password,
-            hint: 'Password',
+            hint: 'Password * (${AppPassword.hintDetail})',
             icon: Icons.lock_outline_rounded,
             secret: _hidePassword,
             suffix: IconButton(
@@ -796,11 +1033,11 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           }),
         ),
         const SizedBox(height: 14),
-        RegisterField(controller: _displayName, hint: 'Display name', icon: Icons.badge_outlined),
+        RegisterField(controller: _displayName, hint: 'Display name *', icon: Icons.badge_outlined),
         const SizedBox(height: 14),
         _imageField(
-          label: 'Personal photo',
-          hint: 'Same avatar used on the admin Identity tab.',
+          label: 'Personal photo *',
+          hint: 'Required. Same avatar used on the admin Identity tab.',
           icon: Icons.person_outline_rounded,
           file: _profilePhoto,
           url: _profilePhotoUrl,
@@ -809,8 +1046,8 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         ),
         const SizedBox(height: 12),
         _imageField(
-          label: 'National ID card',
-          hint: 'Front of the Egyptian national ID for verification.',
+          label: 'National ID card *',
+          hint: 'Required. Front of the Egyptian national ID for verification.',
           icon: Icons.badge_outlined,
           file: _nationalId,
           url: _nationalIdUrl,
@@ -824,15 +1061,24 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
           Text('Age ${_ageYears()} years', style: const TextStyle(color: Color(0xFF8E8B84), fontWeight: FontWeight.w600)),
         ],
         const SizedBox(height: 12),
-        RegisterField(controller: _profession, hint: 'Profession / job title', icon: Icons.work_outline_rounded),
+        RegisterField(controller: _profession, hint: 'Profession / job title *', icon: Icons.work_outline_rounded),
         const SizedBox(height: 12),
-        RegisterField(controller: _bio, hint: 'About', maxLines: 4),
+        RegisterField(
+          controller: _yearsExperience,
+          hint: 'Years of experience *',
+          icon: Icons.timeline_outlined,
+          keyboard: TextInputType.number,
+          digitsOnly: true,
+          maxLength: 2,
+        ),
         const SizedBox(height: 12),
-        RegisterField(controller: _contactEmail, hint: 'Contact email', icon: Icons.alternate_email_rounded, keyboard: TextInputType.emailAddress),
+        RegisterField(controller: _bio, hint: 'About *', maxLines: 4),
+        const SizedBox(height: 12),
+        RegisterField(controller: _contactEmail, hint: 'Contact email *', icon: Icons.alternate_email_rounded, keyboard: TextInputType.emailAddress),
         const SizedBox(height: 12),
         RegisterField(
           controller: _whatsapp,
-          hint: 'WhatsApp 010 / 011 / 012 / 015',
+          hint: 'WhatsApp 010 / 011 / 012 / 015 *',
           icon: Icons.chat_outlined,
           keyboard: TextInputType.phone,
           digitsOnly: true,
@@ -840,41 +1086,41 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
         ),
         const SizedBox(height: 18),
         _socialAccount(
-          title: 'Instagram',
+          title: 'Instagram *',
           link: _instagram,
           followers: _instagramFollowers,
           icon: Icons.camera_alt_outlined,
-          linkHint: 'Instagram link',
+          linkHint: 'Instagram link *',
         ),
         const SizedBox(height: 14),
         _socialAccount(
-          title: 'TikTok',
+          title: 'TikTok *',
           link: _tiktok,
           followers: _tiktokFollowers,
           icon: Icons.music_note_outlined,
-          linkHint: 'TikTok link',
+          linkHint: 'TikTok link *',
         ),
         const SizedBox(height: 14),
         _socialAccount(
-          title: 'Facebook',
+          title: 'Facebook *',
           link: _facebook,
           followers: _facebookFollowers,
           icon: Icons.facebook_outlined,
-          linkHint: 'Facebook link',
+          linkHint: 'Facebook link *',
         ),
         const SizedBox(height: 12),
         RegisterDropdown(
           value: _cityId,
           options: _catalog.cityChoices,
-          hint: 'Home governorate',
+          hint: 'Home governorate *',
           onChanged: (value) => setState(() => _cityId = value),
         ),
         const SizedBox(height: 12),
         _mapAddressTile(),
         const SizedBox(height: 12),
         _imageField(
-          label: 'Cover image',
-          hint: 'Marketplace cover used on the admin Identity tab.',
+          label: 'Cover image *',
+          hint: 'Required. Marketplace cover used on the admin Identity tab.',
           icon: Icons.photo_outlined,
           file: _coverImage,
           url: _coverImageUrl,
@@ -896,14 +1142,14 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final field in _spec.fields) ...[
-          Text(field.label, style: const TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
+          Text('${field.label} *', style: const TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           _dynamicField(field),
           const SizedBox(height: 14),
         ],
-        Text(
-          'Add a portfolio under Previous projects next — the same tab used in admin.',
-          style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, height: 1.35),
+        const Text(
+          'Every Type profile field is required. Add a portfolio under Previous projects next.',
+          style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13, height: 1.35),
         ),
       ],
     );
@@ -1179,11 +1425,175 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
     };
   }
 
+  Widget _calendarStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Add open slots clients can book, or block times you are unavailable. Booked slots stay locked.',
+          style: TextStyle(color: Color(0xFF8E8B84), fontSize: 13, height: 1.35),
+        ),
+        const SizedBox(height: 14),
+        for (var index = 0; index < _slots.length; index++) ...[
+          _slotCard(index),
+          const SizedBox(height: 12),
+        ],
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _slots.add(_SlotDraft())),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Add calendar slot'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Color(0xFF2E2A26)),
+            backgroundColor: const Color(0xFF141210),
+            shape: const StadiumBorder(),
+            minimumSize: const Size.fromHeight(48),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _slotCard(int index) {
+    final slot = _slots[index];
+    final locked = slot.locked;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141416),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2A2A2E)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  locked ? 'Booked slot (locked)' : 'Slot ${index + 1}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (!locked)
+                IconButton(
+                  tooltip: 'Remove',
+                  onPressed: () => setState(() {
+                    _slots.removeAt(index).dispose();
+                  }),
+                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFF6B6B)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _slotWhenField(
+            label: slot.startsAt == null ? 'Starts *' : _formatSlot(slot.startsAt!),
+            enabled: !locked,
+            onTap: () => _pickSlotMoment(slot, start: true),
+          ),
+          const SizedBox(height: 10),
+          _slotWhenField(
+            label: slot.endsAt == null ? 'Ends *' : _formatSlot(slot.endsAt!),
+            enabled: !locked,
+            onTap: () => _pickSlotMoment(slot, start: false),
+          ),
+          if (!locked) ...[
+            const SizedBox(height: 12),
+            const Text('Status', style: TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            RegisterChoiceChips(
+              options: const [
+                CatalogOption(id: 'open', label: 'Open for booking'),
+                CatalogOption(id: 'blocked', label: 'Blocked'),
+              ],
+              selected: slot.status == 'blocked' ? 'blocked' : 'open',
+              onSelect: (value) => setState(() => slot.status = value),
+            ),
+            const SizedBox(height: 12),
+            RegisterField(controller: slot.notes, hint: 'Notes (optional)'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _slotWhenField({required String label, required bool enabled, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xE6121214),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF2A2A2E)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.event_available_rounded, color: enabled ? const Color(0xFF8E8B84) : const Color(0xFF555555)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: label.contains('*') ? const Color(0xFF8E8B84) : Colors.white,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatSlot(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.day}/${local.month}/${local.year} • $hour:$minute';
+  }
+
+  Future<void> _pickSlotMoment(_SlotDraft slot, {required bool start}) async {
+    final initial = (start ? slot.startsAt : slot.endsAt) ??
+        (start ? slot.endsAt : slot.startsAt)?.add(Duration(hours: start ? -2 : 2)) ??
+        DateTime.now().add(const Duration(days: 1));
+    final date = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      initialDate: DateTime(initial.year, initial.month, initial.day),
+    );
+    if (date == null || !mounted) {
+      return;
+    }
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) {
+      return;
+    }
+    final picked = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    setState(() {
+      if (start) {
+        slot.startsAt = picked;
+        if (slot.endsAt == null || !slot.endsAt!.isAfter(picked)) {
+          slot.endsAt = picked.add(const Duration(hours: 2));
+        }
+      } else {
+        slot.endsAt = picked;
+      }
+    });
+  }
+
   Widget _payout() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Payout method', style: TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
+        const Text('Payout method *', style: TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         RegisterChoiceChips(
           options: const [
@@ -1356,7 +1766,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hasPin ? _address.text.trim() : 'Pin address on Google Maps',
+                      hasPin ? _address.text.trim() : 'Pin address on Google Maps *',
                       style: TextStyle(
                         color: hasPin ? Colors.white : const Color(0xFF8E8B84),
                         fontSize: 15,
@@ -1441,7 +1851,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   }
 
   Widget _dateField() {
-    final label = _dob == null ? 'Date of birth' : '${_dob!.day}/${_dob!.month}/${_dob!.year}';
+    final label = _dob == null ? 'Date of birth / age *' : '${_dob!.day}/${_dob!.month}/${_dob!.year}';
     return GestureDetector(
       onTap: () async {
         final picked = await showDatePicker(
@@ -1479,6 +1889,34 @@ class _ExistingFile {
 
   final int id;
   final String name;
+}
+
+class _SlotDraft {
+  _SlotDraft();
+
+  factory _SlotDraft.fromJson(Map<String, dynamic> json) {
+    final draft = _SlotDraft()
+      ..id = json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}')
+      ..status = json['status']?.toString() == 'blocked'
+          ? 'blocked'
+          : (json['status']?.toString() == 'booked' ? 'booked' : 'open')
+      ..locked = json['locked'] == true || json['status']?.toString() == 'booked'
+      ..startsAt = DateTime.tryParse(json['starts_at']?.toString() ?? '')
+      ..endsAt = DateTime.tryParse(json['ends_at']?.toString() ?? '');
+    draft.notes.text = json['notes']?.toString() ?? '';
+    return draft;
+  }
+
+  int? id;
+  DateTime? startsAt;
+  DateTime? endsAt;
+  String status = 'open';
+  bool locked = false;
+  final notes = TextEditingController();
+
+  void dispose() {
+    notes.dispose();
+  }
 }
 
 class _ProjectDraft {

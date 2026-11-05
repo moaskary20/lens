@@ -25,6 +25,9 @@ class SessionAccount {
 
   factory SessionAccount.fromJson(Map<String, dynamic> json) {
     final rawRole = json['role']?.toString() ?? 'client';
+    final vendor = json['vendor'] is Map ? Map<String, dynamic>.from(json['vendor'] as Map) : null;
+    final avatar = json['avatar']?.toString();
+    final vendorPhoto = vendor?['profile_photo']?.toString();
     return SessionAccount(
       name: json['name']?.toString() ?? 'Lens member',
       email: json['email']?.toString() ?? '',
@@ -32,7 +35,7 @@ class SessionAccount {
       vendorId: json['vendor_id'] is int ? json['vendor_id'] as int : int.tryParse('${json['vendor_id']}'),
       vendorName: json['vendor_name']?.toString(),
       phone: json['phone']?.toString(),
-      avatarUrl: json['avatar']?.toString(),
+      avatarUrl: (avatar != null && avatar.isNotEmpty) ? avatar : vendorPhoto,
       cityId: json['city_id'] is int ? json['city_id'] as int : int.tryParse('${json['city_id']}'),
       cityName: json['city']?.toString(),
       locale: json['locale']?.toString() == 'ar' ? 'ar' : 'en',
@@ -202,6 +205,24 @@ class SessionStore extends ChangeNotifier {
       await _persist();
       notifyListeners();
     }
+  }
+
+  Future<void> loginWithGoogle({
+    required String idToken,
+    String role = 'client',
+  }) async {
+    if (!LensConfig.useNetwork) {
+      throw Exception('Google sign-in needs network.');
+    }
+    final payload = await _api.postJson('/app/auth/google', {
+      'id_token': idToken,
+      'role': role == 'vendor' ? 'vendor' : 'client',
+    });
+    _account = SessionAccount.fromJson(payload);
+    _locale = _account?.locale ?? 'en';
+    _onboardingDone = true;
+    await _persist();
+    notifyListeners();
   }
 
   Future<void> register({

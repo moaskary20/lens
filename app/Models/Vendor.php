@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\VendorProfile;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,7 +15,7 @@ class Vendor extends Model
         'user_id', 'vendor_type_id', 'city_id', 'display_name', 'bio', 'cover_image',
         'address', 'latitude', 'longitude', 'verification_status', 'verification_notes',
         'is_active', 'is_featured', 'accepts_out_of_governorate', 'default_travel_fee',
-        'profile_photo', 'national_id_image', 'date_of_birth', 'profession',
+        'profile_photo', 'national_id_image', 'date_of_birth', 'profession', 'years_experience',
         'contact_phone', 'contact_email', 'whatsapp', 'instagram',
         'instagram_followers', 'tiktok_url', 'tiktok_followers', 'facebook_url', 'facebook_followers',
         'bank_name', 'bank_account_holder', 'bank_account_number', 'bank_iban', 'instapay', 'transfer_notes',
@@ -23,9 +24,9 @@ class Vendor extends Model
         'paypal_email', 'paypal_name',
         'half_day_price', 'full_day_price', 'hourly_price',
         'per_video_price', 'turnaround_hours', 'delivery_formats', 'equipment',
-        'specialties', 'extras', 'booked_sessions', 'completed_sessions',
+        'specialties', 'extras', 'booked_sessions', 'completed_sessions', 'assisted_sessions',
         'accepted_sessions', 'rejected_sessions', 'failed_sessions', 'penalty_total',
-        'rating_avg', 'rating_count', 'response_minutes',
+        'rating_avg', 'rating_count', 'client_satisfaction', 'response_minutes',
     ];
 
     protected function casts(): array
@@ -51,6 +52,9 @@ class Vendor extends Model
             'instagram_followers' => 'integer',
             'tiktok_followers' => 'integer',
             'facebook_followers' => 'integer',
+            'years_experience' => 'integer',
+            'assisted_sessions' => 'integer',
+            'client_satisfaction' => 'integer',
         ];
     }
 
@@ -95,11 +99,29 @@ class Vendor extends Model
         foreach (VendorProfile::GEAR_EXTRA_KEYS as $key) {
             if (! empty($extras[$key]) && is_array($extras[$key])) {
                 $fromExtras = array_merge($fromExtras, $extras[$key]);
+            } elseif (! empty($extras[$key]) && is_string($extras[$key])) {
+                $fromExtras[] = trim($extras[$key]);
             }
         }
 
+        foreach (VendorProfile::FREE_TEXT_GEAR_FIELDS as $key => $label) {
+            $raw = $extras[$key] ?? null;
+            if (is_array($raw)) {
+                $raw = implode(', ', array_filter(array_map('strval', $raw)));
+            }
+            $value = trim((string) $raw);
+            if ($value !== '') {
+                $fromExtras[] = $label.': '.$value;
+            }
+        }
+
+        $fromExtras = array_values(array_unique(array_filter(array_map(
+            fn ($item): string => trim((string) $item),
+            $fromExtras,
+        ))));
+
         if ($fromExtras !== []) {
-            $this->equipment = array_values(array_unique($fromExtras));
+            $this->equipment = $fromExtras;
         }
     }
 
@@ -186,6 +208,22 @@ class Vendor extends Model
     public function age(): ?int
     {
         return $this->date_of_birth?->age;
+    }
+
+    /**
+     * Public marketplace visibility: active + staff-verified only.
+     * Pending / rejected vendors can still log in and edit their own account.
+     */
+    public function isMarketplaceVisible(): bool
+    {
+        return (bool) $this->is_active && $this->verification_status === 'verified';
+    }
+
+    public function scopeMarketplaceVisible(Builder $query): Builder
+    {
+        return $query
+            ->where('is_active', true)
+            ->where('verification_status', 'verified');
     }
 
     public function resolvedPricingModel(): ?PricingModel

@@ -58,26 +58,33 @@ class VendorRegisterCatalog
      */
     protected static function extraFieldsFor(string $slug): array
     {
+        $gear = array_map(
+            fn (string $key, string $label): array => self::textarea('extras.'.$key, $label),
+            array_keys(VendorProfile::freeTextGearFieldsFor($slug)),
+            array_values(VendorProfile::freeTextGearFieldsFor($slug)),
+        );
+
         return match ($slug) {
             'photographer' => [
+                ...$gear,
                 self::multi('specialties', 'Primary specialties', VendorProfile::specialtyOptions()),
             ],
-            'videographer' => [
-                self::multi('delivery_formats', 'Supported delivery formats', VendorProfile::deliveryFormatOptions()),
-            ],
+            'videographer' => $gear,
             'reels' => [
+                ...$gear,
                 self::url('extras.tiktok_url', 'TikTok sample link'),
                 self::url('extras.instagram_url', 'Instagram / Reels sample link'),
                 self::number('extras.standard_session_hours', 'Standard session length (hours)'),
             ],
+            'studio' => $gear,
             'model' => [
+                ...$gear,
                 self::text('extras.hair_color', 'Hair color'),
                 self::text('extras.eye_color', 'Eye color'),
             ],
-            'food_stylist' => [
-                self::textarea('extras.addon_notes', 'Add-on notes'),
-            ],
-            default => [],
+            'ugc' => $gear,
+            'food_stylist' => $gear,
+            default => $gear,
         };
     }
 
@@ -154,14 +161,14 @@ class VendorRegisterCatalog
     public static function profileDescription(string $slug): string
     {
         return match ($slug) {
-            'photographer' => 'Same camera, lens, and lighting options clients use on the mobile filter screens.',
-            'videographer' => 'Same video quality and gear options clients use on the mobile filter screens.',
-            'reels' => 'Same mobile-reel filter options plus sample links.',
-            'studio' => 'Same studio type, size, area, and equipment options as Filter Studios.',
-            'model' => 'Same gender, category, age, height, and size options as Filter Models.',
-            'ugc' => 'Same niche, city, accent, and content options as Filter UGC Creators.',
-            'food_stylist' => 'Same expertise, cuisine, city, and content options as Filter Food Stylists.',
-            default => 'The same filter-screen fields clients use in the app.',
+            'photographer' => 'Write your camera, lenses, lighting, and photo extras freely — shown on your public vendor profile.',
+            'videographer' => 'Write video quality, gear, and delivery formats freely — shown on your public vendor profile.',
+            'reels' => 'Write reel quality, gear, and setup freely, then add sample links.',
+            'studio' => 'Write features, sets, amenities, and equipment freely. Studio type and area stay as search tags.',
+            'model' => 'Write sizes and experience freely. Gender, category, age, and height stay as search tags.',
+            'ugc' => 'Write content capabilities and production notes freely. Niche and city stay as search tags.',
+            'food_stylist' => 'Write expertise, content type, and add-ons freely. Cuisine and city stay as search tags.',
+            default => 'Write your gear and capabilities freely — shown on your public vendor profile.',
         };
     }
 

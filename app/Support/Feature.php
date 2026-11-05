@@ -54,8 +54,9 @@ class Feature
     public static function enabled(string $key): bool
     {
         $default = self::CATALOG[$key]['default'] ?? true;
+        $stored = Setting::groupValues('features');
 
-        return (bool) Setting::getValue("features.{$key}", $default);
+        return (bool) ($stored[$key] ?? $default);
     }
 
     /**
@@ -63,8 +64,13 @@ class Feature
      */
     public static function flags(): array
     {
+        // One group read — per-key Setting::getValue was ~40 slow DB cache writes on cold boot.
+        $stored = Setting::groupValues('features');
+
         return collect(self::CATALOG)
-            ->mapWithKeys(fn (array $item, string $key): array => [$key => self::enabled($key)])
+            ->mapWithKeys(fn (array $item, string $key): array => [
+                $key => (bool) ($stored[$key] ?? $item['default']),
+            ])
             ->all();
     }
 

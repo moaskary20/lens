@@ -42,10 +42,15 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
 
   final _search = TextEditingController();
   final _map = MapController();
+  final _mapBoxKey = GlobalKey();
   late PickedMapLocation _picked;
   List<PickedMapLocation> _suggestions = const [];
   bool _searching = false;
   bool _locating = false;
+  bool _draggingPin = false;
+  bool _geocoding = false;
+  LatLng? _dragLockCenter;
+  double? _dragLockZoom;
 
   @override
   void initState() {
@@ -187,27 +192,125 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(18),
-                  child: FlutterMap(
-                    mapController: _map,
-                    options: MapOptions(
-                      initialCenter: _point,
-                      initialZoom: 13,
-                      onTap: (_, point) => _dropPin(point),
-                    ),
+                  child: Stack(
+                    key: _mapBoxKey,
+                    fit: StackFit.expand,
                     children: [
-                      TileLayer(
-                        urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&key=${LensConfig.googleMapsApiKey}',
-                        userAgentPackageName: 'app.lens',
-                      ),
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: _point,
-                            width: 36,
-                            height: 36,
-                            child: const Icon(Icons.location_on, color: LensColors.primary, size: 36),
+                      FlutterMap(
+                        mapController: _map,
+                        options: MapOptions(
+                          initialCenter: _point,
+                          initialZoom: 13,
+                          minZoom: 5,
+                          maxZoom: 20,
+                          // Pinch/scroll zoom + pan when idle; lock map while dragging the pin.
+                          interactionOptions: InteractionOptions(
+                            flags: _draggingPin
+                                ? InteractiveFlag.none
+                                : InteractiveFlag.drag |
+                                    InteractiveFlag.flingAnimation |
+                                    InteractiveFlag.pinchZoom |
+                                    InteractiveFlag.scrollWheelZoom |
+                                    InteractiveFlag.doubleTapZoom |
+                                    InteractiveFlag.doubleTapDragZoom,
+                          ),
+                          onTap: (_, point) {
+                            if (_draggingPin) {
+                              return;
+                            }
+                            _dropPin(point);
+                          },
+                          onPositionChanged: (_, _) {
+                            if (_draggingPin) {
+                              _keepMapLocked();
+                            }
+                          },
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&key=${LensConfig.googleMapsApiKey}',
+                            userAgentPackageName: 'app.lens',
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: _point,
+                                width: 88,
+                                height: 96,
+                                alignment: Alignment.bottomCenter,
+                                child: Listener(
+                                  behavior: HitTestBehavior.opaque,
+                                  onPointerDown: (_) => _beginPinDrag(),
+                                  onPointerMove: (event) {
+                                    if (!_draggingPin) {
+                                      return;
+                                    }
+                                    final point = _latLngForGlobal(event.position);
+                                    if (point == null) {
+                                      return;
+                                    }
+                                    _keepMapLocked();
+                                    _movePinTo(point, live: true);
+                                  },
+                                  onPointerUp: (event) {
+                                    if (!_draggingPin) {
+                                      return;
+                                    }
+                                    final point = _latLngForGlobal(event.position) ?? _point;
+                                    _finishPinDrag(point);
+                                  },
+                                  onPointerCancel: (_) => _cancelPinDrag(),
+                                  child: Transform.translate(
+                                    offset: Offset(0, _draggingPin ? -12 : 0),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          color: _draggingPin ? Colors.white : LensColors.primary,
+                                          size: _draggingPin ? 52 : 46,
+                                          shadows: const [
+                                            Shadow(color: Colors.black54, blurRadius: 8, offset: Offset(0, 2)),
+                                          ],
+                                        ),
+                                        if (_draggingPin)
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: LensColors.primary.withValues(alpha: 0.85),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(color: Colors.white70, width: 1.5),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
+                      ),
+                      Positioned(
+                        right: 12,
+                        bottom: 12,
+                        child: Column(
+                          children: [
+                            _ZoomButton(
+                              icon: Icons.add_rounded,
+                              tooltip: 'Zoom in',
+                              onTap: () => _zoomBy(1),
+                            ),
+                            const SizedBox(height: 8),
+                            _ZoomButton(
+                              icon: Icons.remove_rounded,
+                              tooltip: 'Zoom out',
+                              onTap: () => _zoomBy(-1),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -240,8 +343,22 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
                         ],
                       ),
                     ),
-                  Text(_picked.label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  Text(
+                    _picked.label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 4),
+                  Text(
+                    _draggingPin
+                        ? 'Release to drop the pin'
+                        : (_geocoding
+                            ? 'Updating address…'
+                            : 'Pinch or use + / − to zoom · drag the pin to move it · tap the map to place'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Color(0xFF6B6B70), fontSize: 11.5),
+                  ),
+                  const SizedBox(height: 2),
                   const Text('Powered by Google Maps', style: TextStyle(color: Color(0xFF6B6B70), fontSize: 11.5)),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -396,7 +513,87 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
     }
   }
 
-  Future<void> _dropPin(LatLng point) async {
+  void _zoomBy(double delta) {
+    if (_draggingPin) {
+      return;
+    }
+    final next = (_map.camera.zoom + delta).clamp(5.0, 20.0);
+    _map.move(_map.camera.center, next);
+  }
+
+  void _beginPinDrag() {
+    if (_draggingPin) {
+      return;
+    }
+    _dragLockCenter = _map.camera.center;
+    _dragLockZoom = _map.camera.zoom;
+    setState(() => _draggingPin = true);
+  }
+
+  void _keepMapLocked() {
+    final lock = _dragLockCenter;
+    final zoom = _dragLockZoom;
+    if (lock == null || zoom == null) {
+      return;
+    }
+    final center = _map.camera.center;
+    if ((center.latitude - lock.latitude).abs() > 0.0000001 ||
+        (center.longitude - lock.longitude).abs() > 0.0000001 ||
+        (_map.camera.zoom - zoom).abs() > 0.0001) {
+      _map.move(lock, zoom);
+    }
+  }
+
+  void _movePinTo(LatLng point, {required bool live}) {
+    setState(() {
+      _picked = PickedMapLocation(
+        label: live ? 'Moving pin…' : _picked.label,
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+    });
+  }
+
+  void _finishPinDrag(LatLng point) {
+    _dragLockCenter = null;
+    _dragLockZoom = null;
+    _draggingPin = false;
+    _dropPin(point, moveCamera: false);
+  }
+
+  void _cancelPinDrag() {
+    _dragLockCenter = null;
+    _dragLockZoom = null;
+    if (!_draggingPin) {
+      return;
+    }
+    setState(() => _draggingPin = false);
+  }
+
+  LatLng? _latLngForGlobal(Offset global) {
+    final box = _mapBoxKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) {
+      return null;
+    }
+    return _map.camera.screenOffsetToLatLng(box.globalToLocal(global));
+  }
+
+  Future<void> _dropPin(LatLng point, {bool moveCamera = true}) async {
+    if (mounted) {
+      setState(() {
+        _geocoding = true;
+        _picked = PickedMapLocation(
+          label: '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}',
+          latitude: point.latitude,
+          longitude: point.longitude,
+        );
+        _suggestions = const [];
+      });
+      if (moveCamera) {
+        _map.move(point, _map.camera.zoom);
+      }
+    }
+
     var label = '${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}';
     try {
       final uri = Uri.https('maps.googleapis.com', '/maps/api/geocode/json', {
@@ -415,14 +612,54 @@ class _BookMapPickerPageState extends State<BookMapPickerPage> {
     if (!mounted) {
       return;
     }
-    _use(PickedMapLocation(label: label, latitude: point.latitude, longitude: point.longitude));
+    setState(() {
+      _geocoding = false;
+      _picked = PickedMapLocation(
+        label: label,
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+      _suggestions = const [];
+    });
+    if (moveCamera) {
+      _map.move(LatLng(point.latitude, point.longitude), 14);
+    }
   }
 
   void _use(PickedMapLocation place) {
     setState(() {
       _picked = place;
       _suggestions = const [];
+      _geocoding = false;
     });
     _map.move(LatLng(place.latitude, place.longitude), 14);
+  }
+}
+
+class _ZoomButton extends StatelessWidget {
+  const _ZoomButton({required this.icon, required this.onTap, required this.tooltip});
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xEE1A1B1F),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Tooltip(
+          message: tooltip,
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+        ),
+      ),
+    );
   }
 }

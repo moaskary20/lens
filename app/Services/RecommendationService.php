@@ -260,8 +260,7 @@ class RecommendationService
     {
         $type = $profile['vendor_type_slugs'][0] ?? null;
         $query = Vendor::query()
-            ->where('is_active', true)
-            ->where('verification_status', 'verified')
+            ->marketplaceVisible()
             ->with(['vendorType', 'city', 'badges']);
 
         if ($type) {

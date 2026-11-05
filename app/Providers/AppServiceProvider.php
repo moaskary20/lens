@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Filament\Auth\PanelLoginResponse;
 use App\Notifications\Channels\FcmChannel;
 use App\Support\BrevoMail;
+use App\Support\SiteAuth;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -34,5 +36,11 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Throwable) {
             // Settings may be unavailable during migrate or first install.
         }
+
+        View::composer('site.*', function ($view): void {
+            if (! array_key_exists('authUser', $view->getData())) {
+                $view->with('authUser', SiteAuth::user());
+            }
+        });
     }
 }

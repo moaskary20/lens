@@ -222,6 +222,9 @@ class VendorCard {
     required this.longitude,
     this.filterTags = const [],
     this.completedSessions = 0,
+    this.assistedSessions = 0,
+    this.yearsExperience = 0,
+    this.clientSatisfaction = 0,
     this.halfDayPrice,
     this.fullDayPrice,
     this.hourlyPrice,
@@ -249,6 +252,9 @@ class VendorCard {
       longitude: json['longitude'] == null ? null : _asDouble(json['longitude']),
       filterTags: (json['filter_tags'] as List<dynamic>? ?? const []).map((item) => '$item').toList(),
       completedSessions: _asInt(json['completed_sessions']),
+      assistedSessions: _asInt(json['assisted_sessions']),
+      yearsExperience: _asInt(json['years_experience']),
+      clientSatisfaction: _asInt(json['client_satisfaction']),
       halfDayPrice: json['half_day_price'] == null ? null : _asDouble(json['half_day_price']),
       fullDayPrice: json['full_day_price'] == null ? null : _asDouble(json['full_day_price']),
       hourlyPrice: json['hourly_price'] == null ? null : _asDouble(json['hourly_price']),
@@ -275,6 +281,9 @@ class VendorCard {
   final double? longitude;
   final List<String> filterTags;
   final int completedSessions;
+  final int assistedSessions;
+  final int yearsExperience;
+  final int clientSatisfaction;
   final double? halfDayPrice;
   final double? fullDayPrice;
   final double? hourlyPrice;

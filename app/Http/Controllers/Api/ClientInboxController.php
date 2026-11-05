@@ -28,7 +28,7 @@ class ClientInboxController extends Controller
             ->with(['vendor.portfolios', 'vendor.city', 'vendor.badges', 'vendor.categories', 'vendor.vendorType'])
             ->latest()
             ->get()
-            ->map(fn (Favorite $favorite): ?array => $favorite->vendor?->is_active ? $this->app->publicCard($favorite->vendor) : null)
+            ->map(fn (Favorite $favorite): ?array => $favorite->vendor?->isMarketplaceVisible() ? $this->app->publicCard($favorite->vendor) : null)
             ->filter()
             ->values()
             ->all();
@@ -42,7 +42,7 @@ class ClientInboxController extends Controller
     public function save(Vendor $vendor): JsonResponse
     {
         abort_unless(Feature::enabled('favorites'), 404);
-        abort_unless($vendor->is_active, 404);
+        abort_unless($vendor->isMarketplaceVisible(), 404);
 
         $user = AppClient::requireUser();
         Roles::abortUnlessCan($user, 'save_favorites', 'Favorites are disabled for this role.');
@@ -71,11 +71,13 @@ class ClientInboxController extends Controller
 
         $user = AppClient::requireUser();
         Roles::abortUnlessCan($user, 'receive_notifications', 'Notifications are disabled for this role.');
-        $items = $user->notifications()->latest()->limit(80)->get()->map(fn (DatabaseNotification $item): array => $this->present($item));
+
+        $rows = $user->notifications()->latest()->limit(80)->get();
+        $unread = (int) $user->notifications()->whereNull('read_at')->count();
 
         return response()->json([
-            'unread' => $user->unreadNotifications()->count(),
-            'notifications' => $items->values()->all(),
+            'unread' => $unread,
+            'notifications' => $rows->map(fn (DatabaseNotification $item): array => $this->present($item))->values()->all(),
         ]);
     }
 
@@ -100,9 +102,24 @@ class ClientInboxController extends Controller
 
         $user = AppClient::requireUser();
         Roles::abortUnlessCan($user, 'receive_notifications', 'Notifications are disabled for this role.');
-        $user->unreadNotifications->markAsRead();
+        $user->notifications()->whereNull('read_at')->update(['read_at' => now()]);
 
         return response()->json(['unread' => 0]);
+    }
+
+    public function clearAll(): JsonResponse
+    {
+        abort_unless(Feature::enabled('notifications'), 404);
+
+        $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'receive_notifications', 'Notifications are disabled for this role.');
+        $deleted = $user->notifications()->delete();
+
+        return response()->json([
+            'unread' => 0,
+            'deleted' => $deleted,
+            'notifications' => [],
+        ]);
     }
 
     public function broadcast(Request $request): JsonResponse
@@ -130,6 +147,13 @@ class ClientInboxController extends Controller
             'token' => ['required', 'string', 'max:512'],
             'platform' => ['nullable', 'string', 'in:android,ios,web'],
         ]);
+
+        if (str_starts_with($data['token'], 'lens-local-')) {
+            return response()->json([
+                'registered' => false,
+                'message' => 'Local placeholder tokens are not registered for FCM push.',
+            ], 422);
+        }
 
         $token = DeviceToken::query()->updateOrCreate(
             [

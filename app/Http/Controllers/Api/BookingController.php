@@ -44,6 +44,12 @@ class BookingController extends Controller
         Roles::abortUnlessCan($user, 'book_sessions', 'Booking is disabled for this role.');
 
         $vendor = Vendor::query()->with(['city', 'vendorType.pricingModel.fields', 'travelRates'])->findOrFail($data['vendor_id']);
+        if (! $vendor->isMarketplaceVisible()) {
+            return response()->json([
+                'message' => 'This vendor is not available for booking yet.',
+                'errors' => ['vendor_id' => ['This vendor is pending verification and cannot receive bookings.']],
+            ], 422);
+        }
         $city = $this->cityFromLocation((string) ($data['location_text'] ?? '')) ?? $vendor->city;
         $travel = $this->travelFee($vendor, $city);
         $coupon = $this->couponFromCode($data['promo_code'] ?? null);
@@ -108,6 +114,12 @@ class BookingController extends Controller
         Roles::abortUnlessCan($user, 'book_sessions', 'Booking is disabled for this role.');
 
         $vendor = Vendor::query()->with(['city', 'vendorType.pricingModel.fields', 'travelRates'])->findOrFail($data['vendor_id']);
+        if (! $vendor->isMarketplaceVisible()) {
+            return response()->json([
+                'message' => 'This vendor is not available for booking yet.',
+                'errors' => ['vendor_id' => ['This vendor is pending verification and cannot receive bookings.']],
+            ], 422);
+        }
         $city = $this->cityFromLocation($data['location_text']) ?? $vendor->city;
         $travel = $this->travelFee($vendor, $city);
         $coupon = $this->couponFromCode($data['promo_code'] ?? null);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lens/core/api/api_client.dart';
+import 'package:lens/core/app_password.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/egypt_phone.dart';
 import 'package:lens/core/models/home_data.dart';
@@ -140,9 +141,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() => _error = EgyptPhone.message);
       return;
     }
+    if (_cityId == null || _cityId!.isEmpty) {
+      setState(() => _error = 'Choose your governorate.');
+      return;
+    }
+    if (_locale.trim().isEmpty) {
+      setState(() => _error = 'Choose a language.');
+      return;
+    }
+    if (_picked == null && (_avatarUrl == null || _avatarUrl!.trim().isEmpty)) {
+      setState(() => _error = 'Add a personal photo.');
+      return;
+    }
     if (_password.text.isNotEmpty) {
-      if (_password.text.length < 6) {
-        setState(() => _error = 'New password must be at least 6 characters.');
+      final passwordError = AppPassword.validate(_password.text);
+      if (passwordError != null) {
+        setState(() => _error = passwordError);
         return;
       }
       if (_password.text != _confirm.text) {
@@ -187,12 +201,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 body,
                 files: [await http.MultipartFile.fromPath('avatar', _picked!.path)],
               );
+        final avatar = payload['avatar']?.toString();
         SessionStore.instance.applyAccount(SessionAccount.fromJson(payload).copyWith(
           vendorId: next.vendorId,
           vendorName: next.vendorName,
+          avatarUrl: (avatar != null && avatar.isNotEmpty) ? avatar : next.avatarUrl,
         ));
+        if (avatar != null && avatar.isNotEmpty) {
+          _avatarUrl = avatar;
+          _picked = null;
+        }
       } else {
-        SessionStore.instance.applyAccount(next);
+        SessionStore.instance.applyAccount(next.copyWith(
+          avatarUrl: _picked?.path ?? _avatarUrl ?? next.avatarUrl,
+        ));
       }
       if (!mounted) {
         return;
@@ -344,20 +366,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
           const SizedBox(height: 22),
           _section('Personal details', 'Same fields as the admin Users profile.'),
           const SizedBox(height: 10),
-          RegisterField(controller: _name, hint: 'Full name', icon: Icons.person_outline_rounded),
+          RegisterField(controller: _name, hint: 'Full name *', icon: Icons.person_outline_rounded),
           const SizedBox(height: 12),
-          RegisterField(controller: _email, hint: 'Email', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
+          RegisterField(controller: _email, hint: 'Email *', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
           const SizedBox(height: 12),
           RegisterField(
             controller: _phone,
-            hint: 'Phone 010 / 011 / 012 / 015',
+            hint: 'Phone 010 / 011 / 012 / 015 *',
             icon: Icons.phone_outlined,
             keyboard: TextInputType.phone,
             digitsOnly: true,
             maxLength: 11,
           ),
           const SizedBox(height: 22),
-          _section('Location & language', 'Governorate and language stored on your user record.'),
+          _section('Location & language', 'Governorate and language are required on your user record.'),
           const SizedBox(height: 10),
           _cityTile(),
           const SizedBox(height: 12),
@@ -383,7 +405,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
           ),
           const SizedBox(height: 12),
-          RegisterField(controller: _password, hint: 'New password', icon: Icons.lock_reset_rounded, secret: _hidePassword),
+          RegisterField(controller: _password, hint: 'New password (${AppPassword.hintDetail})', icon: Icons.lock_reset_rounded, secret: _hidePassword),
           const SizedBox(height: 12),
           RegisterField(controller: _confirm, hint: 'Confirm new password', icon: Icons.lock_outline_rounded, secret: _hidePassword),
           const SizedBox(height: 22),

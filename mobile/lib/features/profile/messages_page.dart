@@ -40,21 +40,10 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _load() async {
     if (!_live) {
-      final vendor = widget.home.popular.isEmpty ? null : widget.home.popular.first.vendors.firstOrNull;
       setState(() {
-        _items = [
-          _Project(
-            id: 1,
-            title: 'Yasmin Hall wedding',
-            when: 'Saturday • 2:00 PM',
-            location: 'Zamalek, Cairo',
-            status: 'Confirmed',
-            phone: '01022223344',
-            whatsapp: '01022223344',
-            vendor: vendor,
-          ),
-        ];
-        _selected = 1;
+        _items = const [];
+        _selected = null;
+        _loading = false;
       });
       return;
     }
@@ -75,12 +64,24 @@ class _MessagesPageState extends State<MessagesPage> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _items = const [];
+          _selected = null;
+          _loading = false;
+        });
       }
     }
   }
 
   Future<void> _call(_Project project) async {
+    if (project.phone.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No phone number from this booking yet.')),
+        );
+      }
+      return;
+    }
     final opened = await ContactLaunch.open(ContactLaunch.tel(project.phone));
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Call ${project.phone}')));
@@ -88,9 +89,18 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Future<void> _whatsApp(_Project project) async {
-    final opened = await ContactLaunch.open(ContactLaunch.whatsapp(project.whatsapp));
+    final number = project.whatsapp.isNotEmpty ? project.whatsapp : project.phone;
+    if (number.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No WhatsApp number from this booking yet.')),
+        );
+      }
+      return;
+    }
+    final opened = await ContactLaunch.open(ContactLaunch.whatsapp(number));
     if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('WhatsApp ${project.whatsapp}')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('WhatsApp $number')));
     }
   }
 
@@ -109,6 +119,8 @@ class _MessagesPageState extends State<MessagesPage> {
           location: project.location,
           status: project.status,
           bookingId: project.id,
+          phone: project.phone,
+          whatsapp: project.whatsapp,
         ),
       ),
     );
@@ -231,8 +243,8 @@ class _Project {
       when: json['when']?.toString() ?? '',
       location: json['location']?.toString() ?? '',
       status: json['status_label']?.toString() ?? 'Confirmed',
-      phone: json['phone']?.toString() ?? '01000000000',
-      whatsapp: json['whatsapp']?.toString() ?? json['phone']?.toString() ?? '01000000000',
+      phone: json['phone']?.toString() ?? '',
+      whatsapp: json['whatsapp']?.toString() ?? json['phone']?.toString() ?? '',
       vendor: vendorJson == null ? null : VendorCard.fromJson(vendorJson),
     );
   }

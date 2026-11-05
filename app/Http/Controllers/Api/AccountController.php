@@ -4,15 +4,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Conversation;
 use App\Models\User;
 use App\Models\UserAddress;
 use App\Models\UserPaymentMethod;
+use App\Models\VendorAvailability;
 use App\Models\VendorType;
+use App\Models\WalletTransaction;
+use App\Services\WalletService;
 use App\Support\AppClient;
+use App\Support\AppPassword;
 use App\Support\ClientPayment;
 use App\Support\ClientPreferences;
 use App\Support\Egypt;
+use App\Support\Feature;
 use App\Support\Finance;
+use App\Support\Roles;
 use App\Support\VendorAppProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -116,6 +123,40 @@ class AccountController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function wallet(): JsonResponse
+    {
+        abort_unless(Feature::enabled('wallets'), 404, 'Wallets are disabled.');
+
+        $user = $this->member();
+        $wallet = app(WalletService::class)->ensure($user);
+        $currency = Finance::currency();
+        $transactions = $wallet->transactions()
+            ->with(['booking:id,reference,project_name'])
+            ->latest('id')
+            ->limit(40)
+            ->get()
+            ->map(fn (WalletTransaction $tx): array => $this->presentWalletTransaction($tx, $currency))
+            ->values()
+            ->all();
+
+        return response()->json([
+            'currency' => $currency,
+            'role' => $user->isVendor() ? 'vendor' : 'client',
+            'wallet' => [
+                'available' => (float) $wallet->available,
+                'pending' => (float) $wallet->pending,
+                'coupon_credit' => (float) $wallet->coupon_credit,
+                'spendable' => $wallet->spendable(),
+                'lifetime_earned' => (float) $wallet->lifetime_earned,
+                'lifetime_withdrawn' => (float) $wallet->lifetime_withdrawn,
+                'lifetime_commission' => (float) $wallet->lifetime_commission,
+                'lifetime_paid' => (float) $wallet->lifetime_paid,
+                'lifetime_refunded' => (float) $wallet->lifetime_refunded,
+            ],
+            'transactions' => $transactions,
+        ]);
+    }
+
     public function profile(): JsonResponse
     {
         return response()->json($this->presentProfile($this->member()));
@@ -128,18 +169,21 @@ class AccountController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'string', Egypt::mobileRule(), Rule::unique('users', 'phone')->ignore($user->id)],
-            'locale' => ['nullable', Rule::in(['en', 'ar'])],
-            'city_id' => ['nullable', 'integer', 'exists:cities,id'],
-            'password' => ['nullable', 'string', 'min:6'],
+            'locale' => ['required', Rule::in(['en', 'ar'])],
+            'city_id' => ['required', 'integer', 'exists:cities,id'],
+            'password' => AppPassword::rule(required: false),
             'current_password' => ['nullable', 'string'],
             'avatar' => ['nullable', 'image', 'max:4096'],
-        ], $user->isVendor() ? VendorAppProfile::rules() : []), [
+        ], $user->isVendor() ? VendorAppProfile::rules(true) : []), array_merge(AppPassword::messages(), [
             'phone.required' => Egypt::mobileMessage(),
             'phone.regex' => Egypt::mobileMessage(),
             'contact_phone.regex' => Egypt::mobileMessage(),
+            'whatsapp.required' => 'Enter a WhatsApp number.',
             'whatsapp.regex' => Egypt::mobileMessage(),
             'wallet_phone.regex' => Egypt::mobileMessage(),
-        ]);
+            'city_id.required' => 'Choose your governorate.',
+            'date_of_birth.required' => 'Enter your date of birth.',
+        ]));
 
         if (filled($data['password'] ?? null)) {
             if (! Hash::check((string) ($data['current_password'] ?? ''), $user->password)) {
@@ -149,12 +193,18 @@ class AccountController extends Controller
             }
         }
 
+        if (! $user->isVendor() && ! $request->hasFile('avatar') && blank($user->avatar)) {
+            throw ValidationException::withMessages([
+                'avatar' => 'Add a personal photo.',
+            ]);
+        }
+
         $payload = [
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'],
             'locale' => $data['locale'] ?? $user->locale,
-            'city_id' => $data['city_id'] ?? null,
+            'city_id' => $data['city_id'],
         ];
 
         if (filled($data['password'] ?? null)) {
@@ -186,6 +236,7 @@ class AccountController extends Controller
                     'is_active' => true,
                 ]);
             }
+            VendorAppProfile::assertIdentityImages($request, $vendor);
             VendorAppProfile::apply($request, $vendor, $data);
         }
 
@@ -227,19 +278,113 @@ class AccountController extends Controller
 
     public function projects(): JsonResponse
     {
-        $user = $this->client();
-        $items = Booking::query()
-            ->with(['vendor.vendorType', 'vendor.city'])
-            ->where('client_id', $user->id)
+        $user = $this->member();
+        $asVendor = $user->isVendor() && $user->vendor;
+        $query = Booking::query()
+            ->with(['vendor.vendorType', 'vendor.city', 'vendor.user', 'client', 'conversation'])
             ->whereNotIn('status', ['cancelled', 'rejected', 'failed', 'refunded'])
             ->orderByDesc('scheduled_at')
-            ->limit(40)
-            ->get()
-            ->map(fn (Booking $booking): array => $this->presentProject($booking))
+            ->limit(40);
+
+        if ($asVendor) {
+            $query->where('vendor_id', $user->vendor->id);
+            $view = 'vendor';
+        } else {
+            abort_unless($user->canUseClientApp(), 403, 'Only clients can manage this account.');
+            $query->where('client_id', $user->id);
+            $view = 'client';
+        }
+
+        $items = $query->get()
+            ->map(fn (Booking $booking): array => $this->presentProject($booking, $view))
             ->values()
             ->all();
 
         return response()->json(['projects' => $items]);
+    }
+
+    public function availabilities(): JsonResponse
+    {
+        $vendor = $this->vendorAccount();
+
+        return response()->json([
+            'calendar_title' => \App\Support\VendorProfile::calendarTitle($vendor->vendorType?->slug),
+            'availabilities' => VendorAppProfile::presentAvailabilities($vendor->loadMissing('availabilities')),
+        ]);
+    }
+
+    public function storeAvailability(Request $request): JsonResponse
+    {
+        $vendor = $this->vendorAccount();
+        $data = $request->validate([
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'status' => ['nullable', Rule::in(['open', 'blocked'])],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $slot = $vendor->availabilities()->create([
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'],
+            'status' => ($data['status'] ?? 'open') === 'blocked' ? 'blocked' : 'open',
+            'notes' => $data['notes'] ?? null,
+        ]);
+        $items = VendorAppProfile::presentAvailabilities($vendor->load('availabilities'));
+
+        return response()->json([
+            'availability' => collect($items)->firstWhere('id', $slot->id),
+            'availabilities' => $items,
+        ], 201);
+    }
+
+    public function updateAvailability(Request $request, VendorAvailability $availability): JsonResponse
+    {
+        $vendor = $this->vendorAccount();
+        abort_unless((int) $availability->vendor_id === (int) $vendor->id, 403);
+        abort_if($availability->status === 'booked', 422, 'Booked slots stay locked until the session ends.');
+
+        $data = $request->validate([
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'status' => ['nullable', Rule::in(['open', 'blocked'])],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $availability->update([
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'],
+            'status' => ($data['status'] ?? $availability->status) === 'blocked' ? 'blocked' : 'open',
+            'notes' => array_key_exists('notes', $data) ? $data['notes'] : $availability->notes,
+        ]);
+        $items = VendorAppProfile::presentAvailabilities($vendor->load('availabilities'));
+
+        return response()->json([
+            'availability' => collect($items)->firstWhere('id', $availability->id),
+            'availabilities' => $items,
+        ]);
+    }
+
+    public function destroyAvailability(VendorAvailability $availability): JsonResponse
+    {
+        $vendor = $this->vendorAccount();
+        abort_unless((int) $availability->vendor_id === (int) $vendor->id, 403);
+        abort_if($availability->status === 'booked', 422, 'Booked slots cannot be deleted.');
+        $availability->delete();
+
+        return response()->json([
+            'ok' => true,
+            'availabilities' => VendorAppProfile::presentAvailabilities($vendor->load('availabilities')),
+        ]);
+    }
+
+    protected function vendorAccount(): \App\Models\Vendor
+    {
+        abort_unless(Feature::enabled('bookings'), 404);
+        $user = AppClient::requireUser();
+        abort_unless($user->isVendor() && $user->vendor, 403, 'Only vendors can manage calendar availability.');
+        Roles::abortUnlessCan($user, 'set_availability', 'Calendar availability is disabled for this role.');
+
+        return $user->vendor->loadMissing('vendorType');
     }
 
     protected function client(): User
@@ -263,7 +408,7 @@ class AccountController extends Controller
      */
     protected function presentProfile(User $user): array
     {
-        $user->loadMissing(['city', 'wallet', 'vendor.vendorType', 'vendor.filterTags', 'vendor.portfolios']);
+        $user->loadMissing(['city', 'wallet', 'vendor.vendorType', 'vendor.filterTags', 'vendor.portfolios', 'vendor.availabilities']);
 
         return [
             'id' => $user->id,
@@ -281,6 +426,9 @@ class AccountController extends Controller
             'currency' => Finance::currency(),
             'wallet_available' => (float) ($user->wallet?->available ?? 0),
             'wallet_pending' => (float) ($user->wallet?->pending ?? 0),
+            'wallet_coupon_credit' => (float) ($user->wallet?->coupon_credit ?? 0),
+            'wallet_lifetime_earned' => (float) ($user->wallet?->lifetime_earned ?? 0),
+            'wallet_lifetime_paid' => (float) ($user->wallet?->lifetime_paid ?? 0),
             'payment_methods_count' => $user->paymentMethods()->count(),
             'addresses_count' => $user->addresses()->count(),
             'bookings_count' => $user->isVendor()
@@ -328,14 +476,26 @@ class AccountController extends Controller
     /**
      * @return array<string, mixed>
      */
-    protected function presentProject(Booking $booking): array
+    protected function presentProject(Booking $booking, string $view = 'client'): array
     {
         $vendor = $booking->vendor;
-        $phone = preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: '')) ?: null;
+        $vendor?->loadMissing('user');
+        $booking->loadMissing(['conversation', 'client']);
+        $phone = preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: $vendor?->user?->phone ?: '')) ?: null;
+        $counterpart = $view === 'vendor'
+            ? ($booking->client?->name ?: 'Client')
+            : ($vendor?->display_name ?: 'Creator');
+        $conversationId = $booking->conversation?->id
+            ?? Conversation::query()
+                ->where('client_id', $booking->client_id)
+                ->where('vendor_id', $booking->vendor_id)
+                ->value('id');
 
         return [
             'id' => $booking->id,
+            'booking_id' => $booking->id,
             'title' => $booking->project_name ?: (($vendor?->vendorType?->name_en ?: 'Creative').' Session'),
+            'project_name' => $booking->project_name,
             'reference' => $booking->reference,
             'status' => $booking->status,
             'status_label' => match ($booking->status) {
@@ -349,6 +509,11 @@ class AccountController extends Controller
             'location' => $booking->location_text ?: ($vendor?->city?->name_en ?: 'Egypt'),
             'phone' => $phone,
             'whatsapp' => preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $phone)) ?: $phone,
+            'vendor_id' => $vendor?->id,
+            'client_id' => $booking->client_id,
+            'vendor_name' => $vendor?->display_name,
+            'counterpart' => $counterpart,
+            'conversation_id' => $conversationId ? (int) $conversationId : null,
             'vendor' => [
                 'id' => $vendor?->id,
                 'display_name' => $vendor?->display_name,
@@ -384,5 +549,48 @@ class AccountController extends Controller
             return;
         }
         $user->paymentMethods()->where('id', '!=', $method->id)->update(['is_default' => false]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function presentWalletTransaction(WalletTransaction $tx, string $currency): array
+    {
+        $label = match ($tx->type) {
+            WalletTransaction::PAYMENT => 'Booking payment',
+            WalletTransaction::COUPON => 'Coupon credit',
+            WalletTransaction::REFUND => 'Refund',
+            WalletTransaction::EARNING_HOLD => 'Earnings held',
+            WalletTransaction::HOLD_REVERSAL => 'Hold released',
+            WalletTransaction::EARNING_RELEASE => 'Earnings available',
+            WalletTransaction::COMMISSION => 'Platform commission',
+            WalletTransaction::WITHDRAWAL => 'Withdrawal',
+            WalletTransaction::TOPUP => 'Top up',
+            default => ucfirst(str_replace('_', ' ', (string) $tx->type)),
+        };
+
+        $signed = (float) $tx->available_delta
+            + (float) $tx->pending_delta
+            + (float) $tx->coupon_delta;
+        if (abs($signed) < 0.0001) {
+            $signed = (float) $tx->amount;
+            if (in_array($tx->type, [WalletTransaction::PAYMENT, WalletTransaction::COMMISSION, WalletTransaction::WITHDRAWAL], true)) {
+                $signed = -abs($signed);
+            }
+        }
+
+        return [
+            'id' => $tx->id,
+            'type' => $tx->type,
+            'label' => $label,
+            'amount' => (float) $tx->amount,
+            'signed_amount' => round($signed, 2),
+            'currency' => $currency,
+            'status' => $tx->status ?: 'posted',
+            'notes' => $tx->notes,
+            'booking_reference' => $tx->booking?->reference,
+            'created_at' => $tx->created_at?->toIso8601String(),
+            'created_label' => $tx->created_at?->timezone(config('app.timezone'))->format('j M Y · g:i A'),
+        ];
     }
 }

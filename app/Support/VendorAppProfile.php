@@ -3,42 +3,49 @@
 namespace App\Support;
 
 use App\Models\FilterTag;
+use App\Models\Portfolio;
 use App\Models\Vendor;
+use App\Models\VendorAvailability;
 use App\Models\VendorType;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class VendorAppProfile
 {
     /**
      * @return array<string, mixed>
      */
-    public static function rules(): array
+    public static function rules(bool $required = false): array
     {
+        $req = $required ? 'required' : 'nullable';
+
         return [
-            'vendor_type' => ['nullable', 'string'],
-            'display_name' => ['nullable', 'string', 'max:255'],
-            'date_of_birth' => ['nullable', 'date'],
-            'profession' => ['nullable', 'string', 'max:255'],
-            'bio' => ['nullable', 'string'],
+            'vendor_type' => [$req, 'string'],
+            'display_name' => [$req, 'string', 'max:255'],
+            'date_of_birth' => [$req, 'date'],
+            'profession' => [$req, 'string', 'max:255'],
+            'years_experience' => [$req, 'integer', 'min:0', 'max:80'],
+            'bio' => [$req, 'string'],
             'contact_phone' => ['nullable', Egypt::mobileRule()],
-            'contact_email' => ['nullable', 'email'],
-            'whatsapp' => ['nullable', Egypt::mobileRule()],
-            'instagram' => ['nullable', 'string', 'max:255'],
-            'instagram_followers' => ['nullable', 'integer', 'min:0'],
-            'tiktok_url' => ['nullable', 'string', 'max:255'],
-            'tiktok_followers' => ['nullable', 'integer', 'min:0'],
-            'facebook_url' => ['nullable', 'string', 'max:255'],
-            'facebook_followers' => ['nullable', 'integer', 'min:0'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'contact_email' => [$req, 'email'],
+            'whatsapp' => [$req, 'string', Egypt::mobileRule()],
+            'instagram' => [$req, 'string', 'max:255'],
+            'instagram_followers' => [$req, 'integer', 'min:0'],
+            'tiktok_url' => [$req, 'string', 'max:255'],
+            'tiktok_followers' => [$req, 'integer', 'min:0'],
+            'facebook_url' => [$req, 'string', 'max:255'],
+            'facebook_followers' => [$req, 'integer', 'min:0'],
+            'address' => [$req, 'string', 'max:255'],
+            'latitude' => [$req, 'numeric', 'between:-90,90'],
+            'longitude' => [$req, 'numeric', 'between:-180,180'],
+            'city_id' => [$req, 'integer', 'exists:cities,id'],
             'profile_photo' => ['nullable', 'image', 'max:4096'],
             'national_id_image' => ['nullable', 'image', 'max:4096'],
             'cover_image' => ['nullable', 'image', 'max:8192'],
-            'payout_method' => ['nullable', Rule::in(['bank', 'wallet', 'paypal'])],
+            'payout_method' => [$req, Rule::in(['bank', 'wallet', 'paypal'])],
             'bank_name' => ['nullable', 'string', 'max:255'],
             'bank_account_holder' => ['nullable', 'string', 'max:255'],
             'bank_account_number' => ['nullable', 'string', 'max:64'],
@@ -78,6 +85,12 @@ class VendorAppProfile
             'projects.*.is_featured' => ['nullable', 'boolean'],
             'projects.*.files' => ['nullable', 'array', 'max:20'],
             'projects.*.files.*' => ['file', 'max:51200'],
+            'availabilities' => ['nullable', 'array', 'max:120'],
+            'availabilities.*.id' => ['nullable', 'integer'],
+            'availabilities.*.starts_at' => ['required', 'date'],
+            'availabilities.*.ends_at' => ['required', 'date'],
+            'availabilities.*.status' => ['nullable', Rule::in(['open', 'blocked', 'booked'])],
+            'availabilities.*.notes' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
@@ -90,7 +103,7 @@ class VendorAppProfile
             return null;
         }
 
-        $vendor->loadMissing(['vendorType', 'city', 'filterTags', 'portfolios']);
+        $vendor->loadMissing(['vendorType', 'city', 'filterTags', 'portfolios', 'availabilities']);
         $extras = is_array($vendor->extras) ? $vendor->extras : [];
 
         return [
@@ -100,6 +113,10 @@ class VendorAppProfile
             'display_name' => $vendor->display_name,
             'date_of_birth' => $vendor->date_of_birth?->toDateString(),
             'profession' => $vendor->profession,
+            'years_experience' => (int) ($vendor->years_experience ?? 0),
+            'completed_sessions' => (int) ($vendor->completed_sessions ?? 0),
+            'assisted_sessions' => (int) ($vendor->assisted_sessions ?? 0),
+            'client_satisfaction' => (int) ($vendor->client_satisfaction ?? 0),
             'bio' => $vendor->bio,
             'contact_phone' => $vendor->contact_phone,
             'contact_email' => $vendor->contact_email,
@@ -145,6 +162,8 @@ class VendorAppProfile
             'transfer_notes' => $vendor->transfer_notes,
             'verification_status' => $vendor->verification_status,
             'projects' => self::presentProjects($vendor),
+            'availabilities' => self::presentAvailabilities($vendor),
+            'calendar_title' => VendorProfile::calendarTitle($vendor->vendorType?->slug),
         ];
     }
 
@@ -172,6 +191,9 @@ class VendorAppProfile
             'display_name' => ($data['display_name'] ?? null) ?: $vendor->display_name,
             'date_of_birth' => $data['date_of_birth'] ?? $vendor->date_of_birth,
             'profession' => $data['profession'] ?? $vendor->profession,
+            'years_experience' => array_key_exists('years_experience', $data)
+                ? max(0, (int) $data['years_experience'])
+                : $vendor->years_experience,
             'bio' => $data['bio'] ?? $vendor->bio,
             'contact_phone' => $data['contact_phone'] ?? $vendor->contact_phone,
             'contact_email' => $data['contact_email'] ?? $vendor->contact_email,
@@ -221,6 +243,10 @@ class VendorAppProfile
         if (array_key_exists('projects', $data)) {
             self::syncProjects($request, $vendor, $data['projects'] ?? []);
         }
+
+        if (array_key_exists('availabilities', $data)) {
+            self::syncAvailabilities($vendor, $data['availabilities'] ?? []);
+        }
     }
 
     /**
@@ -250,24 +276,31 @@ class VendorAppProfile
                 ->filter(fn (int $id): bool => $id > 0)
                 ->values()
                 ->all();
+            $projectType = (string) ($project['type'] ?? 'image');
             $meta = [
-                'type' => $project['type'],
                 'title' => $project['title'],
                 'completed_on' => $project['completed_on'] ?? null,
                 'external_url' => $project['external_url'] ?? null,
                 'description' => $project['description'] ?? null,
                 'is_featured' => (bool) ($project['is_featured'] ?? false),
             ];
+            $coverId = (int) ($project['cover_id'] ?? 0);
+            $projectKeep = [];
 
             foreach ($ids as $order => $id) {
                 $row = $vendor->portfolios()->whereKey($id)->first();
                 if (! $row) {
                     continue;
                 }
-                $row->fill($meta);
-                $row->sort_order = ($index * 100) + $order;
+                $row->fill([
+                    ...$meta,
+                    'type' => $row->type ?: $projectType,
+                    'is_cover' => $coverId > 0 ? $row->id === $coverId : $order === 0,
+                    'sort_order' => ($index * 100) + $order,
+                ]);
                 $row->save();
                 $keep[] = $row->id;
+                $projectKeep[] = $row->id;
             }
 
             $uploads = $request->file('projects.'.$index.'.files') ?? [];
@@ -279,21 +312,37 @@ class VendorAppProfile
                 if (! $file instanceof UploadedFile) {
                     continue;
                 }
+                $mime = (string) $file->getMimeType();
+                $type = str_starts_with($mime, 'video/') ? 'video' : ($projectType === 'link' ? 'image' : $projectType);
                 $created = $vendor->portfolios()->create([
                     ...$meta,
+                    'type' => in_array($type, ['image', 'video', 'link'], true) ? $type : 'image',
                     'path' => $file->store('portfolios', 'public'),
+                    'is_cover' => false,
                     'sort_order' => ($index * 100) + 50 + $order,
                 ]);
                 $keep[] = $created->id;
+                $projectKeep[] = $created->id;
             }
 
-            if ($ids === [] && $uploads === []) {
+            if ($projectKeep === [] && ($projectType === 'link' || filled($meta['external_url'] ?? null))) {
                 $created = $vendor->portfolios()->create([
                     ...$meta,
+                    'type' => 'link',
                     'path' => '',
-                    'sort_order' => $index,
+                    'is_cover' => true,
+                    'sort_order' => $index * 100,
                 ]);
                 $keep[] = $created->id;
+                $projectKeep[] = $created->id;
+            }
+
+            if ($projectKeep !== [] && $coverId <= 0) {
+                $first = $vendor->portfolios()->whereKey($projectKeep)->orderBy('sort_order')->first();
+                if ($first && ! $first->is_cover) {
+                    $vendor->portfolios()->whereIn('id', $projectKeep)->update(['is_cover' => false]);
+                    $first->forceFill(['is_cover' => true])->save();
+                }
             }
         }
 
@@ -310,42 +359,427 @@ class VendorAppProfile
     }
 
     /**
+     * Sync open/blocked calendar slots. Booked slots stay locked and are never deleted here.
+     *
+     * @param  list<array<string, mixed>>  $slots
+     */
+    public static function syncAvailabilities(Vendor $vendor, array $slots): void
+    {
+        $keep = $vendor->availabilities()
+            ->where('status', 'booked')
+            ->pluck('id')
+            ->all();
+
+        foreach (array_values($slots) as $index => $slot) {
+            if (! is_array($slot)) {
+                continue;
+            }
+
+            $id = (int) ($slot['id'] ?? 0);
+            $status = (string) ($slot['status'] ?? 'open');
+            if (! in_array($status, ['open', 'blocked', 'booked'], true)) {
+                $status = 'open';
+            }
+
+            if ($id > 0) {
+                $row = $vendor->availabilities()->whereKey($id)->first();
+                if (! $row) {
+                    continue;
+                }
+                if ($row->status === 'booked') {
+                    $keep[] = $row->id;
+
+                    continue;
+                }
+                if ($status === 'booked') {
+                    throw ValidationException::withMessages([
+                        "availabilities.$index.status" => 'Booked slots can only be created by a booking.',
+                    ]);
+                }
+                $row->fill([
+                    'starts_at' => $slot['starts_at'],
+                    'ends_at' => $slot['ends_at'],
+                    'status' => $status,
+                    'notes' => $slot['notes'] ?? null,
+                ]);
+                if ($row->ends_at <= $row->starts_at) {
+                    throw ValidationException::withMessages([
+                        "availabilities.$index.ends_at" => 'Ends must be after starts.',
+                    ]);
+                }
+                $row->save();
+                $keep[] = $row->id;
+
+                continue;
+            }
+
+            if ($status === 'booked') {
+                throw ValidationException::withMessages([
+                    "availabilities.$index.status" => 'New slots must be open or blocked.',
+                ]);
+            }
+
+            $created = $vendor->availabilities()->create([
+                'starts_at' => $slot['starts_at'],
+                'ends_at' => $slot['ends_at'],
+                'status' => $status === 'blocked' ? 'blocked' : 'open',
+                'notes' => $slot['notes'] ?? null,
+            ]);
+            if ($created->ends_at <= $created->starts_at) {
+                $created->delete();
+                throw ValidationException::withMessages([
+                    "availabilities.$index.ends_at" => 'Ends must be after starts.',
+                ]);
+            }
+            $keep[] = $created->id;
+        }
+
+        $vendor->availabilities()
+            ->whereIn('status', ['open', 'blocked'])
+            ->when($keep !== [], fn ($query) => $query->whereNotIn('id', $keep))
+            ->delete();
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
-    protected static function presentProjects(Vendor $vendor): array
+    public static function presentAvailabilities(Vendor $vendor): array
     {
+        return $vendor->availabilities
+            ->sortBy('starts_at')
+            ->values()
+            ->map(fn (VendorAvailability $slot): array => [
+                'id' => $slot->id,
+                'starts_at' => $slot->starts_at?->toIso8601String(),
+                'ends_at' => $slot->ends_at?->toIso8601String(),
+                'status' => $slot->status,
+                'notes' => $slot->notes,
+                'locked' => $slot->status === 'booked',
+            ])
+            ->all();
+    }
+
+    /**
+     * Group portfolio rows into projects (same title + completed_on + description).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function presentProjects(Vendor $vendor): array
+    {
+        $vendor->loadMissing('portfolios');
         $groups = [];
         foreach ($vendor->portfolios->sortBy('sort_order') as $item) {
             $key = implode('|', [
-                (string) $item->type,
-                (string) $item->title,
+                mb_strtolower(trim((string) $item->title)),
                 (string) $item->completed_on,
-                (string) $item->external_url,
+                (string) $item->description,
                 $item->is_featured ? '1' : '0',
             ]);
             if (! isset($groups[$key])) {
                 $groups[$key] = [
+                    'id' => $item->id,
                     'ids' => [],
                     'type' => $item->type,
-                    'title' => $item->title,
+                    'title' => $item->title ?: 'Featured work',
                     'completed_on' => $item->completed_on,
                     'external_url' => $item->external_url,
                     'description' => $item->description,
                     'is_featured' => (bool) $item->is_featured,
+                    'cover_url' => null,
+                    'cover_id' => null,
                     'files' => [],
+                    'media_count' => 0,
+                    'photo_count' => 0,
+                    'video_count' => 0,
                 ];
             }
             $groups[$key]['ids'][] = $item->id;
-            if (filled($item->path)) {
-                $groups[$key]['files'][] = [
+            $kind = self::mediaKind($item);
+            $url = filled($item->path) ? self::publicUrl($item->path) : null;
+            if ($url || $kind === 'link') {
+                $file = [
                     'id' => $item->id,
-                    'name' => basename((string) $item->path),
-                    'url' => Storage::disk('public')->url($item->path),
+                    'name' => filled($item->path) ? basename((string) $item->path) : ($item->title ?: 'Link'),
+                    'url' => $url,
+                    'path' => filled($item->path) ? (string) $item->path : null,
+                    'type' => $item->type,
+                    'kind' => $kind,
+                    'is_cover' => (bool) $item->is_cover,
+                    'external_url' => $item->external_url,
                 ];
+                $groups[$key]['files'][] = $file;
+                $groups[$key]['media_count']++;
+                if ($kind === 'image') {
+                    $groups[$key]['photo_count']++;
+                }
+                if ($kind === 'video') {
+                    $groups[$key]['video_count']++;
+                }
+                if ($item->is_cover && $url) {
+                    $groups[$key]['cover_url'] = $url;
+                    $groups[$key]['cover_id'] = $item->id;
+                }
+            }
+            if ($item->external_url && blank($groups[$key]['external_url'])) {
+                $groups[$key]['external_url'] = $item->external_url;
             }
         }
 
+        foreach ($groups as &$group) {
+            if (! $group['cover_url']) {
+                $cover = collect($group['files'])->firstWhere('kind', 'image')
+                    ?? collect($group['files'])->firstWhere('kind', 'video')
+                    ?? collect($group['files'])->first();
+                if ($cover) {
+                    $group['cover_url'] = $cover['url'] ?? null;
+                    $group['cover_id'] = $cover['id'] ?? null;
+                }
+            }
+            $kinds = collect($group['files'])->pluck('kind')->unique()->values();
+            $group['type'] = $kinds->contains('video') && $kinds->contains('image')
+                ? 'gallery'
+                : ($kinds->first() ?: $group['type']);
+        }
+        unset($group);
+
         return array_values($groups);
+    }
+
+    /**
+     * Sync Filament admin / vendor-panel project groups (cover + many photos/videos).
+     *
+     * @param  list<array<string, mixed>>  $groups
+     */
+    public static function syncAdminProjectGroups(Vendor $vendor, array $groups): void
+    {
+        $keep = [];
+
+        foreach (array_values($groups) as $index => $group) {
+            if (! is_array($group)) {
+                continue;
+            }
+            $title = trim((string) ($group['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+
+            $meta = [
+                'title' => $title,
+                'completed_on' => $group['completed_on'] ?? null,
+                'description' => $group['description'] ?? null,
+                'external_url' => $group['external_url'] ?? null,
+                'is_featured' => (bool) ($group['is_featured'] ?? false),
+            ];
+
+            $cover = self::normalizeUploadPath($group['cover'] ?? null);
+            $images = self::normalizeUploadList($group['images'] ?? []);
+            $videos = self::normalizeUploadList($group['videos'] ?? []);
+            $order = 0;
+
+            if ($cover) {
+                $images = array_values(array_filter($images, fn (string $path): bool => $path !== $cover));
+            }
+
+            if ($cover) {
+                $keep[] = self::upsertPortfolioMedia($vendor, $meta, [
+                    'type' => 'image',
+                    'path' => $cover,
+                    'is_cover' => true,
+                    'sort_order' => ($index * 100) + $order++,
+                ])->id;
+            }
+
+            foreach ($images as $path) {
+                $keep[] = self::upsertPortfolioMedia($vendor, $meta, [
+                    'type' => 'image',
+                    'path' => $path,
+                    'is_cover' => $cover === null && $order === 0,
+                    'sort_order' => ($index * 100) + $order++,
+                ])->id;
+            }
+
+            foreach ($videos as $path) {
+                $keep[] = self::upsertPortfolioMedia($vendor, $meta, [
+                    'type' => 'video',
+                    'path' => $path,
+                    'is_cover' => $cover === null && $images === [] && $order === 0,
+                    'sort_order' => ($index * 100) + $order++,
+                ])->id;
+            }
+
+            if ($order === 0 && filled($meta['external_url'])) {
+                $keep[] = self::upsertPortfolioMedia($vendor, $meta, [
+                    'type' => 'link',
+                    'path' => '',
+                    'is_cover' => true,
+                    'sort_order' => ($index * 100),
+                ])->id;
+            }
+        }
+
+        $query = $vendor->portfolios();
+        if ($keep !== []) {
+            $query->whereNotIn('id', $keep);
+        }
+        $query->get()->each(function (Portfolio $item): void {
+            if (filled($item->path)) {
+                Storage::disk('public')->delete($item->path);
+            }
+            $item->delete();
+        });
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public static function presentProjectsForAdmin(Vendor $vendor): array
+    {
+        return array_map(function (array $project): array {
+            $files = collect($project['files'] ?? []);
+            $cover = $files->firstWhere('is_cover', true) ?? $files->firstWhere('kind', 'image');
+
+            return [
+                'title' => $project['title'],
+                'completed_on' => $project['completed_on'],
+                'description' => $project['description'],
+                'external_url' => $project['external_url'],
+                'is_featured' => $project['is_featured'],
+                'cover' => $cover['path'] ?? null,
+                'images' => $files->where('kind', 'image')
+                    ->when($cover, fn ($collection) => $collection->reject(fn ($file) => ($file['path'] ?? null) === ($cover['path'] ?? null)))
+                    ->pluck('path')
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'videos' => $files->where('kind', 'video')->pluck('path')->filter()->values()->all(),
+            ];
+        }, self::presentProjects($vendor));
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @param  array<string, mixed>  $media
+     */
+    protected static function upsertPortfolioMedia(Vendor $vendor, array $meta, array $media): Portfolio
+    {
+        $existing = null;
+        if (filled($media['path'] ?? null)) {
+            $existing = $vendor->portfolios()
+                ->where('path', $media['path'])
+                ->where('title', $meta['title'])
+                ->first();
+        }
+
+        $payload = [
+            ...$meta,
+            'type' => $media['type'],
+            'path' => $media['path'] ?? '',
+            'is_cover' => (bool) ($media['is_cover'] ?? false),
+            'sort_order' => (int) ($media['sort_order'] ?? 0),
+        ];
+
+        if ($existing) {
+            $existing->fill($payload)->save();
+
+            return $existing;
+        }
+
+        return $vendor->portfolios()->create($payload);
+    }
+
+    /**
+     * @param  mixed  $value
+     * @return list<string>
+     */
+    protected static function normalizeUploadList(mixed $value): array
+    {
+        if ($value instanceof UploadedFile) {
+            return [self::storeUploaded($value)];
+        }
+        if (! is_array($value)) {
+            $one = self::normalizeUploadPath($value);
+
+            return $one ? [$one] : [];
+        }
+
+        $paths = [];
+        foreach ($value as $item) {
+            if ($item instanceof UploadedFile) {
+                $paths[] = self::storeUploaded($item);
+
+                continue;
+            }
+            $path = self::normalizeUploadPath($item);
+            if ($path) {
+                $paths[] = $path;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    protected static function normalizeUploadPath(mixed $value): ?string
+    {
+        if ($value instanceof UploadedFile) {
+            return self::storeUploaded($value);
+        }
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+        $path = ltrim($value, '/');
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, strlen('storage/'));
+        }
+        if (str_contains($path, '://')) {
+            $marker = '/storage/';
+            $pos = strpos($path, $marker);
+            if ($pos !== false) {
+                $path = substr($path, $pos + strlen($marker));
+            } else {
+                return null;
+            }
+        }
+
+        return $path;
+    }
+
+    protected static function storeUploaded(UploadedFile $file): string
+    {
+        return $file->store('portfolios', 'public');
+    }
+
+    protected static function mediaKind(Portfolio $item): string
+    {
+        if ($item->type === 'video') {
+            return 'video';
+        }
+        if ($item->type === 'link' || (blank($item->path) && filled($item->external_url))) {
+            return 'link';
+        }
+        $path = strtolower((string) $item->path);
+        if (str_ends_with($path, '.mp4') || str_ends_with($path, '.mov') || str_ends_with($path, '.webm')) {
+            return 'video';
+        }
+
+        return 'image';
+    }
+
+    public static function assertIdentityImages(Request $request, ?Vendor $vendor = null): void
+    {
+        $messages = [];
+        foreach ([
+            'profile_photo' => 'Add a personal photo.',
+            'national_id_image' => 'Upload your national ID card.',
+            'cover_image' => 'Add a cover image.',
+        ] as $field => $message) {
+            if (! $request->hasFile($field) && blank($vendor?->{$field})) {
+                $messages[$field] = $message;
+            }
+        }
+
+        if ($messages !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages($messages);
+        }
     }
 
     public static function storeIdentityFiles(Request $request, Vendor $vendor): void
@@ -366,10 +800,24 @@ class VendorAppProfile
             Storage::disk('public')->delete($current);
         }
 
-        $vendor->{$field} = $request->file($field)->store($directory, 'public');
+        $stored = $request->file($field)->store($directory, 'public');
+        $vendor->{$field} = $stored;
+
+        if ($field === 'profile_photo') {
+            $user = $vendor->user;
+            if ($user) {
+                if (filled($user->avatar) && is_string($user->avatar)
+                    && ! str_starts_with($user->avatar, 'http://')
+                    && ! str_starts_with($user->avatar, 'https://')
+                    && $user->avatar !== $stored) {
+                    Storage::disk('public')->delete($user->avatar);
+                }
+                $user->forceFill(['avatar' => $stored])->save();
+            }
+        }
     }
 
-    protected static function publicUrl(?string $path): ?string
+    public static function publicUrl(?string $path): ?string
     {
         if (! filled($path)) {
             return null;

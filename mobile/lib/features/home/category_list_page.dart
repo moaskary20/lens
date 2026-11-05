@@ -174,6 +174,30 @@ class _CategoryListPageState extends State<CategoryListPage> {
     }).toList();
   }
 
+  void _selectModelGender(String gender) {
+    var age = _filters.age;
+    var height = _filters.height;
+    if (gender == 'Kids') {
+      age = const RangeValues(0, 17);
+      if (height.start >= 140) {
+        height = const RangeValues(80, 160);
+      }
+    } else if (_filters.gender == 'Kids') {
+      if (age.end.round() <= 17) {
+        age = const RangeValues(18, 50);
+      }
+      if (height.start.round() < 140) {
+        height = const RangeValues(140, 190);
+      }
+    }
+    setState(() {
+      // Tap again to clear back to All.
+      final next = _filters.gender == gender ? 'All' : gender;
+      _filters = _filters.copyWith(gender: next, age: age, height: height);
+      _vendors = _sorted(_applyFilters(_allVendors));
+    });
+  }
+
   Future<void> _openMap() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -315,6 +339,29 @@ class _CategoryListPageState extends State<CategoryListPage> {
                   ),
                 ),
               ),
+            if (widget.type.slug == 'model')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < CategoryFilters.genders.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(
+                        child: _ActionPill(
+                          icon: switch (CategoryFilters.genders[i]) {
+                            'Women' => Icons.female_rounded,
+                            'Kids' => Icons.escalator_warning_rounded,
+                            _ => Icons.male_rounded,
+                          },
+                          label: CategoryFilters.genders[i],
+                          selected: _filters.gender == CategoryFilters.genders[i],
+                          onTap: () => _selectModelGender(CategoryFilters.genders[i]),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Row(
@@ -412,28 +459,41 @@ class _CategoryListPageState extends State<CategoryListPage> {
 }
 
 class _ActionPill extends StatelessWidget {
-  const _ActionPill({required this.icon, required this.label, this.onTap});
+  const _ActionPill({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.selected = false,
+  });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
+    final accent = selected ? LensColors.primary : LensColors.cream;
     final body = Container(
       height: 48,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFF141518),
+        color: selected ? const Color(0x22FF5A1F) : const Color(0xFF141518),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF2A2D34)),
+        border: Border.all(color: selected ? LensColors.primary : const Color(0xFF2A2D34)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: LensColors.cream, size: 18),
+          Icon(icon, color: accent, size: 18),
           const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: selected ? Colors.white : Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ),
         ],
       ),
     );

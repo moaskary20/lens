@@ -15,6 +15,7 @@ Route::get('app/vendors', [AppController::class, 'vendors']);
 Route::get('app/vendors/{vendor}', [AppController::class, 'show']);
 
 Route::post('app/auth/login', [AuthController::class, 'login']);
+Route::post('app/auth/google', [AuthController::class, 'google']);
 Route::post('app/auth/register', [AuthController::class, 'register']);
 Route::get('app/auth/me', [AuthController::class, 'me']);
 Route::get('app/bookings', [AuthController::class, 'bookings']);
@@ -27,9 +28,15 @@ Route::delete('app/account/addresses/{address}', [AccountController::class, 'des
 Route::get('app/account/settings', [AccountController::class, 'settings']);
 Route::post('app/account/settings', [AccountController::class, 'updateSettings']);
 Route::get('app/account/profile', [AccountController::class, 'profile']);
+Route::get('app/account/wallet', [AccountController::class, 'wallet']);
 Route::post('app/account/profile', [AccountController::class, 'updateProfile']);
 Route::post('app/issues', [IssueController::class, 'store']);
 Route::get('app/account/projects', [AccountController::class, 'projects']);
+Route::get('app/account/availability', [AccountController::class, 'availabilities']);
+Route::post('app/account/availability', [AccountController::class, 'storeAvailability']);
+Route::post('app/account/availability/{availability}', [AccountController::class, 'updateAvailability']);
+Route::delete('app/account/availability/{availability}', [AccountController::class, 'destroyAvailability']);
+Route::get('app/vendors/{vendor}/availability', [AppController::class, 'vendorAvailability']);
 Route::post('app/bookings/quote', [BookingController::class, 'quote']);
 Route::post('app/bookings', [BookingController::class, 'store']);
 Route::get('app/bookings/{booking}/deliverables', [BookingController::class, 'deliverables']);
@@ -53,6 +60,7 @@ Route::delete('app/favorites/{vendor}', [ClientInboxController::class, 'forget']
 
 Route::get('app/notifications', [ClientInboxController::class, 'notifications']);
 Route::post('app/notifications/read-all', [ClientInboxController::class, 'readAll']);
+Route::post('app/notifications/clear-all', [ClientInboxController::class, 'clearAll']);
 Route::post('app/notifications/{notification}/read', [ClientInboxController::class, 'read']);
 Route::post('app/device-token', [ClientInboxController::class, 'registerDevice']);
 Route::delete('app/device-token', [ClientInboxController::class, 'forgetDevice']);

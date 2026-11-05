@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lens/core/app_password.dart';
 import 'package:lens/core/egypt_phone.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/features/auth/register_catalog.dart';
@@ -47,8 +48,13 @@ class _UserRegisterPageState extends State<UserRegisterPage> {
   Future<void> _continue() async {
     setState(() => _error = null);
     if (_step == 0) {
-      if (_name.text.trim().isEmpty || _email.text.trim().isEmpty || _password.text.length < 6) {
-        setState(() => _error = 'Enter your name, email, and a password of at least 6 characters.');
+      if (_name.text.trim().isEmpty || _email.text.trim().isEmpty) {
+        setState(() => _error = 'Enter your name, email, and password.');
+        return;
+      }
+      final passwordError = AppPassword.validate(_password.text);
+      if (passwordError != null) {
+        setState(() => _error = passwordError);
         return;
       }
       if (_password.text != _confirm.text) {
@@ -60,6 +66,14 @@ class _UserRegisterPageState extends State<UserRegisterPage> {
     }
     if (!EgyptPhone.isValid(_phone.text, required: true)) {
       setState(() => _error = EgyptPhone.message);
+      return;
+    }
+    if (_cityId == null || _cityId!.isEmpty) {
+      setState(() => _error = 'Choose your governorate.');
+      return;
+    }
+    if (_locale.trim().isEmpty) {
+      setState(() => _error = 'Choose a language.');
       return;
     }
     setState(() => _busy = true);
@@ -115,13 +129,13 @@ class _UserRegisterPageState extends State<UserRegisterPage> {
   Widget _account() {
     return Column(
       children: [
-        RegisterField(controller: _name, hint: 'Full name', icon: Icons.person_outline_rounded),
+        RegisterField(controller: _name, hint: 'Full name *', icon: Icons.person_outline_rounded),
         const SizedBox(height: 12),
-        RegisterField(controller: _email, hint: 'Email', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
+        RegisterField(controller: _email, hint: 'Email *', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
         const SizedBox(height: 12),
         RegisterField(
           controller: _password,
-          hint: 'Password',
+          hint: 'Password * (${AppPassword.hintDetail})',
           icon: Icons.lock_outline_rounded,
           secret: _hidePassword,
           suffix: IconButton(
@@ -130,7 +144,7 @@ class _UserRegisterPageState extends State<UserRegisterPage> {
           ),
         ),
         const SizedBox(height: 12),
-        RegisterField(controller: _confirm, hint: 'Confirm password', icon: Icons.lock_outline_rounded, secret: _hidePassword),
+        RegisterField(controller: _confirm, hint: 'Confirm password *', icon: Icons.lock_outline_rounded, secret: _hidePassword),
       ],
     );
   }
@@ -141,7 +155,7 @@ class _UserRegisterPageState extends State<UserRegisterPage> {
       children: [
         RegisterField(
           controller: _phone,
-          hint: 'Phone 010 / 011 / 012 / 015',
+          hint: 'Phone 010 / 011 / 012 / 015 *',
           icon: Icons.phone_outlined,
           keyboard: TextInputType.phone,
           digitsOnly: true,
@@ -151,11 +165,11 @@ class _UserRegisterPageState extends State<UserRegisterPage> {
         RegisterDropdown(
           value: _cityId,
           options: _catalog.cityChoices,
-          hint: 'Governorate',
+          hint: 'Governorate *',
           onChanged: (value) => setState(() => _cityId = value),
         ),
         const SizedBox(height: 16),
-        const Text('Language', style: TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
+        const Text('Language *', style: TextStyle(color: Color(0xFFB0ABA3), fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         RegisterChoiceChips(
           options: const [

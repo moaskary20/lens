@@ -22,6 +22,29 @@ class AppBookingTest extends TestCase
         $this->seed(LensSeeder::class);
     }
 
+    public function test_pending_vendor_cannot_receive_bookings_or_appear_publicly(): void
+    {
+        $pending = Vendor::query()->where('display_name', 'Noor Cyclorama')->firstOrFail();
+        $this->assertSame('pending', $pending->verification_status);
+
+        $this->getJson('/api/app/vendors/'.$pending->id)->assertNotFound();
+
+        $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
+            ->postJson('/api/app/bookings', [
+                'vendor_id' => $pending->id,
+                'project_name' => 'Should Fail',
+                'project_type' => 'Studio',
+                'client_brief' => 'Pending vendor must not be bookable.',
+                'location_text' => 'Alexandria',
+                'package_type' => 'hourly',
+                'session_price' => 250,
+                'payment_method' => 'wallet',
+                'payment_details' => ['wallet_phone' => '01011112233'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.vendor_id.0', 'This vendor is pending verification and cannot receive bookings.');
+    }
+
     public function test_client_can_book_with_specialty_price_and_map_pin(): void
     {
         $vendor = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();

@@ -166,7 +166,7 @@
         }
 
         const step = () => {
-            const card = rail.querySelector('.vendor-card');
+            const card = rail.querySelector('.vendor-card, .cat');
             if (!card) {
                 return rail.clientWidth * 0.8;
             }

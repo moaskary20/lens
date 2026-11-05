@@ -280,7 +280,7 @@ class LensSeeder extends Seeder
             ['slug' => 'search_cities', 'name' => 'Location', 'scope' => 'all', 'facet_level' => 'primary', 'input_type' => 'checkbox', 'vendor_type_slugs' => [], 'is_system' => false, 'description' => 'Egyptian cities and areas shown as chips in the mobile filter.'],
             ['slug' => 'model_identity', 'name' => 'Gender', 'scope' => 'model', 'facet_level' => 'primary', 'input_type' => 'segment', 'vendor_type_slugs' => ['model'], 'description' => 'Men / Women / Kids tabs on Filter Models.'],
             ['slug' => 'model_category', 'name' => 'Category', 'scope' => 'model', 'facet_level' => 'primary', 'input_type' => 'checkbox', 'vendor_type_slugs' => ['model'], 'description' => 'Fashion, commercial, acting, and other model work types.'],
-            ['slug' => 'model_age', 'name' => 'Age Range', 'scope' => 'model', 'facet_level' => 'secondary', 'input_type' => 'range', 'vendor_type_slugs' => ['model'], 'description' => 'Under 18 through 50+ with an 18–50 year slider.'],
+            ['slug' => 'model_age', 'name' => 'Age Range', 'scope' => 'model', 'facet_level' => 'secondary', 'input_type' => 'range', 'vendor_type_slugs' => ['model'], 'description' => 'Ages 9 through 50+ with a 9–50 year slider.'],
             ['slug' => 'model_height', 'name' => 'Height (cm)', 'scope' => 'model', 'facet_level' => 'secondary', 'input_type' => 'range', 'vendor_type_slugs' => ['model'], 'description' => 'Under 160 through 200+ cm with a 160–200 slider.'],
             ['slug' => 'model_tops', 'name' => 'T-Shirt / Tops', 'scope' => 'model', 'facet_level' => 'secondary', 'input_type' => 'checkbox', 'vendor_type_slugs' => ['model']],
             ['slug' => 'model_pants', 'name' => 'Pants / Bottoms (Waist)', 'scope' => 'model', 'facet_level' => 'secondary', 'input_type' => 'checkbox', 'vendor_type_slugs' => ['model']],
@@ -542,11 +542,14 @@ class LensSeeder extends Seeder
                 'full_day_price' => 3200,
                 'specialties' => ['wedding', 'product', 'editorial'],
                 'extras' => [
-                    'cameras' => ['Canon R5'],
-                    'lenses' => ['85mm f/1.2'],
-                    'lighting' => ['Godox AD600'],
+                    'camera_type' => 'Canon R5',
+                    'lenses_available' => '85mm f/1.2',
+                    'lighting_gear' => 'Godox AD600',
+                    'photo_extras' => 'RAW delivery and high-end retouching',
                 ],
+                'years_experience' => 8,
                 'completed_sessions' => 42,
+                'assisted_sessions' => 12,
                 'booked_sessions' => 48,
                 'accepted_sessions' => 45,
                 'rejected_sessions' => 3,
@@ -554,6 +557,7 @@ class LensSeeder extends Seeder
                 'penalty_total' => 250,
                 'rating_avg' => 4.9,
                 'rating_count' => 37,
+                'client_satisfaction' => 98,
                 'response_minutes' => 18,
             ],
         );
@@ -587,7 +591,9 @@ class LensSeeder extends Seeder
                     'rooms' => ['kitchen', 'bedroom', 'cyclorama'],
                     'props' => ['Dining table', 'Vintage chairs', 'Marble backdrop'],
                 ],
+                'years_experience' => 5,
                 'completed_sessions' => 19,
+                'assisted_sessions' => 6,
                 'booked_sessions' => 24,
                 'accepted_sessions' => 20,
                 'rejected_sessions' => 3,
@@ -595,6 +601,7 @@ class LensSeeder extends Seeder
                 'penalty_total' => 0,
                 'rating_avg' => 4.6,
                 'rating_count' => 12,
+                'client_satisfaction' => 92,
             ],
         );
 
@@ -612,36 +619,36 @@ class LensSeeder extends Seeder
         );
 
         Portfolio::query()->updateOrCreate(
-            ['vendor_id' => $photoVendor->id, 'title' => 'Yasmin Hall wedding'],
+            ['vendor_id' => $photoVendor->id, 'title' => 'Yasmin Hall wedding', 'sort_order' => 1],
             [
                 'type' => 'image',
-                'path' => 'portfolios/fahad-wedding.jpg',
+                'path' => VendorPhotos::cover('photographer', 0),
                 'description' => 'Reception and couple portraits with strobe lighting.',
                 'completed_on' => '2025',
                 'is_featured' => true,
-                'sort_order' => 1,
+                'is_cover' => true,
             ],
         );
         Portfolio::query()->updateOrCreate(
-            ['vendor_id' => $photoVendor->id, 'title' => 'Fragrance still life'],
+            ['vendor_id' => $photoVendor->id, 'title' => 'Fragrance still life', 'sort_order' => 2],
             [
                 'type' => 'image',
-                'path' => 'portfolios/fahad-product.jpg',
+                'path' => VendorPhotos::cover('photographer', 1),
                 'description' => 'Product grid for a Cairo perfume launch.',
                 'completed_on' => '2024',
                 'is_featured' => false,
-                'sort_order' => 2,
+                'is_cover' => true,
             ],
         );
         Portfolio::query()->updateOrCreate(
-            ['vendor_id' => $studioVendor->id, 'title' => 'Cyclorama wall'],
+            ['vendor_id' => $studioVendor->id, 'title' => 'Cyclorama wall', 'sort_order' => 1],
             [
                 'type' => 'image',
-                'path' => 'portfolios/noor-cyc.jpg',
+                'path' => VendorPhotos::cover('studio', 0),
                 'description' => 'Infinity wall ready for e-commerce and lookbooks.',
                 'completed_on' => '2025',
                 'is_featured' => true,
-                'sort_order' => 1,
+                'is_cover' => true,
             ],
         );
 
@@ -655,6 +662,8 @@ class LensSeeder extends Seeder
 
         $this->seedHomeShowcaseVendors($cairo?->id, $alexandria?->id);
         $this->concentrateVendorsInAlexandria($cairo?->id, $alexandria?->id);
+        $this->seedVendorSocialFollowers();
+        $this->seedVendorProjectGalleries();
 
         $category = Category::query()->where('slug', 'wedding')->first();
         $booking = Booking::query()->updateOrCreate(
@@ -921,7 +930,7 @@ class LensSeeder extends Seeder
                 ['Other', 'أخرى', 'model-other', null, 0, null],
             ],
             'model_age' => [
-                ['Under 18', 'أقل من 18', 'model-age-under-18', 'years', 0, 17],
+                ['9 - 17', '9 - 17', 'model-age-9-17', 'years', 9, 17],
                 ['18 - 25', '18 - 25', 'model-age-18-25', 'years', 18, 25],
                 ['26 - 35', '26 - 35', 'model-age-26-35', 'years', 26, 35],
                 ['36 - 50', '36 - 50', 'model-age-36-50', 'years', 36, 50],
@@ -952,6 +961,36 @@ class LensSeeder extends Seeder
                 ['38', '38', 'model-waist-38'],
             ],
             'model_shoes' => [
+                ['9', '9', 'model-shoe-9', 'EU'],
+                ['10', '10', 'model-shoe-10', 'EU'],
+                ['11', '11', 'model-shoe-11', 'EU'],
+                ['12', '12', 'model-shoe-12', 'EU'],
+                ['13', '13', 'model-shoe-13', 'EU'],
+                ['14', '14', 'model-shoe-14', 'EU'],
+                ['15', '15', 'model-shoe-15', 'EU'],
+                ['16', '16', 'model-shoe-16', 'EU'],
+                ['17', '17', 'model-shoe-17', 'EU'],
+                ['18', '18', 'model-shoe-18', 'EU'],
+                ['19', '19', 'model-shoe-19', 'EU'],
+                ['20', '20', 'model-shoe-20', 'EU'],
+                ['21', '21', 'model-shoe-21', 'EU'],
+                ['22', '22', 'model-shoe-22', 'EU'],
+                ['23', '23', 'model-shoe-23', 'EU'],
+                ['24', '24', 'model-shoe-24', 'EU'],
+                ['25', '25', 'model-shoe-25', 'EU'],
+                ['26', '26', 'model-shoe-26', 'EU'],
+                ['27', '27', 'model-shoe-27', 'EU'],
+                ['28', '28', 'model-shoe-28', 'EU'],
+                ['29', '29', 'model-shoe-29', 'EU'],
+                ['30', '30', 'model-shoe-30', 'EU'],
+                ['31', '31', 'model-shoe-31', 'EU'],
+                ['32', '32', 'model-shoe-32', 'EU'],
+                ['33', '33', 'model-shoe-33', 'EU'],
+                ['34', '34', 'model-shoe-34', 'EU'],
+                ['35', '35', 'model-shoe-35', 'EU'],
+                ['36', '36', 'model-shoe-36', 'EU'],
+                ['37', '37', 'model-shoe-37', 'EU'],
+                ['38', '38', 'model-shoe-38', 'EU'],
                 ['39', '39', 'model-shoe-39', 'EU'],
                 ['40', '40', 'model-shoe-40', 'EU'],
                 ['41', '41', 'model-shoe-41', 'EU'],
@@ -1434,13 +1473,16 @@ class LensSeeder extends Seeder
                     'full_day_price' => $row['full'] ?? null,
                     'hourly_price' => $row['hourly'] ?? null,
                     'per_video_price' => $row['per_video'] ?? null,
+                    'years_experience' => 3 + ($index % 8),
                     'completed_sessions' => 12 + $index,
+                    'assisted_sessions' => 2 + ($index % 5),
                     'booked_sessions' => 16 + $index,
                     'accepted_sessions' => 14 + $index,
                     'rejected_sessions' => 1,
                     'failed_sessions' => 0,
                     'rating_avg' => $row['rating'],
                     'rating_count' => $row['count'],
+                    'client_satisfaction' => (int) min(100, max(0, round(((float) $row['rating'] / 5) * 100))),
                     'response_minutes' => 20,
                 ],
             );
@@ -1585,6 +1627,69 @@ class LensSeeder extends Seeder
         foreach (Vendor::query()->with('user')->get() as $vendor) {
             if ($vendor->user) {
                 $vendor->user->forceFill(['city_id' => $vendor->city_id])->save();
+            }
+        }
+    }
+
+    /**
+     * Every marketplace vendor gets Instagram / TikTok / Facebook follower counts
+     * so the vendor profile social row always has numbers to show.
+     */
+    protected function seedVendorSocialFollowers(): void
+    {
+        foreach (Vendor::query()->orderBy('id')->cursor() as $vendor) {
+            $id = (int) $vendor->id;
+            $vendor->forceFill([
+                'instagram_followers' => 8000 + (($id * 17359) % 92000),
+                'tiktok_followers' => 5000 + (($id * 24691) % 65000),
+                'facebook_followers' => 7000 + (($id * 31469) % 88000),
+                'instagram' => filled($vendor->instagram) ? $vendor->instagram : ('https://instagram.com/lens'.$id),
+                'tiktok_url' => filled($vendor->tiktok_url) ? $vendor->tiktok_url : ('https://tiktok.com/@lens'.$id),
+                'facebook_url' => filled($vendor->facebook_url) ? $vendor->facebook_url : ('https://facebook.com/lens'.$id),
+            ])->save();
+        }
+    }
+
+    /**
+     * Fill Previous projects galleries for vendors that still have no portfolio media.
+     *
+     * @param  \Illuminate\Support\Collection<int, Vendor>|null  $vendors
+     */
+    protected function seedVendorProjectGalleries($vendors = null): void
+    {
+        $query = $vendors
+            ? collect($vendors)
+            : Vendor::query()->with(['vendorType', 'portfolios'])->where('is_active', true)->orderBy('id')->get();
+
+        foreach ($query as $vendor) {
+            if (! $vendor instanceof Vendor) {
+                continue;
+            }
+            $vendor->loadMissing(['vendorType', 'portfolios']);
+            $hasMedia = $vendor->portfolios->contains(
+                fn (Portfolio $item): bool => filled($item->path) || filled($item->external_url)
+            );
+            if ($hasMedia) {
+                continue;
+            }
+
+            $slug = $vendor->vendorType?->slug ?? 'photographer';
+            $groups = VendorPhotos::projectGroups($slug, (int) $vendor->id, 3, 3);
+            $sort = 1;
+            foreach ($groups as $group) {
+                foreach ($group['images'] as $imageIndex => $url) {
+                    Portfolio::query()->create([
+                        'vendor_id' => $vendor->id,
+                        'type' => 'image',
+                        'path' => $url,
+                        'title' => $group['title'],
+                        'description' => $group['description'],
+                        'completed_on' => $group['completed_on'],
+                        'is_featured' => (bool) $group['is_featured'],
+                        'is_cover' => $imageIndex === 0,
+                        'sort_order' => $sort++,
+                    ]);
+                }
             }
         }
     }

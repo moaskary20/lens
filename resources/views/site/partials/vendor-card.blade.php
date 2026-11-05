@@ -3,17 +3,42 @@
     $kind = $kind ?? 'creator';
     $badges = collect($vendor['badges'] ?? []);
     $top = $badges->contains('top-rated') || $badges->contains('verified');
+    $user = $authUser ?? null;
+    $reveal = $reveal ?? true;
 @endphp
-<article class="vendor-card">
+<article class="vendor-card" @if($reveal) data-reveal @endif>
     <a class="cover" href="{{ route('site.vendor', $vendor['id']) }}">
-        <img src="{{ $vendor['cover_url'] }}" alt="{{ $vendor['display_name'] }}">
+        <img src="{{ $vendor['cover_url'] ?? $vendor['cover_image'] ?? asset('branding/lenslogo_mark.png') }}" alt="{{ $vendor['display_name'] }}">
         @if($top)
             <span class="badge">Top Rated</span>
         @endif
-        <span class="heart" aria-hidden="true">♡</span>
     </a>
+    @if($user)
+        <button
+            type="button"
+            class="heart fav-heart"
+            style="position:absolute;right:10px;top:10px;z-index:2"
+            x-data="favoriteToggle({
+                on: {{ !empty($vendor['favorited']) ? 'true' : 'false' }},
+                url: @js(route('site.favorites.save', $vendor['id'])),
+                csrf: @js(csrf_token()),
+                loginUrl: @js(route('site.login')),
+            })"
+            :class="on && 'is-on'"
+            @click.prevent="
+                if (on) {
+                    await fetch(@js(route('site.favorites.forget', $vendor['id'])), { method:'DELETE', headers:{'X-CSRF-TOKEN':csrf,'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}}).then(r => { if(r.ok) on=false; });
+                } else {
+                    toggle();
+                }
+            "
+            aria-label="Favorite"
+        >♥</button>
+    @else
+        <a class="heart" href="{{ route('site.login') }}" aria-label="Sign in to favorite">♡</a>
+    @endif
     <div class="meta">
-        <img class="face" src="{{ $vendor['profile_photo_url'] }}" alt="">
+        <img class="face" src="{{ $vendor['profile_photo_url'] ?? $vendor['profile_photo'] ?? asset('branding/lenslogo_mark.png') }}" alt="">
         <div>
             <strong>{{ $vendor['display_name'] }}</strong>
             <p>{{ $vendor['vendor_type_name'] ?? $kind }}</p>

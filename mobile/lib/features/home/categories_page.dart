@@ -41,9 +41,28 @@ class _CategoriesPageState extends State<CategoriesPage> {
       if (!mounted || types is! List || types.isEmpty) {
         return;
       }
-      final home = HomeData.fromJson(remote);
+      final previous = _home.vendorTypes;
+      final previousSlugs = {for (final type in previous) type.slug};
+      final remoteSlugs = {
+        for (final item in types)
+          if (item is Map && '${item['slug'] ?? ''}'.trim().isNotEmpty)
+            '${item['slug']}'.trim(),
+      };
+      final merged = Map<String, dynamic>.from(remote);
+      // Never shrink or reshuffle an already-full grid on this screen.
+      if (remoteSlugs.difference(previousSlugs).isEmpty && previous.isNotEmpty) {
+        merged['vendor_types'] = [
+          for (final type in previous)
+            {
+              'slug': type.slug,
+              'label': type.label,
+              if (type.icon != null) 'icon': type.icon,
+            },
+        ];
+      }
+      final home = HomeData.fromJson(merged);
       AppShell.currentHome = home;
-      AppShell.currentBootstrap = remote;
+      AppShell.currentBootstrap = merged;
       setState(() => _home = home);
     } catch (_) {}
   }

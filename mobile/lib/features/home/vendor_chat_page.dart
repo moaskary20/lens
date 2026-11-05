@@ -25,6 +25,8 @@ class VendorChatPage extends StatefulWidget {
     this.status = 'Confirmed',
     this.bookingId,
     this.clientId,
+    this.phone,
+    this.whatsapp,
   });
 
   final VendorCard vendor;
@@ -35,6 +37,8 @@ class VendorChatPage extends StatefulWidget {
   final String status;
   final int? bookingId;
   final int? clientId;
+  final String? phone;
+  final String? whatsapp;
 
   @override
   State<VendorChatPage> createState() => _VendorChatPageState();
@@ -56,6 +60,8 @@ class _VendorChatPageState extends State<VendorChatPage> {
   String? _remoteStatus;
   bool _busy = false;
   String? _playingKey;
+  String? _contactPhone;
+  String? _whatsapp;
   List<_ChatItem> _items = [];
 
   VendorCard get vendor => widget.vendor;
@@ -97,7 +103,7 @@ class _VendorChatPageState extends State<VendorChatPage> {
     if (widget.dateLabel.trim().isNotEmpty) {
       return widget.dateLabel;
     }
-    return 'Saturday, 19 September 2026 • 2:00 PM';
+    return '';
   }
 
   String get _where {
@@ -110,7 +116,10 @@ class _VendorChatPageState extends State<VendorChatPage> {
     if (vendor.location.isNotEmpty) {
       return vendor.location;
     }
-    return vendor.city.isEmpty ? 'Cairo, Egypt' : '${vendor.city}, Egypt';
+    if (vendor.city.isNotEmpty) {
+      return vendor.city;
+    }
+    return '';
   }
 
   String get _statusLabel => (_remoteStatus ?? widget.status).trim().isEmpty
@@ -121,12 +130,23 @@ class _VendorChatPageState extends State<VendorChatPage> {
 
   List<String> get _shots => VendorPhotos.shots(vendor.vendorType, vendor.id);
 
-  String get _phone => '010${vendor.id.toString().padLeft(8, '0')}';
+  String get _phone {
+    final raw = (_contactPhone ?? widget.phone ?? '').replaceAll(RegExp(r'\D'), '');
+    return raw;
+  }
+
+  String get _whatsappNumber {
+    final raw = (_whatsapp ?? widget.whatsapp ?? _contactPhone ?? widget.phone ?? '').replaceAll(RegExp(r'\D'), '');
+    return raw.isEmpty ? _phone : raw;
+  }
 
   @override
   void initState() {
     super.initState();
-    if (!_live) {
+    _contactPhone = widget.phone;
+    _whatsapp = widget.whatsapp;
+    // Live chats start empty and hydrate only from /app/conversations.
+    if (!LensConfig.useNetwork) {
       _seedLocal();
     }
     _connect();
@@ -182,6 +202,9 @@ class _VendorChatPageState extends State<VendorChatPage> {
       return;
     }
     try {
+      if (widget.clientId == null) {
+        await _loadVendorContact();
+      }
       final payload = await _api.postJson('/app/conversations', {
         if (widget.clientId != null) 'client_id': widget.clientId,
         if (widget.clientId == null) 'vendor_id': vendor.id,
@@ -198,6 +221,31 @@ class _VendorChatPageState extends State<VendorChatPage> {
         return;
       }
       _toast('Could not open this booking chat. Please try again.');
+    }
+  }
+
+  Future<void> _loadVendorContact() async {
+    if ((_contactPhone ?? '').replaceAll(RegExp(r'\D'), '').isNotEmpty &&
+        (_whatsapp ?? '').replaceAll(RegExp(r'\D'), '').isNotEmpty) {
+      return;
+    }
+    try {
+      final payload = await _api.getJson('/app/vendors/${vendor.id}');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        final phone = payload['contact_phone']?.toString();
+        final whatsapp = payload['whatsapp']?.toString();
+        if (phone != null && phone.trim().isNotEmpty) {
+          _contactPhone = phone;
+        }
+        if (whatsapp != null && whatsapp.trim().isNotEmpty) {
+          _whatsapp = whatsapp;
+        }
+      });
+    } catch (_) {
+      // Keep any phone passed from the booking payload.
     }
   }
 
@@ -229,9 +277,8 @@ class _VendorChatPageState extends State<VendorChatPage> {
       _remoteWhen = session['when']?.toString();
       _remoteWhere = session['where']?.toString();
       _remoteStatus = session['status']?.toString();
-      if (messages.isNotEmpty) {
-        _items = _withDays(messages);
-      }
+      // Always replace with API messages so the thread never keeps local seed data.
+      _items = _withDays(messages);
     });
   }
 
@@ -523,6 +570,13 @@ class _VendorChatPageState extends State<VendorChatPage> {
   }
 
   Future<void> _callVendor() async {
+    if (_phone.isEmpty) {
+      await _loadVendorContact();
+    }
+    if (_phone.isEmpty) {
+      _toast('Vendor phone is not available yet.');
+      return;
+    }
     final opened = await ContactLaunch.open(ContactLaunch.tel(_phone));
     if (!opened && mounted) {
       _toast('Call $_phone');
@@ -530,9 +584,16 @@ class _VendorChatPageState extends State<VendorChatPage> {
   }
 
   Future<void> _whatsAppVendor() async {
-    final opened = await ContactLaunch.open(ContactLaunch.whatsapp(_phone));
+    if (_whatsappNumber.isEmpty) {
+      await _loadVendorContact();
+    }
+    if (_whatsappNumber.isEmpty) {
+      _toast('Vendor WhatsApp is not available yet.');
+      return;
+    }
+    final opened = await ContactLaunch.open(ContactLaunch.whatsapp(_whatsappNumber));
     if (!opened && mounted) {
-      _toast('WhatsApp $_phone');
+      _toast('WhatsApp $_whatsappNumber');
     }
   }
 
@@ -732,50 +793,54 @@ class _VendorChatPageState extends State<VendorChatPage> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.calendar_today_outlined,
-                            color: _muted,
-                            size: 13,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              _when,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _muted,
-                                fontSize: 11.5,
+                      if (_when.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today_outlined,
+                              color: _muted,
+                              size: 13,
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                _when,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: _muted,
+                                  fontSize: 11.5,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_outlined,
-                            color: _muted,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              _where,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _muted,
-                                fontSize: 11.5,
+                          ],
+                        ),
+                      ],
+                      if (_where.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on_outlined,
+                              color: _muted,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _where,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: _muted,
+                                  fontSize: 11.5,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

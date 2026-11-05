@@ -44,6 +44,11 @@ class SearchEngineTest extends TestCase
 
     public function test_secondary_studio_kitchen_tag_filters_studios(): void
     {
+        // Seeded as pending; must be verified to appear in marketplace search.
+        Vendor::query()->where('display_name', 'Noor Cyclorama')->update([
+            'verification_status' => 'verified',
+        ]);
+
         $results = app(VendorSearch::class)->search(SearchQuery::fromArray([
             'vendor_type_slugs' => ['studio'],
             'filter_tag_slugs' => ['kitchen-set'],
@@ -51,6 +56,20 @@ class SearchEngineTest extends TestCase
 
         $this->assertSame('Noor Cyclorama', $results['vendors'][0]['vendor']->display_name);
         $this->assertContains('kitchen-set', $results['vendors'][0]['matched_tags']);
+    }
+
+    public function test_pending_vendors_are_hidden_from_marketplace_search(): void
+    {
+        $pending = Vendor::query()->where('display_name', 'Noor Cyclorama')->firstOrFail();
+        $this->assertSame('pending', $pending->verification_status);
+
+        $results = app(VendorSearch::class)->search(SearchQuery::fromArray([
+            'vendor_type_slugs' => ['studio'],
+            'filter_tag_slugs' => ['kitchen-set'],
+        ]));
+
+        $names = collect($results['vendors'])->map(fn (array $row): string => $row['vendor']->display_name)->all();
+        $this->assertNotContains('Noor Cyclorama', $names);
     }
 
     public function test_natural_language_food_brief_suggests_stylist_and_kitchen(): void

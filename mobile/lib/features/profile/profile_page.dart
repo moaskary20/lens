@@ -17,6 +17,7 @@ import 'package:lens/features/profile/edit_profile_page.dart';
 import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/payment_methods_page.dart';
 import 'package:lens/features/profile/report_issue_page.dart';
+import 'package:lens/features/profile/wallet_page.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -44,9 +45,12 @@ class ProfilePage extends StatelessWidget {
               _header(context),
               const SizedBox(height: 18),
               _identity(context),
-              const SizedBox(height: 22),
-              const _StatsRow(),
-              const SizedBox(height: 16),
+              if (signedIn) ...[
+                const SizedBox(height: 22),
+                const _StatsRow(),
+                const SizedBox(height: 16),
+              ] else
+                const SizedBox(height: 22),
               const _LanguagePicker(),
               const SizedBox(height: 18),
               _row(context, Icons.calendar_today_outlined, 'My Bookings', onTap: () => _guard(context, () {
@@ -56,6 +60,13 @@ class ProfilePage extends StatelessWidget {
                 }
                 _open(context, 'My Bookings');
               })),
+              if (data.on('wallets'))
+                _row(
+                  context,
+                  Icons.account_balance_wallet_outlined,
+                  'Wallet',
+                  onTap: () => _guard(context, () => openWallet(context, data)),
+                ),
               if (data.on('favorites'))
                 _row(context, Icons.favorite_border_rounded, 'Saved Creators', onTap: () => openFavorites(context, data)),
               _row(context, Icons.credit_card_outlined, 'Payment Methods', onTap: () => _guard(context, () => _openPage(context, PaymentMethodsPage(home: data)))),
@@ -487,6 +498,9 @@ class _StatsRowState extends State<_StatsRow> {
 
   @override
   Widget build(BuildContext context) {
+    if (SessionStore.instance.isGuest) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(

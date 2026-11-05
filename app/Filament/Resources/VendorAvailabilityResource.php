@@ -42,7 +42,7 @@ class VendorAvailabilityResource extends Resource
 
     protected static function showsInNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     public static function form(Schema $schema): Schema

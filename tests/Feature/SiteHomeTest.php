@@ -61,9 +61,18 @@ class SiteHomeTest extends TestCase
             ->assertSee('Download Our App')
             ->assertSee('Quick Links')
             ->assertSee('Explore Now')
-            ->assertSee('UCC Creators')
+            ->assertSee('UGC Creators')
+            ->assertSee('AI Videos & Motion')
+            ->assertSee('Bloggers & Influencers')
+            ->assertSee('Voice Over')
             ->assertSee('It’s a creative community')
             ->getContent();
+
+        $this->assertSame(
+            1,
+            substr_count($html, 'branding/categories/ai_motion.jpg'),
+            'Home Categories must list each admin vendor type once (no hardcoded duplicates).',
+        );
 
         $this->assertDoesNotMatchRegularExpression(
             "/background-image:\\s*url\\('https?:\\/\\/(?:127\\.0\\.0\\.1|localhost)/",
@@ -106,5 +115,48 @@ class SiteHomeTest extends TestCase
         $this->get('/creatives/'.$vendor->id)
             ->assertOk()
             ->assertSee($vendor->display_name);
+    }
+
+    public function test_search_explore_and_bookings_match_mobile_features(): void
+    {
+        config(['lens.coming_soon' => false]);
+
+        $this->get('/search')
+            ->assertOk()
+            ->assertSee('All')
+            ->assertSee('Photographers')
+            ->assertSee('All cities')
+            ->assertSee('Sort')
+            ->assertSee('Filter');
+
+        $this->get('/explore')
+            ->assertOk()
+            ->assertSee('All Categories')
+            ->assertSee('data-card-slider', false)
+            ->assertSee('explore-cats-rail', false)
+            ->assertSee('Photographers')
+            ->assertSee('Popular Photographer')
+            ->assertSee('View all categories');
+
+        $this->get('/bookings')
+            ->assertOk()
+            ->assertSee('Sign in to continue')
+            ->assertSee('Sign In');
+
+        $this->post('/bookings/login', [
+            'email' => 'client@lens.app',
+            'password' => 'password',
+        ])->assertRedirect('/bookings');
+
+        $this->get('/bookings')
+            ->assertOk()
+            ->assertSee('Upcoming')
+            ->assertSee('Completed')
+            ->assertSee('Canceled')
+            ->assertSee('Sarah Bennett');
+
+        $this->get('/bookings?tab=completed')->assertOk();
+        $this->post('/bookings/logout')->assertRedirect('/bookings');
+        $this->get('/bookings')->assertOk()->assertSee('Sign in to continue');
     }
 }

@@ -9,6 +9,7 @@ use App\Models\FilterTag;
 use App\Models\Vendor;
 use App\Support\Feature;
 use App\Support\Finance;
+use App\Support\VendorAppProfile;
 use App\Support\VendorProfile;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -64,6 +65,7 @@ class MyProfile extends Page
             'national_id_image' => $vendor->national_id_image,
             'date_of_birth' => $vendor->date_of_birth,
             'profession' => $vendor->profession,
+            'years_experience' => $vendor->years_experience,
             'bio' => $vendor->bio,
             'contact_phone' => $vendor->contact_phone ?: $vendor->user?->phone,
             'contact_email' => $vendor->contact_email ?: $vendor->user?->email,
@@ -83,6 +85,7 @@ class MyProfile extends Page
             'category_ids' => $vendor->categories()->pluck('categories.id')->all(),
             'filter_tag_ids' => $vendor->filterTags()->pluck('filter_tags.id')->all(),
             'profile_filters' => VendorProfile::hydrateProfileFilters($vendor),
+            'project_groups' => VendorAppProfile::presentProjectsForAdmin($vendor),
             'specialties' => $vendor->specialties,
             'delivery_formats' => $vendor->delivery_formats,
             'turnaround_hours' => $vendor->turnaround_hours,
@@ -196,14 +199,17 @@ class MyProfile extends Page
                         TextInput::make('default_travel_fee')->label('Default transportation fee')->numeric()->prefix(Finance::currency())
                             ->helperText('Used when there is no specific rate for the destination governorate. Set per-governorate rates on Travel fees.')
                             ->visible(fn (Get $get): bool => (bool) $get('accepts_out_of_governorate')),
+                        Placeholder::make('years_experience_view')->label('Years of experience')->content((string) ($vendor->years_experience ?? 0)),
                         Placeholder::make('booked_sessions_view')->label('Sessions booked')->content((string) ($vendor->booked_sessions ?? 0)),
                         Placeholder::make('accepted_sessions_view')->label('Accepted')->content((string) ($vendor->accepted_sessions ?? 0)),
                         Placeholder::make('rejected_sessions_view')->label('Rejected')->content((string) ($vendor->rejected_sessions ?? 0)),
-                        Placeholder::make('completed_sessions_view')->label('Completed')->content((string) ($vendor->completed_sessions ?? 0)),
+                        Placeholder::make('completed_sessions_view')->label('Projects completed')->content((string) ($vendor->completed_sessions ?? 0)),
+                        Placeholder::make('assisted_sessions_view')->label('Assisted projects')->content((string) ($vendor->assisted_sessions ?? 0)),
                         Placeholder::make('failed_sessions_view')->label('Failed sessions')->content((string) ($vendor->failed_sessions ?? 0)),
                         Placeholder::make('penalty_total_view')->label('Applied penalties')->content(number_format((float) ($vendor->penalty_total ?? 0), 0).' '.Finance::currency()),
                         Placeholder::make('rating_avg_view')->label('Average rating')->content(number_format((float) ($vendor->rating_avg ?? 0), 2).' ★'),
                         Placeholder::make('rating_count_view')->label('Review count')->content((string) ($vendor->rating_count ?? 0)),
+                        Placeholder::make('client_satisfaction_view')->label('Client satisfaction')->content((string) ($vendor->client_satisfaction ?? 0).'%'),
                     ])->columns(2),
                 ])->persistTabInQueryString()->columnSpanFull(),
             ])
@@ -236,10 +242,12 @@ class MyProfile extends Page
         $categoryIds = $state['category_ids'] ?? [];
         $filterTagIds = $state['filter_tag_ids'] ?? [];
         $profileFilters = is_array($state['profile_filters'] ?? null) ? $state['profile_filters'] : [];
+        $projectGroups = is_array($state['project_groups'] ?? null) ? $state['project_groups'] : [];
         unset(
             $state['category_ids'],
             $state['filter_tag_ids'],
             $state['profile_filters'],
+            $state['project_groups'],
             $state['vendor_type_id'],
             $state['portfolios'],
             $state['verification_status'],
@@ -269,8 +277,7 @@ class MyProfile extends Page
             ? $filterTagIds
             : [];
         VendorProfile::syncProfileFilters($vendor, $profileFilters, $extraIds);
-
-        $this->form->model($vendor->fresh())->saveRelationships();
+        VendorAppProfile::syncAdminProjectGroups($vendor, $projectGroups);
 
         Notification::make()->title('Profile saved')->success()->send();
     }

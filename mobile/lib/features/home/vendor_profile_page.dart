@@ -11,6 +11,7 @@ import 'package:lens/features/auth/login_view.dart';
 import 'package:lens/features/home/book_date_page.dart';
 import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
+import 'package:lens/features/home/vendor_project_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
 
@@ -37,7 +38,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   late String _tab;
   late String _filter;
   late List<String> _filters;
-  late List<_Shot> _shots;
+  late List<_PortfolioProject> _projectsGallery;
   late String _bio;
   late String _profession;
   late String _tagline;
@@ -47,16 +48,22 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   late String _years;
   late int _satisfaction;
   late List<String> _equipment;
+  List<_EquipmentDetail> _equipmentDetails = const [];
   late List<String> _specialties;
   late List<_Package> _packages;
+  List<_SocialStat> _social = const [];
+  List<_ReviewItem> _reviews = const [];
+  late VendorCard _profile;
+  var _loadedFromApi = false;
   String _contactPhone = '';
   String _whatsapp = '';
   final _tabScroll = ScrollController();
 
-  VendorCard get vendor => widget.vendor;
+  VendorCard get vendor => _profile;
   bool get booked => widget.booked;
   bool get _guest => SessionStore.instance.isGuest;
-  bool get _revealName => booked || BookedVendorsStore.instance.has(vendor.id);
+  bool get _hasBooking => booked || BookedVendorsStore.instance.has(vendor.id);
+  bool get _revealName => _hasBooking;
   String get _visibleName => _revealName ? vendor.displayName : vendor.publicName;
   String get _visibleBio => _revealName ? _bio : _bio.replaceAll(vendor.displayName, vendor.maskedName);
 
@@ -64,7 +71,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     if (_contactPhone.isNotEmpty) {
       return _contactPhone.replaceAll(RegExp(r'\D'), '');
     }
-    return '010${vendor.id.toString().padLeft(8, '0')}';
+    return '';
   }
 
   String get _whatsappNumber {
@@ -77,6 +84,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   @override
   void initState() {
     super.initState();
+    _profile = widget.vendor;
     _tab = 'Portfolio';
     _hydrateFromCard();
     if (LensConfig.useNetwork) {
@@ -94,18 +102,17 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     final type = vendor.vendorType;
     _filters = _filtersFor(type);
     _filter = 'All';
-    _shots = _shotsFor(vendor);
+    _projectsGallery = _projectsFor(vendor);
     _bio = '${vendor.displayName} is a ${vendor.vendorTypeName.toLowerCase()} based in ${vendor.city.isEmpty ? 'Cairo' : vendor.city}, creating booked work across ${vendor.tags.isEmpty ? 'campaigns' : vendor.tags.join(', ')}.';
     _profession = vendor.vendorTypeName;
     _tagline = _taglineFor(type);
     _response = 'Responds in 1 hour';
     _projects = vendor.completedSessions;
-    _assisted = 0;
-    _years = _projects > 0 ? '${(_projects / 15).floor().clamp(1, 20)}+' : '1+';
-    _satisfaction = vendor.ratingAvg > 0
-        ? (vendor.ratingAvg * 20).round().clamp(0, 99)
-        : 0;
+    _assisted = vendor.assistedSessions;
+    _years = '${vendor.yearsExperience}+';
+    _satisfaction = vendor.clientSatisfaction;
     _equipment = _equipmentFor(type);
+    _equipmentDetails = const [];
     _specialties = vendor.tags.isEmpty ? _filters.skip(1).take(3).toList() : vendor.tags;
     _packages = [
       if ((vendor.hourlyPrice ?? 0) > 0)
@@ -131,64 +138,118 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
 
   Future<void> _load() async {
     try {
-      final payload = await ApiClient().getJson('/app/vendors/${vendor.id}');
+      final payload = await ApiClient().getJson('/app/vendors/${widget.vendor.id}');
       if (!mounted) {
         return;
       }
       setState(() {
-        _bio = payload['bio']?.toString().isNotEmpty == true ? payload['bio'].toString() : _bio;
-        _profession = payload['profession']?.toString().isNotEmpty == true ? payload['profession'].toString() : _profession;
-        _tagline = payload['tagline']?.toString().isNotEmpty == true ? payload['tagline'].toString() : _tagline;
-        final minutes = payload['response_minutes'];
-        if (minutes is num) {
-          _response = minutes <= 60 ? 'Responds in 1 hour' : 'Responds in ${(minutes / 60).ceil()} hours';
-        }
-        if (payload['completed_sessions'] != null) {
-          _projects = int.tryParse('${payload['completed_sessions']}') ?? _projects;
-        }
-        if (payload['assisted_sessions'] != null) {
-          _assisted = int.tryParse('${payload['assisted_sessions']}') ?? _assisted;
-        }
-        if (payload['years_experience'] != null) {
-          _years = '${payload['years_experience']}+';
-        }
-        if (payload['client_satisfaction'] is num) {
-          _satisfaction = (payload['client_satisfaction'] as num).toInt();
-        }
-        _equipment = _stringList(payload['equipment']).isEmpty ? _equipment : _stringList(payload['equipment']);
-        _specialties = _stringList(payload['specialties']).isEmpty ? _specialties : _stringList(payload['specialties']);
-        final filters = _stringList(payload['portfolio_filters']);
-        if (filters.isNotEmpty) {
-          _filters = filters;
-        }
-        final shots = (payload['portfolio'] as List<dynamic>? ?? const [])
-            .whereType<Map>()
-            .map((item) => _Shot.fromJson(Map<String, dynamic>.from(item)))
-            .where((item) => item.url.isNotEmpty)
-            .toList();
-        if (shots.isNotEmpty) {
-          _shots = shots;
-        }
-        final packages = (payload['packages'] as List<dynamic>? ?? const [])
-            .whereType<Map>()
-            .map((item) => _Package.fromJson(Map<String, dynamic>.from(item)))
-            .toList();
-        if (packages.isNotEmpty) {
-          _packages = packages;
-        }
-        _contactPhone = payload['contact_phone']?.toString() ?? _contactPhone;
-        _whatsapp = payload['whatsapp']?.toString() ?? _whatsapp;
+        _applyApiProfile(payload);
       });
     } catch (_) {
       // Keep the listing snapshot when the profile API is offline.
     }
   }
 
-  List<_Shot> get _visibleShots {
-    if (_filter == 'All') {
-      return _shots;
+  void _applyApiProfile(Map<String, dynamic> payload) {
+    _loadedFromApi = true;
+    _profile = VendorCard.fromJson(payload);
+    _bio = payload['bio']?.toString().isNotEmpty == true
+        ? payload['bio'].toString()
+        : _bio;
+    _profession = payload['profession']?.toString().isNotEmpty == true
+        ? payload['profession'].toString()
+        : (_profile.vendorTypeName.isNotEmpty ? _profile.vendorTypeName : _profession);
+    _tagline = payload['tagline']?.toString().isNotEmpty == true
+        ? payload['tagline'].toString()
+        : _tagline;
+    final minutes = payload['response_minutes'];
+    if (minutes is num) {
+      final value = minutes.toInt();
+      if (value <= 0) {
+        _response = 'Responds soon';
+      } else if (value <= 60) {
+        _response = 'Responds in 1 hour';
+      } else {
+        _response = 'Responds in ${(value / 60).ceil()} hours';
+      }
     }
-    return _shots.where((item) => item.category == _filter).toList();
+    _projects = int.tryParse('${payload['completed_sessions']}') ?? _profile.completedSessions;
+    _assisted = int.tryParse('${payload['assisted_sessions']}') ?? _profile.assistedSessions;
+    final years = int.tryParse('${payload['years_experience']}') ?? _profile.yearsExperience;
+    _years = '$years+';
+    _satisfaction = payload['client_satisfaction'] is num
+        ? (payload['client_satisfaction'] as num).toInt()
+        : _profile.clientSatisfaction;
+    _equipment = _stringList(payload['equipment']);
+    _equipmentDetails = (payload['equipment_details'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => _EquipmentDetail.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.label.isNotEmpty && item.value.isNotEmpty)
+        .toList();
+    _specialties = _stringList(payload['specialties']);
+    final filters = _stringList(payload['portfolio_filters']);
+    _filters = filters.isNotEmpty ? filters : const ['All'];
+    if (!_filters.contains(_filter)) {
+      _filter = _filters.first;
+    }
+    final apiProjects = (payload['projects'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => _PortfolioProject.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.coverUrl.isNotEmpty || item.files.isNotEmpty)
+        .toList();
+    if (apiProjects.isNotEmpty) {
+      _projectsGallery = apiProjects;
+    } else {
+      final legacy = (payload['portfolio'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => _PortfolioProject.fromLegacyShot(Map<String, dynamic>.from(item)))
+          .where((item) => item.coverUrl.isNotEmpty)
+          .toList();
+      _projectsGallery = legacy.isNotEmpty ? legacy : _projectsFor(_profile);
+    }
+    _packages = (payload['packages'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => _Package.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+    _reviews = (payload['reviews'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => _ReviewItem.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+    _contactPhone = payload['contact_phone']?.toString() ?? '';
+    _whatsapp = payload['whatsapp']?.toString() ?? '';
+    final social = (payload['social'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => _SocialStat.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.followers != null)
+        .toList();
+    if (social.isNotEmpty) {
+      _social = social;
+    } else {
+      _social = [
+        if (payload['instagram_followers'] != null)
+          _SocialStat(
+            label: 'Instagram',
+            followers: int.tryParse('${payload['instagram_followers']}'),
+          ),
+        if (payload['tiktok_followers'] != null)
+          _SocialStat(
+            label: 'TikTok',
+            followers: int.tryParse('${payload['tiktok_followers']}'),
+          ),
+        if (payload['facebook_followers'] != null)
+          _SocialStat(
+            label: 'Facebook',
+            followers: int.tryParse('${payload['facebook_followers']}'),
+          ),
+      ].where((item) => item.followers != null).toList();
+    }
+  }
+
+  List<_PortfolioProject> get _visibleProjects {
+    if (_filter == 'All') {
+      return _projectsGallery;
+    }
+    return _projectsGallery.where((item) => item.category == _filter || item.category.isEmpty).toList();
   }
 
   static const _muted = Color(0xFF8E8B84);
@@ -215,14 +276,14 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       body: Stack(
         children: [
           ListView(
-            padding: EdgeInsets.only(bottom: booked ? 118 : 108),
+            padding: EdgeInsets.only(bottom: _hasBooking ? 118 : 108),
             cacheExtent: 1600,
             children: [
               _hero(),
               Padding(
-                padding: EdgeInsets.fromLTRB(16, booked ? 0 : 16, 16, 0),
+                padding: EdgeInsets.fromLTRB(16, _hasBooking ? 0 : 16, 16, 0),
                 child: Transform.translate(
-                  offset: Offset(0, booked ? -28 : 0),
+                  offset: Offset(0, _hasBooking ? -28 : 0),
                   child: _identity(location),
                 ),
               ),
@@ -239,7 +300,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: booked ? _contactBar() : _bookNowBar(),
+            child: _hasBooking ? _contactBar() : _bookNowBar(),
           ),
         ],
       ),
@@ -249,7 +310,9 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   Widget _hero() {
     final cover = (vendor.coverUrl != null && vendor.coverUrl!.isNotEmpty)
         ? vendor.coverUrl!
-        : VendorPhotos.cover(vendor.vendorType, vendor.id);
+        : (_loadedFromApi
+            ? ''
+            : VendorPhotos.cover(vendor.vendorType, vendor.id));
 
     return SizedBox(
       height: 292,
@@ -328,119 +391,173 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Widget _identity(String location) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _avatar(),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _avatar(),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _visibleName,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.15),
+                        ),
+                      ),
+                      if (vendor.verified) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.verified, color: _verifiedBlue, size: 18),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _profession,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFFB0ABA3), fontSize: 14, fontWeight: FontWeight.w500, height: 1.2),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined, color: Color(0xFF8E8B84), size: 15),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          location,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (widget.home.on('reviews')) ...[
+                        const Icon(Icons.star_rounded, color: Color(0xFFF5C451), size: 16),
+                        const SizedBox(width: 3),
+                        Text(
+                          vendor.ratingAvg.toStringAsFixed(1),
+                          softWrap: false,
+                          style: const TextStyle(color: Color(0xFFF5C451), fontSize: 13, fontWeight: FontWeight.w800),
+                        ),
                         Flexible(
                           child: Text(
-                            _visibleName,
+                            ' (${vendor.ratingCount} reviews)',
                             maxLines: 1,
                             softWrap: false,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.15),
+                            style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w500),
                           ),
                         ),
-                        if (vendor.verified) ...[
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: _verifiedBlue, size: 18),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF163226),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF2E7A4F)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.circle, color: Color(0xFF3DDC84), size: 8),
-                        const SizedBox(width: 6),
-                        Text(
-                          booked ? 'Your vendor' : 'Available this weekend',
-                          softWrap: false,
-                          style: const TextStyle(color: Color(0xFF7DCEA0), fontSize: 11, fontWeight: FontWeight.w700),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: Text('·', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 16, fontWeight: FontWeight.w700, height: 1)),
                         ),
                       ],
-                    ),
+                      const Icon(Icons.bolt_rounded, color: Color(0xFF3DDC84), size: 16),
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          _response,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+            ),
+          ],
+        ),
+        if (_social.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          _socialFollowers(),
+        ],
+      ],
+    );
+  }
+
+  Widget _socialFollowers() {
+    _SocialStat? of(String key) {
+      for (final item in _social) {
+        if (item.label.toLowerCase().contains(key) && item.followers != null) {
+          return item;
+        }
+      }
+      return null;
+    }
+
+    final items = [
+      of('instagram'),
+      of('tiktok'),
+      of('facebook'),
+    ].whereType<_SocialStat>().toList();
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(width: 18),
+          Flexible(child: _socialFollowerTile(items[i])),
+        ],
+      ],
+    );
+  }
+
+  Widget _socialFollowerTile(_SocialStat item) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _socialIcon(item.label),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
               Text(
-                _profession,
+                _formatFollowers(item.followers!),
                 maxLines: 1,
-                softWrap: false,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFFB0ABA3), fontSize: 14, fontWeight: FontWeight.w500, height: 1.2),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1,
+                ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.location_on_outlined, color: Color(0xFF8E8B84), size: 15),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      location,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  if (widget.home.on('reviews')) ...[
-                    const Icon(Icons.star_rounded, color: Color(0xFFF5C451), size: 16),
-                    const SizedBox(width: 3),
-                    Text(
-                      vendor.ratingAvg.toStringAsFixed(1),
-                      softWrap: false,
-                      style: const TextStyle(color: Color(0xFFF5C451), fontSize: 13, fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      ' (${vendor.ratingCount} reviews)',
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('·', style: TextStyle(color: Color(0xFF8E8B84), fontSize: 16, fontWeight: FontWeight.w700, height: 1)),
-                    ),
-                  ],
-                  const Icon(Icons.bolt_rounded, color: Color(0xFF3DDC84), size: 16),
-                  const SizedBox(width: 2),
-                  Flexible(
-                    child: Text(
-                      _response,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
+              const Text(
+                'Followers',
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF8E8B84),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
               ),
             ],
           ),
@@ -449,9 +566,67 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     );
   }
 
+  Widget _socialIcon(String label) {
+    final key = label.trim().toLowerCase();
+    if (key.contains('instagram')) {
+      return Container(
+        width: 28,
+        height: 28,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF), Color(0xFF515BD4)],
+          ),
+        ),
+        child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 15),
+      );
+    }
+    if (key.contains('tiktok')) {
+      return Container(
+        width: 28,
+        height: 28,
+        decoration: const BoxDecoration(color: Color(0xFF111111), shape: BoxShape.circle),
+        child: const Center(
+          child: Text(
+            '♪',
+            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800, height: 1),
+          ),
+        ),
+      );
+    }
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: const BoxDecoration(color: Color(0xFF1877F2), shape: BoxShape.circle),
+      child: const Icon(Icons.facebook, color: Colors.white, size: 17),
+    );
+  }
+
+  String _formatFollowers(int value) {
+    if (value >= 1000000) {
+      final millions = value / 1000000;
+      final text = millions >= 10 || millions == millions.roundToDouble()
+          ? millions.round().toString()
+          : millions.toStringAsFixed(1);
+      return '${text}M';
+    }
+    if (value >= 1000) {
+      final thousands = value / 1000;
+      final text = thousands >= 10 || thousands == thousands.roundToDouble()
+          ? thousands.round().toString()
+          : thousands.toStringAsFixed(1);
+      return '${text}K';
+    }
+    return '$value';
+  }
+
   Widget _avatar() {
     final size = booked ? 96.0 : 108.0;
-    final photo = vendor.profilePhotoUrl ?? VendorPhotos.portrait(vendor.vendorType, vendor.id);
+    final photo = (vendor.profilePhotoUrl != null && vendor.profilePhotoUrl!.isNotEmpty)
+        ? vendor.profilePhotoUrl!
+        : (_loadedFromApi ? '' : (VendorPhotos.portrait(vendor.vendorType, vendor.id)));
     final radius = booked ? size / 2 : 24.0;
 
     return Container(
@@ -463,7 +638,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         border: booked ? Border.all(color: LensColors.charcoal, width: 3) : null,
       ),
       clipBehavior: Clip.antiAlias,
-      child: LensConfig.useNetwork
+      child: LensConfig.useNetwork && photo.isNotEmpty
           ? Image.network(
               photo,
               width: size,
@@ -636,39 +811,79 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(_visibleBio, style: const TextStyle(color: _creamText, height: 1.45, fontSize: 14)),
         ),
-      'Specialties' => Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _specialties.map((item) => _chip(item)).toList(),
-        ),
-      'Equipment' => Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _equipment.map((item) => _chip(item)).toList(),
-        ),
-      'Packages' => Column(
-          children: _packages
-              .map(
-                (item) => Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141518),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF2A2D34)),
+      'Specialties' => _specialties.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('No specialties listed yet.', style: TextStyle(color: _muted)),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _specialties.map((item) => _chip(item)).toList(),
+            ),
+      'Equipment' => _equipmentDetails.isNotEmpty
+          ? Column(
+              children: [
+                for (final item in _equipmentDetails)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141518),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF2A2D34)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                        const SizedBox(height: 6),
+                        Text(item.value, style: const TextStyle(color: _creamText, height: 1.4, fontSize: 13.5)),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(item.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
-                      Text(_money(item.price), style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w800)),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-        ),
+              ],
+            )
+          : (_equipment.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('No equipment listed yet.', style: TextStyle(color: _muted)),
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _equipment.map((item) => _chip(item)).toList(),
+                )),
+      'Packages' => _packages.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('No packages listed yet.', style: TextStyle(color: _muted)),
+            )
+          : Column(
+              children: _packages
+                  .map(
+                    (item) => Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141518),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF2A2D34)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(item.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                          Text(_money(item.price), style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
       'Reviews' => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -681,10 +896,52 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Clients highlight on-time delivery, art direction, and a calm on-set presence.',
-              style: TextStyle(color: _creamText, height: 1.4),
-            ),
+            if (_reviews.isEmpty)
+              const Text(
+                'No reviews yet.',
+                style: TextStyle(color: _muted, height: 1.4),
+              )
+            else
+              for (final review in _reviews) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141518),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF2A2D34)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              review.client,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          const Icon(Icons.star_rounded, color: Color(0xFFF5C451), size: 15),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${review.rating}',
+                            style: const TextStyle(color: Color(0xFFF5C451), fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                      if (review.comment.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          review.comment,
+                          style: const TextStyle(color: _creamText, height: 1.4, fontSize: 13.5),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
           ],
         ),
       _ => _masonry(),
@@ -692,7 +949,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Widget _masonry() {
-    final items = _visibleShots;
+    final items = _visibleProjects;
     if (items.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 8),
@@ -700,90 +957,98 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       );
     }
 
-    if (items.length >= 3) {
-      final rest = items.skip(3).toList();
-      return Column(
-        children: [
-          SizedBox(
-            height: 228,
-            child: Row(
-              children: [
-                Expanded(flex: 6, child: _tile(items[0], padded: false, caption: false)),
-                const SizedBox(width: 5),
-                Expanded(
-                  flex: 5,
-                  child: Column(
-                    children: [
-                      Expanded(child: _tile(items[1], padded: false, caption: false)),
-                      const SizedBox(height: 5),
-                      Expanded(child: _tile(items[2], padded: false, caption: false)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (rest.isNotEmpty) ...[
-            const SizedBox(height: 5),
-            _twoCol(rest),
-          ],
-        ],
-      );
-    }
-
-    return _twoCol(items);
-  }
-
-  Widget _twoCol(List<_Shot> items) {
-    final left = <_Shot>[];
-    final right = <_Shot>[];
+    final left = <_PortfolioProject>[];
+    final right = <_PortfolioProject>[];
     for (var i = 0; i < items.length; i++) {
       (i.isEven ? left : right).add(items[i]);
     }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: Column(children: [for (final shot in left) _tile(shot, height: shot.tall ? 176 : 124)])),
-        const SizedBox(width: 5),
-        Expanded(child: Column(children: [for (final shot in right) _tile(shot, height: shot.tall ? 176 : 124)])),
+        Expanded(child: Column(children: [for (final project in left) _projectTile(project, tall: project.tall)])),
+        const SizedBox(width: 8),
+        Expanded(child: Column(children: [for (final project in right) _projectTile(project, tall: !project.tall)])),
       ],
     );
   }
 
-  Widget _tile(_Shot shot, {double? height, bool padded = true, bool caption = true}) {
-    final image = ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _photo(shot.url),
-          if (caption && shot.title.isNotEmpty)
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.center,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xB3000000)],
+  Widget _projectTile(_PortfolioProject project, {required bool tall}) {
+    final imageHeight = tall ? 176.0 : 124.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: GestureDetector(
+        onTap: () => _openProject(project),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: imageHeight,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _photo(project.coverUrl),
+                    if (project.mediaCount > 1)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xCC000000),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.collections_rounded, color: Colors.white, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${project.mediaCount}',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (project.videoCount > 0)
+                      const Positioned(
+                        left: 8,
+                        bottom: 8,
+                        child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 22),
+                      ),
+                  ],
                 ),
               ),
             ),
-          if (caption && shot.title.isNotEmpty)
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 8,
-              child: Text(
-                shot.title,
-                style: const TextStyle(color: LensColors.cream, fontWeight: FontWeight.w800, fontSize: 12, height: 1.15),
+            if (project.title.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                project.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: LensColors.cream, fontWeight: FontWeight.w800, fontSize: 13, height: 1.2),
               ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
-    final sized = height == null ? image : SizedBox(height: height, width: double.infinity, child: image);
-    return Padding(
-      padding: EdgeInsets.only(bottom: padded ? 5 : 0),
-      child: sized,
+  }
+
+  void _openProject(_PortfolioProject project) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VendorProjectPage(
+          title: project.title.isEmpty ? 'Project' : project.title,
+          description: project.description,
+          completedOn: project.completedOn,
+          externalUrl: project.externalUrl,
+          files: project.files,
+        ),
+      ),
     );
   }
 
@@ -975,6 +1240,17 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Future<void> _call() async {
+    if (_phone.isEmpty) {
+      await _load();
+    }
+    if (_phone.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vendor phone is not available yet.')),
+        );
+      }
+      return;
+    }
     final opened = await ContactLaunch.open(ContactLaunch.tel(_phone));
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Call $_phone')));
@@ -982,6 +1258,17 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Future<void> _whatsApp() async {
+    if (_whatsappNumber.isEmpty) {
+      await _load();
+    }
+    if (_whatsappNumber.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vendor WhatsApp is not available yet.')),
+        );
+      }
+      return;
+    }
     final opened = await ContactLaunch.open(ContactLaunch.whatsapp(_whatsappNumber));
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('WhatsApp $_whatsappNumber')));
@@ -994,29 +1281,157 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         builder: (_) => VendorChatPage(
           vendor: vendor,
           location: vendor.location.isEmpty ? vendor.city : vendor.location,
-          status: booked ? 'Confirmed' : 'Pending',
+          status: _hasBooking ? 'Confirmed' : 'Pending',
+          phone: _phone.isEmpty ? null : _phone,
+          whatsapp: _whatsappNumber.isEmpty ? null : _whatsappNumber,
         ),
       ),
     );
   }
 }
 
-class _Shot {
-  const _Shot({required this.url, required this.title, required this.category, required this.tall});
+class _ReviewItem {
+  const _ReviewItem({
+    required this.rating,
+    required this.comment,
+    required this.client,
+  });
 
-  factory _Shot.fromJson(Map<String, dynamic> json) {
-    return _Shot(
-      url: json['url']?.toString() ?? '',
-      title: json['title']?.toString() ?? '',
-      category: json['category']?.toString() ?? 'All',
-      tall: json['tall'] == true,
+  factory _ReviewItem.fromJson(Map<String, dynamic> json) {
+    return _ReviewItem(
+      rating: json['rating'] is num
+          ? (json['rating'] as num).toInt()
+          : int.tryParse('${json['rating']}') ?? 0,
+      comment: json['comment']?.toString() ?? '',
+      client: json['client']?.toString() ?? 'Client',
     );
   }
 
-  final String url;
+  final int rating;
+  final String comment;
+  final String client;
+}
+
+class _SocialStat {
+  const _SocialStat({required this.label, this.followers, this.url});
+
+  factory _SocialStat.fromJson(Map<String, dynamic> json) {
+    final raw = json['followers'];
+    int? followers;
+    if (raw is num) {
+      followers = raw.toInt();
+    } else if (raw != null) {
+      followers = int.tryParse('$raw');
+    }
+    return _SocialStat(
+      label: json['label']?.toString() ?? '',
+      followers: followers,
+      url: json['url']?.toString(),
+    );
+  }
+
+  final String label;
+  final int? followers;
+  final String? url;
+}
+
+class _EquipmentDetail {
+  const _EquipmentDetail({required this.label, required this.value});
+
+  factory _EquipmentDetail.fromJson(Map<String, dynamic> json) {
+    return _EquipmentDetail(
+      label: json['label']?.toString() ?? '',
+      value: json['value']?.toString() ?? '',
+    );
+  }
+
+  final String label;
+  final String value;
+}
+
+class _PortfolioProject {
+  const _PortfolioProject({
+    required this.id,
+    required this.title,
+    required this.coverUrl,
+    required this.category,
+    required this.tall,
+    required this.files,
+    this.description = '',
+    this.completedOn = '',
+    this.externalUrl = '',
+    this.mediaCount = 0,
+    this.photoCount = 0,
+    this.videoCount = 0,
+  });
+
+  factory _PortfolioProject.fromJson(Map<String, dynamic> json) {
+    final files = (json['files'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => VendorProjectFile.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+    var cover = json['cover_url']?.toString() ?? '';
+    if (cover.isEmpty) {
+      for (final file in files) {
+        if (file.kind == 'image' && file.url.isNotEmpty) {
+          cover = file.url;
+          break;
+        }
+      }
+    }
+    if (cover.isEmpty && files.isNotEmpty) {
+      cover = files.first.url;
+    }
+    return _PortfolioProject(
+      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+      title: json['title']?.toString() ?? 'Featured work',
+      coverUrl: cover,
+      category: json['category']?.toString() ?? '',
+      tall: json['tall'] == true || ((json['id'] is int ? json['id'] as int : 0) % 3 == 0),
+      description: json['description']?.toString() ?? '',
+      completedOn: json['completed_on']?.toString() ?? '',
+      externalUrl: json['external_url']?.toString() ?? '',
+      files: files,
+      mediaCount: json['media_count'] is num
+          ? (json['media_count'] as num).toInt()
+          : files.length,
+      photoCount: json['photo_count'] is num
+          ? (json['photo_count'] as num).toInt()
+          : files.where((item) => item.kind == 'image').length,
+      videoCount: json['video_count'] is num
+          ? (json['video_count'] as num).toInt()
+          : files.where((item) => item.kind == 'video').length,
+    );
+  }
+
+  factory _PortfolioProject.fromLegacyShot(Map<String, dynamic> json) {
+    final url = json['url']?.toString() ?? '';
+    return _PortfolioProject(
+      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+      title: json['title']?.toString() ?? 'Featured work',
+      coverUrl: url,
+      category: json['category']?.toString() ?? '',
+      tall: json['tall'] == true,
+      files: url.isEmpty
+          ? const []
+          : [VendorProjectFile(id: 0, url: url, kind: 'image')],
+      mediaCount: url.isEmpty ? 0 : 1,
+      photoCount: url.isEmpty ? 0 : 1,
+    );
+  }
+
+  final int id;
   final String title;
+  final String coverUrl;
   final String category;
   final bool tall;
+  final String description;
+  final String completedOn;
+  final String externalUrl;
+  final List<VendorProjectFile> files;
+  final int mediaCount;
+  final int photoCount;
+  final int videoCount;
 }
 
 class _Package {
@@ -1033,17 +1448,21 @@ class _Package {
   final double price;
 }
 
-List<_Shot> _shotsFor(VendorCard vendor) {
+List<_PortfolioProject> _projectsFor(VendorCard vendor) {
   final urls = VendorPhotos.shots(vendor.vendorType, vendor.id);
   final filters = _filtersFor(vendor.vendorType).where((item) => item != 'All').toList();
   final titles = _titlesFor(vendor.vendorType);
   return [
     for (var i = 0; i < urls.length; i++)
-      _Shot(
-        url: urls[i],
+      _PortfolioProject(
+        id: i + 1,
         title: titles[i % titles.length],
+        coverUrl: urls[i],
         category: filters[i % filters.length],
         tall: i % 3 == 0,
+        files: [VendorProjectFile(id: i + 1, url: urls[i], kind: 'image')],
+        mediaCount: 1,
+        photoCount: 1,
       ),
   ];
 }

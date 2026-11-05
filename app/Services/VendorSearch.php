@@ -16,9 +16,30 @@ class VendorSearch
     public function search(SearchQuery $query): array
     {
         $settings = SearchEngine::settings();
-        $vendors = Vendor::query()
-            ->where('is_active', true)
-            ->with(['vendorType', 'city', 'categories', 'filterTags', 'availabilities', 'badges'])
+        $builder = Vendor::query()
+            ->marketplaceVisible()
+            ->with(['vendorType', 'city', 'categories', 'filterTags', 'availabilities', 'badges']);
+
+        // Push simple filters to SQL so category listings don't load the whole marketplace.
+        if ($query->vendorTypeSlugs !== []) {
+            $builder->whereHas(
+                'vendorType',
+                fn ($typeQuery) => $typeQuery->whereIn('slug', $query->vendorTypeSlugs),
+            );
+        }
+
+        if ($query->cityId) {
+            $builder->where('city_id', $query->cityId);
+        }
+
+        if ($query->topRated) {
+            $builder->where('rating_avg', '>=', (float) ($settings['top_rated_threshold'] ?? 4.8));
+        }
+
+        $vendors = $builder
+            ->orderByDesc('is_featured')
+            ->orderByDesc('rating_avg')
+            ->orderByDesc('rating_count')
             ->get();
 
         $scored = $vendors

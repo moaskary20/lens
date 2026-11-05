@@ -60,6 +60,13 @@ class PlatformSettings extends Page
             'support_phone' => '',
             'default_locale' => 'en',
             'maintenance_mode' => false,
+            'force_update' => false,
+            'android_min_version' => '',
+            'ios_min_version' => '',
+            'android_store_url' => 'https://play.google.com/store/apps/details?id=app.lens.lens',
+            'ios_store_url' => '',
+            'update_title' => 'Update required',
+            'update_message' => 'A new version of Lens is available on the store. Please update before continuing.',
         ], Setting::groupValues('platform'), StorageQuota::settings(), BrevoMail::formState()));
     }
 
@@ -99,6 +106,38 @@ class PlatformSettings extends Page
                     Toggle::make('maintenance_mode')->label('Maintenance mode'),
                     Textarea::make('about')->label('About the platform')->columnSpanFull(),
                 ])->columns(2),
+                Section::make('Mobile force update')
+                    ->description('Checked on every app open (before home). Turn Force update on, set the minimum version above the old build, and users cannot use the app until they install from the store.')
+                    ->schema([
+                        Toggle::make('force_update')
+                            ->label('Force update')
+                            ->helperText('When on, outdated installs are blocked until they update from the store.'),
+                        TextInput::make('android_min_version')
+                            ->label('Android minimum version')
+                            ->placeholder('5.5.6')
+                            ->helperText('Must be higher than old installs (current store builds use versionName like 5.5.5). Leave blank to skip Android.'),
+                        TextInput::make('ios_min_version')
+                            ->label('iOS minimum version')
+                            ->placeholder('5.5.6')
+                            ->helperText('Compare against CFBundleShortVersionString. Leave blank to skip iOS.'),
+                        TextInput::make('android_store_url')
+                            ->label('Google Play URL')
+                            ->url()
+                            ->required()
+                            ->default('https://play.google.com/store/apps/details?id=app.lens.lens')
+                            ->helperText('Play Store listing for Lens.'),
+                        TextInput::make('ios_store_url')
+                            ->label('App Store URL')
+                            ->url()
+                            ->placeholder('https://apps.apple.com/app/idXXXXXXXX'),
+                        TextInput::make('update_title')
+                            ->label('Update title')
+                            ->maxLength(80),
+                        Textarea::make('update_message')
+                            ->label('Update message')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])->columns(2),
                 Section::make('File storage')
                     ->description('Limit vendor portfolio uploads by category, cap client project files, and auto-delete closed client projects.')
                     ->schema([

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\City;
 use App\Models\User;
 use App\Models\Vendor;
 use Database\Seeders\LensSeeder;
@@ -20,6 +21,50 @@ class AppAuthTest extends TestCase
         $this->seed(LensSeeder::class);
     }
 
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    protected function vendorRegisterPayload(array $overrides = []): array
+    {
+        $cairo = City::query()->where('name_en', 'Cairo')->firstOrFail();
+
+        return array_merge([
+            'name' => 'Cairo Motion',
+            'email' => 'cairo.motion@lens.app',
+            'password' => 'Password1!',
+            'role' => 'vendor',
+            'phone' => '01112345678',
+            'city_id' => $cairo->id,
+            'vendor_type' => 'videographer',
+            'display_name' => 'Cairo Motion',
+            'date_of_birth' => '1994-06-12',
+            'profession' => 'Videographer',
+            'years_experience' => 6,
+            'bio' => 'Commercial and wedding films.',
+            'contact_email' => 'cairo.motion@lens.app',
+            'whatsapp' => '01112345678',
+            'instagram' => 'https://instagram.com/cairomotion',
+            'instagram_followers' => 12000,
+            'tiktok_url' => 'https://tiktok.com/@cairomotion',
+            'tiktok_followers' => 8000,
+            'facebook_url' => 'https://facebook.com/cairomotion',
+            'facebook_followers' => 5000,
+            'address' => 'Zamalek, Cairo',
+            'latitude' => 30.0626,
+            'longitude' => 31.2197,
+            'payout_method' => 'wallet',
+            'wallet_network_type' => 'telecom',
+            'wallet_telecom' => 'vodafone',
+            'wallet_phone' => '01112345678',
+            'half_day_price' => 1800,
+            'full_day_price' => 3200,
+            'profile_photo' => UploadedFile::fake()->image('photo.jpg'),
+            'national_id_image' => UploadedFile::fake()->image('nid.jpg'),
+            'cover_image' => UploadedFile::fake()->image('cover.jpg'),
+        ], $overrides);
+    }
+
     public function test_client_and_vendor_can_sign_in_and_see_their_bookings(): void
     {
         $this->postJson('/api/app/auth/login', [
@@ -35,6 +80,8 @@ class AppAuthTest extends TestCase
             ->assertJsonPath('role', 'client');
         $this->assertNotEmpty($clientBookings->json('bookings'));
         $this->assertEquals('Fahad Studio Light', $clientBookings->json('bookings.0.counterpart'));
+        $this->assertSame('01022223344', $clientBookings->json('bookings.0.phone'));
+        $this->assertSame('01022223344', $clientBookings->json('bookings.0.whatsapp'));
         $this->assertContains($clientBookings->json('bookings.0.group'), ['upcoming', 'completed', 'canceled']);
         $this->assertIsArray($clientBookings->json('summary'));
         $this->assertEquals(
@@ -43,6 +90,14 @@ class AppAuthTest extends TestCase
             + (int) $clientBookings->json('summary.completed')
             + (int) $clientBookings->json('summary.canceled'),
         );
+
+        $vendor = Vendor::query()->where('display_name', 'Fahad Studio Light')->firstOrFail();
+        $vendor->update(['contact_phone' => null, 'whatsapp' => null]);
+        $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
+            ->getJson('/api/app/bookings')
+            ->assertOk()
+            ->assertJsonPath('bookings.0.phone', '01022223344')
+            ->assertJsonPath('bookings.0.whatsapp', '01022223344');
 
         $this->postJson('/api/app/auth/login', [
             'email' => 'vendor@lens.app',
@@ -59,24 +114,23 @@ class AppAuthTest extends TestCase
 
     public function test_guest_can_register_as_client_or_vendor(): void
     {
+        Storage::fake('public');
+        $cairo = City::query()->where('name_en', 'Cairo')->firstOrFail();
+
         $this->postJson('/api/app/auth/register', [
             'name' => 'Nour Adel',
             'email' => 'nour@lens.app',
-            'password' => 'password',
+            'password' => 'Password1!',
             'role' => 'client',
             'phone' => '01012345678',
+            'city_id' => $cairo->id,
         ])->assertCreated()->assertJsonPath('role', 'client');
 
         $this->assertDatabaseHas('users', ['email' => 'nour@lens.app', 'role' => 'client']);
 
-        $this->postJson('/api/app/auth/register', [
-            'name' => 'Cairo Motion',
-            'email' => 'cairo.motion@lens.app',
-            'password' => 'password',
-            'role' => 'vendor',
-            'phone' => '01112345678',
-            'vendor_type' => 'videographer',
-        ])->assertCreated()->assertJsonPath('role', 'vendor');
+        $this->post('/api/app/auth/register', $this->vendorRegisterPayload())
+            ->assertCreated()
+            ->assertJsonPath('role', 'vendor');
 
         $user = User::query()->where('email', 'cairo.motion@lens.app')->firstOrFail();
         $this->assertTrue(Vendor::query()->where('user_id', $user->id)->exists());
@@ -84,12 +138,13 @@ class AppAuthTest extends TestCase
 
     public function test_register_stores_admin_profile_and_payout_fields(): void
     {
-        $cairo = \App\Models\City::query()->where('name_en', 'Cairo')->firstOrFail();
+        Storage::fake('public');
+        $cairo = City::query()->where('name_en', 'Cairo')->firstOrFail();
 
         $this->postJson('/api/app/auth/register', [
             'name' => 'Mona Client',
             'email' => 'mona.client@lens.app',
-            'password' => 'password',
+            'password' => 'Password1!',
             'role' => 'client',
             'phone' => '01599998877',
             'locale' => 'ar',
@@ -103,16 +158,17 @@ class AppAuthTest extends TestCase
             'city_id' => $cairo->id,
         ]);
 
-        $this->postJson('/api/app/auth/register', [
+        $this->post('/api/app/auth/register', $this->vendorRegisterPayload([
             'name' => 'Yasmin Lens',
             'email' => 'yasmin.vendor@lens.app',
-            'password' => 'password',
-            'role' => 'vendor',
             'phone' => '01588887766',
-            'city_id' => $cairo->id,
+            'whatsapp' => '01588887766',
+            'wallet_phone' => '01588887766',
             'vendor_type' => 'photographer',
             'display_name' => 'Yasmin Studio',
             'profession' => 'Wedding photographer',
+            'years_experience' => 5,
+            'contact_email' => 'yasmin.vendor@lens.app',
             'instagram' => 'https://instagram.com/yasminstudio',
             'instagram_followers' => 128000,
             'tiktok_url' => 'https://tiktok.com/@yasminstudio',
@@ -125,8 +181,6 @@ class AppAuthTest extends TestCase
                 'cameras' => ['Sony A7 IV'],
                 'lenses' => ['35mm f/1.4'],
             ],
-            'half_day_price' => 1800,
-            'full_day_price' => 3200,
             'projects' => [
                 [
                     'type' => 'link',
@@ -137,13 +191,10 @@ class AppAuthTest extends TestCase
                     'is_featured' => true,
                 ],
             ],
-            'payout_method' => 'wallet',
-            'wallet_network_type' => 'telecom',
-            'wallet_telecom' => 'vodafone',
-            'wallet_phone' => '01588887766',
-        ])->assertCreated()->assertJsonPath('role', 'vendor');
+        ]))->assertCreated()->assertJsonPath('role', 'vendor');
 
         $vendor = Vendor::query()->where('display_name', 'Yasmin Studio')->firstOrFail();
+        $this->assertSame(5, $vendor->years_experience);
         $this->assertSame('pending', $vendor->verification_status);
         $this->assertSame('wallet', $vendor->payout_method);
         $this->assertSame('vodafone', $vendor->wallet_telecom);
@@ -165,14 +216,15 @@ class AppAuthTest extends TestCase
     {
         Storage::fake('public');
 
-        $this->post('/api/app/auth/register', [
+        $this->post('/api/app/auth/register', $this->vendorRegisterPayload([
             'name' => 'Gallery Vendor',
             'email' => 'gallery.vendor@lens.app',
-            'password' => 'password',
-            'role' => 'vendor',
             'phone' => '01298765432',
+            'whatsapp' => '01298765432',
+            'wallet_phone' => '01298765432',
             'vendor_type' => 'photographer',
             'display_name' => 'Gallery Light',
+            'contact_email' => 'gallery.vendor@lens.app',
             'half_day_price' => 1500,
             'full_day_price' => 2800,
             'projects' => [
@@ -185,7 +237,7 @@ class AppAuthTest extends TestCase
                     ],
                 ],
             ],
-        ])->assertCreated();
+        ]))->assertCreated();
 
         $vendor = Vendor::query()->where('display_name', 'Gallery Light')->firstOrFail();
         $this->assertSame(2, $vendor->portfolios()->count());
@@ -198,20 +250,24 @@ class AppAuthTest extends TestCase
 
     public function test_register_rejects_non_egyptian_mobile_numbers(): void
     {
+        $cairo = City::query()->where('name_en', 'Cairo')->firstOrFail();
+
         $this->postJson('/api/app/auth/register', [
             'name' => 'Bad Phone',
             'email' => 'bad.phone@lens.app',
-            'password' => 'password',
+            'password' => 'Password1!',
             'role' => 'client',
             'phone' => '01912345678',
+            'city_id' => $cairo->id,
         ])->assertStatus(422)->assertJsonValidationErrors('phone');
 
         $this->postJson('/api/app/auth/register', [
             'name' => 'Short Phone',
             'email' => 'short.phone@lens.app',
-            'password' => 'password',
+            'password' => 'Password1!',
             'role' => 'vendor',
             'phone' => '0101234567',
+            'city_id' => $cairo->id,
             'vendor_type' => 'photographer',
         ])->assertStatus(422)->assertJsonValidationErrors('phone');
     }

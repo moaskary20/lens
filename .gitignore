@@ -23,8 +23,13 @@ password.text
 /public/js/filament
 /public/storage
 /storage/*.key
+/storage/app/firebase/
 /storage/pail
 /vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
+*.hprof
+.tmp-splash-frames/
+*.bak-*
+**/*.bak-*

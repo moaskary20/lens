@@ -36,6 +36,102 @@ class VendorProfile
         'devices',
     ];
 
+    /**
+     * Free-text gear / equipment fields by vendor type (shown as title + text on the vendor profile).
+     *
+     * @var array<string, array<string, string>> vendor type slug => [extras key => label]
+     */
+    public const FREE_TEXT_GEAR_BY_TYPE = [
+        'photographer' => [
+            'camera_type' => 'Camera type',
+            'lenses_available' => 'Lenses available',
+            'lighting_gear' => 'Lighting gear',
+            'photo_extras' => 'Photo extras',
+        ],
+        'videographer' => [
+            'video_quality' => 'Video quality & formats',
+            'video_gear' => 'Video gear',
+            'delivery_formats_notes' => 'Delivery formats',
+        ],
+        'reels' => [
+            'video_quality' => 'Video quality & formats',
+            'video_gear' => 'Video gear',
+            'reels_setup' => 'Mobile reel setup',
+        ],
+        'studio' => [
+            'studio_features' => 'Features & equipment',
+            'studio_sets' => 'Studio sets & decoration',
+            'studio_amenities' => 'Studio amenities',
+            'studio_equipment' => 'Equipment included',
+        ],
+        'model' => [
+            'model_sizes_notes' => 'Sizes (tops, waist, shoes)',
+            'model_experience_notes' => 'Work experience',
+        ],
+        'ugc' => [
+            'ugc_content_notes' => 'Content type & capabilities',
+            'ugc_gear_notes' => 'Gear & production notes',
+        ],
+        'food_stylist' => [
+            'food_expertise_notes' => 'Expertise & styling',
+            'food_content_notes' => 'Content type',
+            'addon_notes' => 'Add-on notes',
+        ],
+    ];
+
+    /**
+     * Flat map of every free-text gear key => label (all vendor types).
+     *
+     * @var array<string, string>
+     */
+    public const FREE_TEXT_GEAR_FIELDS = [
+        'camera_type' => 'Camera type',
+        'lenses_available' => 'Lenses available',
+        'lighting_gear' => 'Lighting gear',
+        'photo_extras' => 'Photo extras',
+        'video_quality' => 'Video quality & formats',
+        'video_gear' => 'Video gear',
+        'delivery_formats_notes' => 'Delivery formats',
+        'reels_setup' => 'Mobile reel setup',
+        'studio_features' => 'Features & equipment',
+        'studio_sets' => 'Studio sets & decoration',
+        'studio_amenities' => 'Studio amenities',
+        'studio_equipment' => 'Equipment included',
+        'model_sizes_notes' => 'Sizes (tops, waist, shoes)',
+        'model_experience_notes' => 'Work experience',
+        'ugc_content_notes' => 'Content type & capabilities',
+        'ugc_gear_notes' => 'Gear & production notes',
+        'food_expertise_notes' => 'Expertise & styling',
+        'food_content_notes' => 'Content type',
+        'addon_notes' => 'Add-on notes',
+    ];
+
+    /**
+     * Filter-group slugs replaced by free-text fields on create/edit (still usable in client search).
+     *
+     * @var list<string>
+     */
+    public const FREE_TEXT_FILTER_SLUGS = [
+        'camera',
+        'lenses',
+        'lighting',
+        'photo_extras',
+        'video_quality',
+        'video_gear',
+        'reels',
+        'studio_features',
+        'studio_sets',
+        'studio_amenities',
+        'studio_equipment',
+        'model_tops',
+        'model_pants',
+        'model_shoes',
+        'ugc_content',
+        'food_expertise',
+        'food_content',
+        'food_stylist',
+    ];
+
     public static function slug(Get $get, ?Vendor $record = null): ?string
     {
         $id = $get('vendor_type_id')
@@ -169,7 +265,70 @@ class VendorProfile
             'model_experience',
             'ugc',
             'food_stylist',
+            ...self::FREE_TEXT_FILTER_SLUGS,
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function freeTextGearFieldsFor(?string $slug): array
+    {
+        if ($slug === null) {
+            return [];
+        }
+
+        return self::FREE_TEXT_GEAR_BY_TYPE[$slug] ?? [];
+    }
+
+    /**
+     * @return list<\Filament\Schemas\Components\Component>
+     */
+    public static function freeTextGearFields(?string $slug = null): array
+    {
+        $map = $slug ? self::freeTextGearFieldsFor($slug) : self::FREE_TEXT_GEAR_FIELDS;
+        $fields = [];
+        foreach ($map as $key => $label) {
+            $fields[] = Textarea::make('extras.'.$key)
+                ->label($label)
+                ->rows(3)
+                ->placeholder('Write freely — brands, models, kits, features, or notes')
+                ->columnSpanFull();
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @return list<array{label: string, value: string}>
+     */
+    public static function presentFreeTextGear(?Vendor $vendor): array
+    {
+        if (! $vendor) {
+            return [];
+        }
+
+        $extras = is_array($vendor->extras) ? $vendor->extras : [];
+        $slug = $vendor->vendorType?->slug;
+        $map = self::freeTextGearFieldsFor($slug);
+        if ($map === []) {
+            $map = self::FREE_TEXT_GEAR_FIELDS;
+        }
+
+        $items = [];
+        foreach ($map as $key => $label) {
+            $raw = $extras[$key] ?? null;
+            if (is_array($raw)) {
+                $raw = implode(', ', array_filter(array_map('strval', $raw)));
+            }
+            $value = trim((string) $raw);
+            if ($value === '') {
+                continue;
+            }
+            $items[] = ['label' => $label, 'value' => $value];
+        }
+
+        return $items;
     }
 
     /**
@@ -278,14 +437,15 @@ class VendorProfile
                 ->visible(fn (Get $get, ?Vendor $record = null): bool => self::slug($get, $record) === null),
 
             Section::make('Filter profile')
-                ->description('The same options clients use on the mobile filter screens. These tags decide how the vendor appears in search.')
+                ->description('Marketplace discovery tags clients use on mobile filter screens (gender, city, studio type, etc.). Equipment and gear are written freely in the type extras below.')
                 ->schema(self::filterProfileFields())
-                ->visible(fn (Get $get, ?Vendor $record = null): bool => self::slug($get, $record) !== null),
+                ->visible(fn (Get $get, ?Vendor $record = null): bool => self::slug($get, $record) !== null && self::filterProfileGroups(self::slug($get, $record))->isNotEmpty()),
 
             Section::make('Photographer extras')
-                ->description('Free-text notes that sit next to the filter tags.')
+                ->description('Write camera, lenses, lighting, and extras freely. Clients see the title and your text on the vendor profile.')
                 ->visible(self::visibleFor('photographer'))
                 ->schema([
+                    ...self::freeTextGearFields('photographer'),
                     CheckboxList::make('specialties')->label('Primary specialties')
                         ->options(self::specialtyOptions())
                         ->columns(2)
@@ -297,12 +457,10 @@ class VendorProfile
                 ]),
 
             Section::make('Videographer extras')
+                ->description('Write video quality, gear, and delivery formats freely — same style as photographer Camera type.')
                 ->visible(self::visibleFor('videographer'))
                 ->schema([
-                    CheckboxList::make('delivery_formats')->label('Supported delivery formats')
-                        ->options(self::deliveryFormatOptions())
-                        ->columns(2)
-                        ->columnSpanFull(),
+                    ...self::freeTextGearFields('videographer'),
                     Placeholder::make('videographer_projects_hint')
                         ->hiddenLabel()
                         ->content('Add video reel highlights under Previous projects (upload clips or paste a reel URL).')
@@ -310,8 +468,10 @@ class VendorProfile
                 ]),
 
             Section::make('Mobile Reels extras')
+                ->description('Write reel quality, gear, and setup freely. Sample links stay below.')
                 ->visible(self::visibleFor('reels'))
                 ->schema([
+                    ...self::freeTextGearFields('reels'),
                     TextInput::make('extras.tiktok_url')->label('TikTok sample link')->url()->columnSpanFull(),
                     TextInput::make('extras.instagram_url')->label('Instagram / Reels sample link')->url()->columnSpanFull(),
                     TextInput::make('extras.standard_session_hours')->label('Standard session length (hours)')->numeric()->minValue(0.5)->step(0.5),
@@ -322,8 +482,10 @@ class VendorProfile
                 ]),
 
             Section::make('Studio extras')
+                ->description('Write features, sets, amenities, and included equipment freely.')
                 ->visible(self::visibleFor('studio'))
                 ->schema([
+                    ...self::freeTextGearFields('studio'),
                     Placeholder::make('studio_calendar_hint')
                         ->hiddenLabel()
                         ->content('Add the studio gallery under Previous projects. After saving, book hourly slots from the Hourly slot booking calendar tab.')
@@ -331,19 +493,23 @@ class VendorProfile
                 ]),
 
             Section::make('Model extras')
+                ->description('Write sizes and experience freely. Gender / category / age / height stay in Filter profile for Men · Women · Kids search.')
                 ->visible(self::visibleFor('model'))
                 ->schema([
+                    ...self::freeTextGearFields('model'),
                     TextInput::make('extras.hair_color')->label('Hair color'),
                     TextInput::make('extras.eye_color')->label('Eye color'),
                     Placeholder::make('model_projects_hint')
                         ->hiddenLabel()
                         ->content('Upload a polished photo portfolio under Previous projects. After saving, set open dates on the Availability calendar tab.')
                         ->columnSpanFull(),
-                ])->columns(2),
+                ]),
 
             Section::make('UGC extras')
+                ->description('Write content capabilities and production gear freely.')
                 ->visible(self::visibleFor('ugc'))
                 ->schema([
+                    ...self::freeTextGearFields('ugc'),
                     Placeholder::make('ugc_projects_hint')
                         ->hiddenLabel()
                         ->content('Add short-form UGC video samples under Previous projects (vertical video files or social links).')
@@ -351,9 +517,10 @@ class VendorProfile
                 ]),
 
             Section::make('Food Stylist extras')
+                ->description('Write expertise, content type, and add-ons freely.')
                 ->visible(self::visibleFor('food_stylist'))
                 ->schema([
-                    Textarea::make('extras.addon_notes')->label('Add-on notes')->rows(3)->columnSpanFull(),
+                    ...self::freeTextGearFields('food_stylist'),
                     Placeholder::make('food_projects_hint')
                         ->hiddenLabel()
                         ->content('Add a food styling & staging portfolio under Previous projects.')
@@ -404,59 +571,55 @@ class VendorProfile
 
     public static function projectsRepeater(): Repeater
     {
-        $normalizePath = function (array $data): array {
-            $data['path'] = filled($data['path'] ?? null) ? $data['path'] : '';
+        $quotaMb = fn ($record = null): int => \App\Support\StorageQuota::portfolioQuotaMb(
+            $record instanceof Vendor
+                ? $record->vendorType?->slug
+                : auth()->user()?->vendor?->vendorType?->slug
+        );
+        $maxKb = fn ($record = null): int => \App\Support\StorageQuota::portfolioMaxSizeKb(
+            $record instanceof Vendor
+                ? $record->vendorType?->slug
+                : auth()->user()?->vendor?->vendorType?->slug
+        );
 
-            return $data;
-        };
-
-        return Repeater::make('portfolios')
-            ->relationship()
+        return Repeater::make('project_groups')
             ->label('Completed projects')
             ->addActionLabel('Add previous project')
             ->defaultItems(0)
             ->collapsed()
             ->cloneable()
-            ->orderColumn('sort_order')
+            ->reorderable()
             ->schema([
-                Select::make('type')->label('Item type')->options([
-                    'image' => 'Photo',
-                    'video' => 'Video',
-                    'link' => 'Social / external link',
-                ])->default('image')->live()->required(),
                 TextInput::make('title')->label('Project title')->required(),
                 TextInput::make('completed_on')->label('Completed on')->placeholder('2025 or Jun 2025'),
-                FileUpload::make('path')->label('Photo / video file')
+                FileUpload::make('cover')
+                    ->label('Cover image')
+                    ->image()
                     ->directory('portfolios')
-                    ->visible(fn (Get $get): bool => in_array($get('type'), ['image', 'video'], true))
-                    ->acceptedFileTypes(fn (Get $get): array => $get('type') === 'video'
-                        ? ['video/mp4', 'video/quicktime', 'video/webm']
-                        : ['image/jpeg', 'image/png', 'image/webp'])
-                    ->maxSize(fn ($record = null): int => \App\Support\StorageQuota::portfolioMaxSizeKb(
-                        $record instanceof \App\Models\Vendor
-                            ? $record->vendorType?->slug
-                            : ($record instanceof \App\Models\Portfolio
-                                ? $record->vendor?->vendorType?->slug
-                                : auth()->user()?->vendor?->vendorType?->slug)
-                    ))
-                    ->helperText(fn ($record = null): string => 'This vendor category may store up to '.\App\Support\StorageQuota::portfolioQuotaMb(
-                        $record instanceof \App\Models\Vendor
-                            ? $record->vendorType?->slug
-                            : ($record instanceof \App\Models\Portfolio
-                                ? $record->vendor?->vendorType?->slug
-                                : auth()->user()?->vendor?->vendorType?->slug)
-                    ).' MB of portfolio files.'),
-                TextInput::make('external_url')->label('Sample URL')
-                    ->url()
-                    ->visible(fn (Get $get): bool => in_array($get('type'), ['link', 'video'], true))
-                    ->required(fn (Get $get): bool => $get('type') === 'link'),
+                    ->imageEditor()
+                    ->helperText('Shown as the folder thumbnail on the vendor profile portfolio grid.'),
+                FileUpload::make('images')
+                    ->label('Project photos')
+                    ->image()
+                    ->multiple()
+                    ->reorderable()
+                    ->directory('portfolios')
+                    ->maxSize($maxKb)
+                    ->helperText(fn ($record = null): string => 'Add multiple photos inside this project. Quota up to '.$quotaMb($record).' MB.'),
+                FileUpload::make('videos')
+                    ->label('Project videos')
+                    ->multiple()
+                    ->reorderable()
+                    ->directory('portfolios')
+                    ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/webm'])
+                    ->maxSize($maxKb),
+                TextInput::make('external_url')->label('Sample / social URL')->url(),
                 Textarea::make('description')->label('What was delivered')->rows(3)->columnSpanFull(),
                 Toggle::make('is_featured')->label('Feature this project'),
             ])
             ->columns(2)
             ->columnSpanFull()
-            ->mutateRelationshipDataBeforeCreateUsing($normalizePath)
-            ->mutateRelationshipDataBeforeSaveUsing($normalizePath);
+            ->helperText('Each project can have a cover plus many photos and videos. The cover is the first image clients see in the portfolio grid.');
     }
 
     /**
@@ -480,6 +643,8 @@ class VendorProfile
                 }),
             TextInput::make('profession')->label('Profession / job title')
                 ->helperText('Free text. Marketplace category is the vendor type (photographer, studio, …).'),
+            TextInput::make('years_experience')->label('Years of experience')->numeric()->integer()->minValue(0)->maxValue(80)
+                ->helperText('Shown on the public vendor profile in the app and website.'),
             Textarea::make('bio')->label('About')->rows(3)->columnSpanFull(),
         ];
     }

@@ -8,7 +8,7 @@ class CategoryFilters {
     this.gender = 'All',
     this.services = const {},
     this.cities = const {},
-    this.age = const RangeValues(18, 50),
+    this.age = const RangeValues(9, 50),
     this.height = const RangeValues(160, 200),
     this.tops = const {},
     this.pants = const {},
@@ -65,7 +65,7 @@ class CategoryFilters {
     'Other',
   ];
 
-  static const ageBands = ['Under 18', '18 - 25', '26 - 35', '36 - 50', '50+'];
+  static const ageBands = ['9 - 17', '18 - 25', '26 - 35', '36 - 50', '50+'];
 
   static const heightBands = [
     'Under 160',
@@ -78,7 +78,11 @@ class CategoryFilters {
 
   static const topSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
   static const pantSizes = ['28', '30', '32', '34', '36', '38'];
-  static const shoeSizes = ['39', '40', '41', '42', '43', '44', '45+'];
+  static const shoeSizes = [
+    '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
+    '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32',
+    '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45+',
+  ];
 
   static const studioTypes = [
     'All Types',
@@ -341,7 +345,7 @@ class CategoryFilters {
     gender: 'Men',
     services: {'Fashion'},
     cities: {'Cairo'},
-    age: RangeValues(18, 50),
+    age: RangeValues(9, 50),
     height: RangeValues(160, 200),
     tops: {'M'},
     pants: {'32'},
@@ -580,7 +584,7 @@ class _FilterPageState extends State<FilterPage> {
     if (_isModel) {
       return const CategoryFilters(
         gender: 'All',
-        age: RangeValues(18, 50),
+        age: RangeValues(9, 50),
         height: RangeValues(160, 200),
         price: RangeValues(500, 10000),
         vendorSlug: 'model',
@@ -772,7 +776,7 @@ class _FilterPageState extends State<FilterPage> {
                       child: Column(
                         children: [
                           _rangeSlider(
-                            min: 0,
+                            min: 9,
                             max: _filters.gender == 'Kids' ? 17 : 60,
                             values: _filters.age,
                             unitSuffix: ' yrs',
@@ -782,7 +786,7 @@ class _FilterPageState extends State<FilterPage> {
                             _labels(
                               'model_age',
                               _filters.gender == 'Kids'
-                                  ? const ['Under 18']
+                                  ? const ['9 - 17']
                                   : CategoryFilters.ageBands,
                             ),
                             _selectedAgeBands,
@@ -1175,7 +1179,7 @@ class _FilterPageState extends State<FilterPage> {
   }
 
   Set<String> get _selectedAgeBands => switch ((_filters.age.start.round(), _filters.age.end.round())) {
-        (0, 17) => {'Under 18'},
+        (9, 17) => {'9 - 17'},
         (18, 25) => {'18 - 25'},
         (26, 35) => {'26 - 35'},
         (36, 50) => {'36 - 50'},
@@ -1195,7 +1199,7 @@ class _FilterPageState extends State<FilterPage> {
 
   void _selectAgeBand(String value) {
     final range = switch (value) {
-      'Under 18' => const RangeValues(0, 17),
+      '9 - 17' || 'Under 18' => const RangeValues(9, 17),
       '18 - 25' => const RangeValues(18, 25),
       '26 - 35' => const RangeValues(26, 35),
       '36 - 50' => const RangeValues(36, 50),
@@ -1587,13 +1591,13 @@ class _FilterPageState extends State<FilterPage> {
     var age = _filters.age;
     var height = _filters.height;
     if (option == 'Kids') {
-      age = const RangeValues(0, 17);
+      age = const RangeValues(9, 17);
       if (height.start >= 140) {
         height = const RangeValues(80, 160);
       }
     } else if (_filters.gender == 'Kids' || option == 'All') {
       if (age.end.round() <= 17) {
-        age = const RangeValues(18, 50);
+        age = const RangeValues(9, 50);
       }
       if (height.start.round() < 140) {
         height = const RangeValues(140, 190);

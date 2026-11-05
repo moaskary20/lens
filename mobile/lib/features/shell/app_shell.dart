@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:lens/app.dart';
 import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/booked_vendors_store.dart';
+import 'package:lens/core/bootstrap_cache.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/favorites_store.dart';
+import 'package:lens/core/force_update.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
 import 'package:lens/core/push_alerts.dart';
@@ -23,6 +26,7 @@ import 'package:lens/features/profile/app_settings_page.dart';
 import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/profile_page.dart';
 import 'package:lens/features/profile/report_issue_page.dart';
+import 'package:lens/features/profile/wallet_page.dart';
 import 'package:lens/features/shell/lens_nav_bar.dart';
 
 class AppShell extends StatefulWidget {
@@ -122,6 +126,7 @@ class AppShellState extends State<AppShell>
   bool _focusSearch = false;
   bool _guestBookings = false;
   late Map<String, dynamic> _bootstrap;
+  late HomeData _home;
   late final AnimationController _menu;
   late final Animation<double> _menuAnim;
 
@@ -129,8 +134,12 @@ class AppShellState extends State<AppShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _bootstrap = Map<String, dynamic>.from(widget.bootstrap);
+    _bootstrap = BootstrapCache.withFastTypes(Map<String, dynamic>.from(widget.bootstrap));
+    _home = HomeData.fromJson(_bootstrap);
     AppShell.currentBootstrap = _bootstrap;
+    AppShell.currentHome = _home;
+    // Upgrade to cached admin types ASAP when demo was shorter.
+    unawaited(_hydrateCachedTypes());
     _menu = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -140,13 +149,12 @@ class AppShellState extends State<AppShell>
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
-    final home = HomeData.fromJson(_bootstrap);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      FavoritesStore.instance.hydrate(home);
-      NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
+      FavoritesStore.instance.hydrate(_home);
+      NotificationsStore.instance.hydrate(unread: _home.unreadNotifications);
       BookedVendorsStore.instance.hydrate();
       PushAlerts.instance.start(onOpenInbox: _openInboxFromPush);
       _refreshBootstrap();
@@ -157,7 +165,7 @@ class AppShellState extends State<AppShell>
     if (widget.openClientCreateOnStart) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          openClientCreateFlow(context, HomeData.fromJson(_bootstrap));
+          openClientCreateFlow(context, _home);
         }
       });
     }
@@ -180,13 +188,19 @@ class AppShellState extends State<AppShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _refreshBootstrap();
-      NotificationsStore.instance.refresh();
+      unawaited(_refreshBootstrap());
+      unawaited(
+        ForceUpdate.enforce(
+          context,
+          bootstrap: _bootstrap,
+          fetchLive: true,
+        ),
+      );
     }
   }
 
   void _openInboxFromPush() {
-    final home = AppShell.currentHome ?? HomeData.fromJson(_bootstrap);
+    final home = AppShell.currentHome ?? _home;
     if (!home.on('notifications')) {
       return;
     }
@@ -195,6 +209,37 @@ class AppShellState extends State<AppShell>
       return;
     }
     openNotifications(nav.context, home);
+  }
+
+  void _applyBootstrap(Map<String, dynamic> next) {
+    _bootstrap = BootstrapCache.withFastTypes(next);
+    _home = HomeData.fromJson(_bootstrap);
+    AppShell.currentBootstrap = _bootstrap;
+    AppShell.currentHome = _home;
+  }
+
+  Future<void> _hydrateCachedTypes() async {
+    final cached = await BootstrapCache.loadVendorTypes();
+    if (!mounted || cached == null || cached.isEmpty) {
+      return;
+    }
+    final current = _bootstrap['vendor_types'];
+    final currentSlugs = BootstrapCache.typeSlugs(current);
+    final cachedSlugs = BootstrapCache.typeSlugs(cached);
+    // Upgrade when cache has the full admin set; never shrink the painted grid.
+    if (cachedSlugs.length <= currentSlugs.length &&
+        cachedSlugs.difference(currentSlugs).isEmpty) {
+      return;
+    }
+    setState(() {
+      _applyBootstrap(
+        Map<String, dynamic>.from(_bootstrap)
+          ..['vendor_types'] = BootstrapCache.bestTypes(
+            remote: current,
+            cached: cached,
+          ),
+      );
+    });
   }
 
   Future<void> _refreshBootstrap() async {
@@ -207,14 +252,39 @@ class AppShellState extends State<AppShell>
       if (!mounted || types is! List) {
         return;
       }
+      final previousTypes = _bootstrap['vendor_types'];
+      final previousSlugs = BootstrapCache.typeSlugs(previousTypes);
+      final previousMaps = (previousTypes is List ? previousTypes : const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      final merged = Map<String, dynamic>.from(remote);
+      final richest = BootstrapCache.bestTypes(
+        remote: types,
+        cached: previousMaps,
+      );
+      final nextSlugs = BootstrapCache.typeSlugs(richest);
+      // Keep the already-painted grid stable unless admin added new type slugs.
+      if (nextSlugs.difference(previousSlugs).isEmpty) {
+        merged['vendor_types'] = previousTypes is List && previousMaps.isNotEmpty
+            ? previousTypes
+            : richest;
+      } else {
+        merged['vendor_types'] = richest;
+        unawaited(BootstrapCache.saveVendorTypes(richest));
+      }
       setState(() {
-        _bootstrap = Map<String, dynamic>.from(remote);
-        AppShell.currentBootstrap = _bootstrap;
+        _applyBootstrap(merged);
       });
-      final home = HomeData.fromJson(_bootstrap);
-      AppShell.currentHome = home;
-      FavoritesStore.instance.hydrate(home);
-      NotificationsStore.instance.hydrate(unread: home.unreadNotifications);
+      FavoritesStore.instance.hydrate(_home);
+      NotificationsStore.instance.hydrate(unread: _home.unreadNotifications);
+      if (mounted) {
+        await ForceUpdate.enforce(
+          context,
+          bootstrap: _bootstrap,
+          fetchLive: false,
+        );
+      }
     } catch (_) {}
   }
 
@@ -240,7 +310,7 @@ class AppShellState extends State<AppShell>
       }
       _index = index;
       _guestBookings = index == 1 && guestBookings;
-      final searchIndex = HomeData.fromJson(_bootstrap).on('bookings') ? 2 : 1;
+      final searchIndex = _home.on('bookings') ? 2 : 1;
       if (index != searchIndex) {
         _focusSearch = false;
       }
@@ -296,7 +366,7 @@ class AppShellState extends State<AppShell>
       setState(() {
         _index = _tabHistory.last;
         _guestBookings = false;
-        final searchIndex = HomeData.fromJson(_bootstrap).on('bookings')
+        final searchIndex = _home.on('bookings')
             ? 2
             : 1;
         if (_index != searchIndex) {
@@ -314,7 +384,7 @@ class AppShellState extends State<AppShell>
 
   @override
   Widget build(BuildContext context) {
-    final home = HomeData.fromJson(_bootstrap);
+    final home = _home;
     AppShell.currentHome = home;
     final bookingsOn = home.on('bookings');
     final searchIndex = bookingsOn ? 2 : 1;
@@ -444,6 +514,8 @@ class AppShellState extends State<AppShell>
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => MessagesPage(home: home)),
         );
+      case 'wallet':
+        openWallet(context, home);
       case 'report':
         openReportIssue(context);
       case 'settings':
@@ -459,7 +531,7 @@ class AppShellState extends State<AppShell>
   }
 
   void openBookings({bool guestPreview = false}) {
-    final bookingsOn = HomeData.fromJson(_bootstrap).on('bookings');
+    final bookingsOn = _home.on('bookings');
     if (!bookingsOn) {
       return;
     }
@@ -467,7 +539,7 @@ class AppShellState extends State<AppShell>
   }
 
   void _openSearch({bool focus = false}) {
-    final bookingsOn = HomeData.fromJson(_bootstrap).on('bookings');
+    final bookingsOn = _home.on('bookings');
     _selectTab(bookingsOn ? 2 : 1);
     if (focus) {
       setState(() => _focusSearch = true);
@@ -570,6 +642,13 @@ class _LensMenu extends StatelessWidget {
                     label: 'Profile',
                     fontSize: labelSize,
                   ),
+                  if (home.on('wallets'))
+                    _item(
+                      id: 'wallet',
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: 'Wallet',
+                      fontSize: labelSize,
+                    ),
                   if (home.on('notifications'))
                     _item(
                       id: 'notifications',

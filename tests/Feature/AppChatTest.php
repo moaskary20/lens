@@ -31,6 +31,12 @@ class AppChatTest extends TestCase
         $conversationId = $opened->json('id');
         $this->assertNotEmpty($conversationId);
 
+        $vendorUser = User::query()->where('email', 'vendor@lens.app')->firstOrFail();
+        $beforeMessages = $vendorUser->notifications()
+            ->get()
+            ->filter(fn ($n) => ($n->data['title'] ?? null) === 'New message')
+            ->count();
+
         $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
             ->postJson('/api/app/conversations/'.$conversationId.'/messages', [
                 'type' => 'text',
@@ -40,6 +46,11 @@ class AppChatTest extends TestCase
             ->assertJsonPath('message.body', 'Hi, can we confirm the lighting setup?');
 
         $this->assertTrue(Message::query()->where('body', 'Hi, can we confirm the lighting setup?')->exists());
+        $this->assertGreaterThan(
+            $beforeMessages,
+            $vendorUser->fresh()->notifications()->get()->filter(fn ($n) => ($n->data['title'] ?? null) === 'New message')->count(),
+            'Sending a chat message must create a New message notification for the other party.',
+        );
 
         $conversation = Conversation::query()->findOrFail($conversationId);
 

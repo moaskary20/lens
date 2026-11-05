@@ -10,13 +10,14 @@ class Portfolio extends Model
 {
     protected $fillable = [
         'vendor_id', 'type', 'path', 'title', 'description', 'completed_on',
-        'external_url', 'is_featured', 'sort_order',
+        'external_url', 'is_featured', 'is_cover', 'sort_order',
     ];
 
     protected function casts(): array
     {
         return [
             'is_featured' => 'boolean',
+            'is_cover' => 'boolean',
         ];
     }
 

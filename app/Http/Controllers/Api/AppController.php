@@ -11,14 +11,19 @@ use App\Models\Vendor;
 use App\Models\VendorType;
 use App\Services\VendorSearch;
 use App\Support\AppClient;
+use App\Support\AppUpdate;
 use App\Support\Egypt;
+use App\Support\Feature;
 use App\Support\Roles;
 use App\Support\SearchEngine;
+use App\Support\VendorAppProfile;
+use App\Support\VendorProfile;
 use App\Support\VendorRegisterCatalog;
 use App\Support\SearchQuery;
 use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class AppController extends Controller
 {
@@ -34,13 +39,18 @@ class AppController extends Controller
         $logoUrl = is_string($logoPath) ? $this->publicUrl($logoPath) : null;
 
         $types = VendorType::query()->marketplace()->orderBy('sort_order')->orderBy('name_en')->get();
-        $categories = Category::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name_en')
-            ->get(['slug', 'name_en', 'name_ar', 'icon', 'sort_order']);
+        $catalog = $this->bootstrapCatalog($types);
+        // Always fresh so Admin → Vendor Types → Enabled updates Categories immediately.
+        $catalog['vendor_types'] = $types->map(fn (VendorType $type): array => [
+            'slug' => $type->slug,
+            'name' => $type->name_en,
+            'label' => $this->typeLabel($type->slug, $type->name_en),
+            'icon' => $type->icon,
+            'name_ar' => $type->name_ar,
+            'sort_order' => (int) $type->sort_order,
+        ])->values()->all();
 
-        return response()->json([
+        return response()->json(array_merge($catalog, [
             'name' => Setting::getValue('platform.app_name', 'Lens'),
             'logo' => $logoUrl,
             'tagline' => 'Find. Book. Create.',
@@ -51,6 +61,7 @@ class AppController extends Controller
             'ai_helper' => 'Describe your idea and let AI find the right creatives for you.',
             'voice_input_enabled' => (bool) ($search['voice_input_enabled'] ?? true),
             'moodboard_mode' => $search['moodboard_mode'] ?? 'after_payment',
+            'app_update' => AppUpdate::forBootstrap(),
             'unread_notifications' => ($features['notifications'] ?? false) ? (int) ($client?->unreadNotifications()->count() ?? 0) : 0,
             'favorite_ids' => ($features['favorites'] ?? false) && $client
                 ? $client->favorites()->pluck('vendor_id')->map(fn ($id) => (int) $id)->values()->all()
@@ -65,47 +76,63 @@ class AppController extends Controller
                 'cream' => '#F2EFE9',
             ],
             'features' => $features,
-            'vendor_types' => $types->map(fn (VendorType $type): array => [
-                'slug' => $type->slug,
-                'name' => $type->name_en,
-                'label' => $this->typeLabel($type->slug, $type->name_en),
-                'icon' => $type->icon,
-                'name_ar' => $type->name_ar,
-                'sort_order' => (int) $type->sort_order,
-            ])->values()->all(),
-            'categories' => $categories->map(fn (Category $category): array => [
-                'slug' => $category->slug,
-                'name' => $category->name_en,
-                'label' => $category->name_en,
-                'name_ar' => $category->name_ar,
-                'icon' => $category->icon,
-                'sort_order' => (int) $category->sort_order,
-            ])->values()->all(),
-            'popular' => $this->popular($types),
-            'filter_catalog' => SearchEngine::appFilters(),
-            'cities' => City::query()
-                ->where('is_active', true)
-                ->whereHas('vendors', fn ($query) => $query->where('is_active', true))
-                ->orderBy('name_en')
-                ->get(['id', 'name_en', 'name_ar'])
-                ->map(fn (City $city): array => [
-                    'id' => $city->id,
-                    'name' => $city->name_en,
-                    'name_en' => $city->name_en,
-                    'name_ar' => $city->name_ar,
-                ])->values()->all(),
-            'banks' => collect(Egypt::banks())
-                ->map(fn (string $label, string $id): array => ['id' => $id, 'label' => $label])
-                ->values()->all(),
-            'telecom_wallets' => collect(Egypt::telecomWallets())
-                ->map(fn (string $label, string $id): array => ['id' => $id, 'label' => $label])
-                ->values()->all(),
-            'vendor_register' => VendorRegisterCatalog::types(),
-            'screens' => AppScreen::query()
+        ]));
+    }
+
+    /**
+     * Shared marketplace catalog used by home Categories / popular rails.
+     * Uses the file cache store — database cache on slow disks made cold
+     * bootstrap take many seconds of cache INSERTs.
+     *
+     * @param  \Illuminate\Support\Collection<int, VendorType>  $types
+     * @return array<string, mixed>
+     */
+    protected function bootstrapCatalog($types): array
+    {
+        $version = (string) $types->pluck('id')->sort()->implode('-');
+
+        return Cache::store('file')->remember('lens.app.bootstrap.catalog.v7.'.$version, now()->addMinutes(5), function () use ($types): array {
+            $categories = Category::query()
                 ->where('is_active', true)
                 ->orderBy('sort_order')
-                ->get(['slug', 'title', 'body', 'cta_label', 'image', 'sort_order']),
-        ]);
+                ->orderBy('name_en')
+                ->get(['slug', 'name_en', 'name_ar', 'icon', 'sort_order']);
+
+            return [
+                'categories' => $categories->map(fn (Category $category): array => [
+                    'slug' => $category->slug,
+                    'name' => $category->name_en,
+                    'label' => $category->name_en,
+                    'name_ar' => $category->name_ar,
+                    'icon' => $category->icon,
+                    'sort_order' => (int) $category->sort_order,
+                ])->values()->all(),
+                'popular' => $this->popular($types),
+                'filter_catalog' => SearchEngine::appFilters(),
+                'cities' => City::query()
+                    ->where('is_active', true)
+                    ->whereHas('vendors', fn ($query) => $query->marketplaceVisible())
+                    ->orderBy('name_en')
+                    ->get(['id', 'name_en', 'name_ar'])
+                    ->map(fn (City $city): array => [
+                        'id' => $city->id,
+                        'name' => $city->name_en,
+                        'name_en' => $city->name_en,
+                        'name_ar' => $city->name_ar,
+                    ])->values()->all(),
+                'banks' => collect(Egypt::banks())
+                    ->map(fn (string $label, string $id): array => ['id' => $id, 'label' => $label])
+                    ->values()->all(),
+                'telecom_wallets' => collect(Egypt::telecomWallets())
+                    ->map(fn (string $label, string $id): array => ['id' => $id, 'label' => $label])
+                    ->values()->all(),
+                'vendor_register' => VendorRegisterCatalog::types(),
+                'screens' => AppScreen::query()
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->get(['slug', 'title', 'body', 'cta_label', 'image', 'sort_order']),
+            ];
+        });
     }
 
     public function vendors(Request $request): JsonResponse
@@ -142,12 +169,48 @@ class AppController extends Controller
         return response()->json($this->publicProfile($vendor));
     }
 
+    public function vendorAvailability(Request $request, Vendor $vendor): JsonResponse
+    {
+        abort_unless($vendor->isMarketplaceVisible(), 404);
+        abort_unless(Feature::enabled('bookings'), 404);
+
+        $data = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $query = $vendor->availabilities()
+            ->where('status', 'open')
+            ->orderBy('starts_at');
+
+        if (! empty($data['from'])) {
+            $query->where('ends_at', '>=', $data['from']);
+        }
+        if (! empty($data['to'])) {
+            $query->where('starts_at', '<=', $data['to']);
+        } else {
+            $query->where('starts_at', '>=', now()->subDay());
+        }
+
+        $slots = $query->limit(120)->get()->map(fn ($slot): array => [
+            'id' => $slot->id,
+            'starts_at' => $slot->starts_at?->toIso8601String(),
+            'ends_at' => $slot->ends_at?->toIso8601String(),
+            'status' => $slot->status,
+        ])->values()->all();
+
+        return response()->json([
+            'vendor_id' => $vendor->id,
+            'availabilities' => $slots,
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function publicProfile(Vendor $vendor, bool $forApp = true): array
     {
-        abort_unless($vendor->is_active, 404);
+        abort_unless($vendor->isMarketplaceVisible(), 404);
 
         $vendor->loadMissing(['portfolios', 'city', 'badges', 'categories', 'vendorType', 'reviews.client', 'user']);
         $slug = $vendor->vendorType?->slug;
@@ -155,32 +218,36 @@ class AppController extends Controller
         $filters = VendorPhotos::filters($slug);
         $categories = array_values(array_filter($filters, fn (string $item): bool => $item !== 'All'));
 
-        $portfolio = $vendor->portfolios
-            ->sortBy('sort_order')
-            ->values()
-            ->map(function ($item, int $index) use ($slug, $categories): array {
-                return [
-                    'url' => $this->publicUrl($item->path) ?: VendorPhotos::cover($slug, $index),
-                    'title' => $item->title ?: 'Featured work',
-                    'category' => $categories[$index % max(1, count($categories))] ?? 'All',
-                    'tall' => $index % 3 === 0,
-                ];
-            })
-            ->all();
-
-        if (count($portfolio) < 6) {
-            $portfolio = array_values(array_merge($portfolio, VendorPhotos::gallery($slug, (int) $vendor->id)));
-            $portfolio = array_slice($portfolio, 0, 8);
+        $projects = VendorAppProfile::presentProjects($vendor);
+        $portfolio = [];
+        foreach (array_values($projects) as $index => $project) {
+            $cover = $project['cover_url'] ?? null;
+            if (! $cover && ! empty($project['files'][0]['url'])) {
+                $cover = $project['files'][0]['url'];
+            }
+            // Seeded / incomplete projects may have titles without uploaded files yet.
+            $cover = $cover ?: VendorPhotos::cover($slug, $index);
+            $portfolio[] = [
+                'id' => $project['id'] ?? null,
+                'url' => $cover,
+                'title' => $project['title'] ?: 'Featured work',
+                'category' => $categories[$index % max(1, count($categories))] ?? 'All',
+                'tall' => $index % 3 === 0,
+                'media_count' => (int) ($project['media_count'] ?? count($project['files'] ?? [])),
+                'photo_count' => (int) ($project['photo_count'] ?? 0),
+                'video_count' => (int) ($project['video_count'] ?? 0),
+            ];
+            $projects[$index]['cover_url'] = $projects[$index]['cover_url'] ?: $cover;
         }
 
-        $equipment = array_values(array_filter($vendor->equipment ?? []));
+        // Portfolio / equipment come only from admin/vendor data — no invented fillers.
+        $equipmentDetails = VendorProfile::presentFreeTextGear($vendor);
+        $equipment = array_values(array_filter(array_map(
+            fn (array $item): string => trim(($item['label'] ?? '').': '.($item['value'] ?? ''), ': '),
+            $equipmentDetails,
+        )));
         if ($equipment === []) {
-            $equipment = match ($slug) {
-                'food_stylist' => ['Prop library', 'Surface boards', 'Steam kit', 'Natural light'],
-                'videographer', 'reels' => ['Sony FX3', 'Gimbal', 'LED panels', 'Wireless lavs'],
-                'studio' => ['Cyclorama', 'Kitchen set', 'Strobes', 'Tethering'],
-                default => ['Canon R5', '85mm f/1.2', 'Godox strobes', 'Color grading'],
-            };
+            $equipment = array_values(array_filter($vendor->equipment ?? []));
         }
 
         $packages = $vendor->bookablePackages();
@@ -203,8 +270,6 @@ class AppController extends Controller
                 ])
                 ->all();
         }
-        $projects = (int) ($vendor->completed_sessions ?? 0);
-        $booked = (int) ($vendor->booked_sessions ?? 0);
         $client = AppClient::user();
         $contactUnlocked = $forApp && $client && $vendor->bookings()
             ->where('client_id', $client->id)
@@ -229,18 +294,18 @@ class AppController extends Controller
                 default => "Find. Book.\nCreate.",
             },
             'response_minutes' => (int) ($vendor->response_minutes ?: 45),
-            'completed_sessions' => $projects,
-            'assisted_sessions' => max(0, $booked - $projects),
-            'years_experience' => $projects > 0 ? max(1, (int) floor($projects / 15)) : 1,
-            'client_satisfaction' => (float) $vendor->rating_avg > 0
-                ? min(99, max(0, (int) round(((float) $vendor->rating_avg) * 20)))
-                : 0,
+            'completed_sessions' => (int) ($vendor->completed_sessions ?? 0),
+            'assisted_sessions' => (int) ($vendor->assisted_sessions ?? 0),
+            'years_experience' => (int) ($vendor->years_experience ?? 0),
+            'client_satisfaction' => (int) ($vendor->client_satisfaction ?? 0),
             'available_weekend' => true,
             'equipment' => $equipment,
+            'equipment_details' => $equipmentDetails,
             'specialties' => $payload['tags'] ?: array_slice($categories, 0, 3),
             'project_types' => $projectTypes,
             'packages' => $packages,
             'portfolio' => $portfolio,
+            'projects' => $projects,
             'portfolio_filters' => $filters,
             'reviews' => $vendor->reviews
                 ->where('is_visible', true)
@@ -253,11 +318,23 @@ class AppController extends Controller
                     'client' => $review->client?->name ?: 'Client',
                 ])
                 ->all(),
-            'social' => collect([
-                ['label' => 'Instagram', 'url' => $vendor->instagram, 'followers' => $vendor->instagram_followers],
-                ['label' => 'TikTok', 'url' => $vendor->tiktok_url, 'followers' => $vendor->tiktok_followers],
-                ['label' => 'Facebook', 'url' => $vendor->facebook_url, 'followers' => $vendor->facebook_followers],
-            ])->filter(fn (array $row): bool => filled($row['url']))->values()->all(),
+            'social' => [
+                [
+                    'label' => 'Instagram',
+                    'url' => $vendor->instagram,
+                    'followers' => $vendor->instagram_followers !== null ? (int) $vendor->instagram_followers : null,
+                ],
+                [
+                    'label' => 'TikTok',
+                    'url' => $vendor->tiktok_url,
+                    'followers' => $vendor->tiktok_followers !== null ? (int) $vendor->tiktok_followers : null,
+                ],
+                [
+                    'label' => 'Facebook',
+                    'url' => $vendor->facebook_url,
+                    'followers' => $vendor->facebook_followers !== null ? (int) $vendor->facebook_followers : null,
+                ],
+            ],
             'contact_unlocked' => $contactUnlocked,
             'contact_phone' => $contactUnlocked ? $contactPhone : null,
             'whatsapp' => $contactUnlocked ? ($vendor->whatsapp ?: $contactPhone) : null,
@@ -270,22 +347,36 @@ class AppController extends Controller
      */
     protected function popular($types): array
     {
+        // No nested cache — bootstrapCatalog already memoizes this payload.
         $sections = [];
 
         foreach ($types as $type) {
-            $results = $this->search->search(SearchQuery::fromArray([
-                'vendor_type_slugs' => [$type->slug],
-                'limit' => 10,
-            ]));
+            $vendors = Vendor::query()
+                ->marketplaceVisible()
+                ->where('vendor_type_id', $type->id)
+                ->with(['vendorType', 'city', 'badges', 'portfolios', 'categories', 'filterTags'])
+                ->orderByDesc('is_featured')
+                ->orderByDesc('rating_avg')
+                ->orderByDesc('rating_count')
+                ->limit(8)
+                ->get();
 
-            if ($results['vendors'] === []) {
+            if ($vendors->isEmpty()) {
                 continue;
             }
 
             $sections[] = [
                 'slug' => $type->slug,
                 'title' => $this->popularTitle($type->slug, $type->name_en),
-                'vendors' => array_map(fn (array $row): array => $this->card($row), $results['vendors']),
+                'vendors' => $vendors
+                    ->map(fn (Vendor $vendor): array => $this->card([
+                        'vendor' => $vendor,
+                        'score' => 0,
+                        'matched_tags' => [],
+                        'reasons' => [],
+                    ]))
+                    ->values()
+                    ->all(),
             ];
         }
 
@@ -389,6 +480,10 @@ class AppController extends Controller
             'filter_tags' => $vendor->filterTags->pluck('slug')->values()->all(),
             'starting_from' => $starting,
             'verified' => $vendor->verification_status === 'verified' || $vendor->badges->contains('slug', 'verified'),
+            'completed_sessions' => (int) ($vendor->completed_sessions ?? 0),
+            'assisted_sessions' => (int) ($vendor->assisted_sessions ?? 0),
+            'years_experience' => (int) ($vendor->years_experience ?? 0),
+            'client_satisfaction' => (int) ($vendor->client_satisfaction ?? 0),
             'latitude' => $this->coord($vendor->latitude ?? $vendor->city?->latitude, (int) $vendor->id, 30.0444, 0.04),
             'longitude' => $this->coord($vendor->longitude ?? $vendor->city?->longitude, (int) $vendor->id + 5, 31.2357, 0.05),
         ]);
@@ -456,6 +551,9 @@ class AppController extends Controller
             'model' => 'Models',
             'ugc' => 'UGC Creators',
             'food_stylist' => 'Food Stylists',
+            'ai_motion' => 'AI Videos & Motion',
+            'bloggers' => 'Bloggers & Influencers',
+            'voice' => 'Voice Over',
             default => $fallback,
         };
     }

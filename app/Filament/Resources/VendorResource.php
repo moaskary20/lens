@@ -159,7 +159,8 @@ class VendorResource extends Resource
                         'rejected' => 'Rejected',
                     ])->native(false),
                     Textarea::make('verification_notes')->label('Verification notes'),
-                    Toggle::make('is_active')->label('Visible in marketplace')->default(true),
+                    Toggle::make('is_active')->label('Account enabled')
+                        ->helperText('Marketplace listing and bookings also require Verification = Verified.'),
                     Toggle::make('is_featured')->label('Featured on home'),
                     Toggle::make('accepts_out_of_governorate')->label('Works outside home governorate')
                         ->helperText('If on, a travel fee is added when the booking city is in another governorate.')
@@ -168,14 +169,20 @@ class VendorResource extends Resource
                         ->helperText('Used when there is no specific rate for the destination governorate. Set per-governorate rates on the vendor edit page.')
                         ->visible(fn (Get $get): bool => (bool) $get('accepts_out_of_governorate')),
                     TextInput::make('response_minutes')->label('Avg. reply time (minutes)')->numeric(),
-                    TextInput::make('booked_sessions')->label('Sessions booked')->numeric()->disabled(),
-                    TextInput::make('accepted_sessions')->label('Accepted')->numeric()->disabled(),
-                    TextInput::make('rejected_sessions')->label('Rejected')->numeric()->disabled(),
-                    TextInput::make('completed_sessions')->label('Completed')->numeric()->disabled(),
-                    TextInput::make('failed_sessions')->label('Failed sessions')->numeric()->disabled(),
-                    TextInput::make('penalty_total')->label('Applied penalties')->numeric()->prefix(Finance::currency())->disabled(),
-                    TextInput::make('rating_avg')->label('Average rating')->numeric()->disabled(),
-                    TextInput::make('rating_count')->label('Review count')->numeric()->disabled(),
+                    TextInput::make('booked_sessions')->label('Sessions booked')->numeric()->integer()->minValue(0)
+                        ->helperText('Updated by bookings; staff can correct if needed.'),
+                    TextInput::make('accepted_sessions')->label('Accepted')->numeric()->integer()->minValue(0),
+                    TextInput::make('rejected_sessions')->label('Rejected')->numeric()->integer()->minValue(0),
+                    TextInput::make('completed_sessions')->label('Projects completed')->numeric()->integer()->minValue(0)
+                        ->helperText('Public profile “Projects Completed”. Auto-increments on delivery; staff can set the real total.'),
+                    TextInput::make('assisted_sessions')->label('Assisted projects')->numeric()->integer()->minValue(0)
+                        ->helperText('Public profile “Assisted”. Set the real assisted / co-shoot count.'),
+                    TextInput::make('failed_sessions')->label('Failed sessions')->numeric()->integer()->minValue(0),
+                    TextInput::make('penalty_total')->label('Applied penalties')->numeric()->prefix(Finance::currency()),
+                    TextInput::make('rating_avg')->label('Average rating')->numeric()->minValue(0)->maxValue(5)->step(0.01),
+                    TextInput::make('rating_count')->label('Review count')->numeric()->integer()->minValue(0),
+                    TextInput::make('client_satisfaction')->label('Client satisfaction %')->numeric()->integer()->minValue(0)->maxValue(100)
+                        ->helperText('Public profile “Client Satisfaction”. Recalculated from reviews; staff can override.'),
                 ])->columns(2),
             ])->columnSpanFull(),
         ]);

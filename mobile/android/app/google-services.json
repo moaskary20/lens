@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "165894637736",
+    "project_id": "lens-fa2b5",
+    "storage_bucket": "lens-fa2b5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:165894637736:android:516a6768e4f9de33dd9a9d",
+        "android_client_info": {
+          "package_name": "app.lens.lens"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "165894637736-lil7v98s08ndt4munuj7885iv8nmsos1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3NsnGadAuydjjdRDgkug6PX_jOAvCA8Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "165894637736-lil7v98s08ndt4munuj7885iv8nmsos1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

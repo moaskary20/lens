@@ -88,6 +88,8 @@ void main() {
       'Giza',
     );
 
+    expect(find.text('Also available in'), findsNothing);
+
     await tester.tap(find.byKey(const Key('search-current-governorate')));
     await tester.pumpAndSettle();
     expect(find.text('Cairo'), findsWidgets);
@@ -523,7 +525,7 @@ void main() {
     expect(find.widgetWithText(TextField, 'Email'), findsOneWidget);
   });
 
-  testWidgets('home categories view all opens every department', (
+  testWidgets('home categories show on home without view all', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -533,16 +535,14 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('view-all-categories')));
-    await tester.pumpAndSettle();
-    expect(find.text('All Categories'), findsOneWidget);
-    expect(find.byKey(const Key('all-category-photographer')), findsOneWidget);
-    expect(find.byKey(const Key('all-category-videographer')), findsOneWidget);
-    expect(find.byKey(const Key('all-category-food_stylist')), findsOneWidget);
+    expect(find.byKey(const Key('view-all-categories')), findsNothing);
+    expect(find.byKey(const Key('home-category-photographer')), findsOneWidget);
+    expect(find.byKey(const Key('home-category-videographer')), findsOneWidget);
+    expect(find.byKey(const Key('home-category-food_stylist')), findsOneWidget);
     expect(find.text('Photographers'), findsWidgets);
     expect(find.text('Videographers'), findsWidgets);
     expect(find.text('Food Stylists'), findsWidgets);
-    await tester.tap(find.byKey(const Key('all-category-videographer')));
+    await tester.tap(find.byKey(const Key('home-category-videographer')));
     await tester.pumpAndSettle();
     expect(find.text('Sort'), findsOneWidget);
     expect(find.text('Videographers'), findsWidgets);
@@ -648,7 +648,11 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(FavoriteHeart).first);
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('guest-favorite-dialog')), findsOneWidget);
+    expect(find.text("You're not signed in"), findsOneWidget);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
     // Guests must not get fake Favorites / Notifications badge counts.
     expect(find.text('1'), findsNothing);
     await tester.tap(find.byTooltip('Notifications'));
@@ -1478,7 +1482,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Filter Models (Kids)'), findsOneWidget);
     expect(find.text('0 - 17 years'), findsOneWidget);
-    expect(find.text('Under 18'), findsOneWidget);
+    expect(find.text('9 - 17'), findsOneWidget);
     await tester.ensureVisible(find.text('Fashion'));
     await tester.tap(find.text('Fashion'));
     await tester.pumpAndSettle();

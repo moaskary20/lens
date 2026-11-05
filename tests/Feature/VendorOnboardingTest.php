@@ -34,7 +34,6 @@ class VendorOnboardingTest extends TestCase
             ->assertSee('Lighting gear')
             ->assertSee('Primary specialties')
             ->assertSee('Previous projects')
-            ->assertSee('Yasmin Hall wedding')
             ->assertSee('Half-day price (6 hours)')
             ->assertSee('Full-day price (12 hours)');
     }
@@ -48,7 +47,8 @@ class VendorOnboardingTest extends TestCase
             ->get('/admin/vendors/'.$vendor->id.'/edit')
             ->assertOk()
             ->assertSee('Studio Type')
-            ->assertSee('Features & Equipment')
+            ->assertSee('Features & equipment')
+            ->assertSee('Studio sets & decoration')
             ->assertSee('Hourly slot booking calendar')
             ->assertSee('Studio gallery')
             ->assertSee('Price per hour per location');
@@ -60,11 +60,11 @@ class VendorOnboardingTest extends TestCase
         $cityId = Vendor::query()->where('display_name', 'Fahad Studio Light')->value('city_id');
 
         $cases = [
-            'videographer' => ['Video quality & formats', 'Video gear', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
-            'reels' => ['Mobile reel creators', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
-            'model' => ['Gender', 'Category', 'Height (cm)', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
-            'ugc' => ['Category / Niche', 'Short-form UGC samples', 'Price per video'],
-            'food_stylist' => ['Category / Expertise', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'videographer' => ['Video quality & formats', 'Video gear', 'Delivery formats', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'reels' => ['Mobile reel setup', 'TikTok sample link', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'model' => ['Gender', 'Category', 'Height (cm)', 'Sizes (tops, waist, shoes)', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
+            'ugc' => ['Category / Niche', 'Content type & capabilities', 'Short-form UGC samples', 'Price per video'],
+            'food_stylist' => ['Expertise & styling', 'Add-on notes', 'Half-day price (6 hours)', 'Full-day price (12 hours)'],
         ];
 
         foreach ($cases as $slug => $needles) {
@@ -111,9 +111,10 @@ class VendorOnboardingTest extends TestCase
             'display_name' => 'Desert Light',
             'specialties' => ['wedding', 'corporate'],
             'extras' => [
-                'cameras' => ['Sony A7 IV'],
-                'lenses' => ['35mm f/1.4'],
-                'lighting' => ['Profoto B10'],
+                'camera_type' => 'Sony A7 IV',
+                'lenses_available' => '35mm f/1.4',
+                'lighting_gear' => 'Profoto B10',
+                'photo_extras' => 'RAW + retouching',
             ],
         ]);
 
@@ -128,9 +129,15 @@ class VendorOnboardingTest extends TestCase
 
         $vendor->refresh();
 
-        $this->assertEqualsCanonicalizing(['Sony A7 IV', '35mm f/1.4', 'Profoto B10'], $vendor->equipment);
+        $this->assertContains('Camera type: Sony A7 IV', $vendor->equipment);
+        $this->assertContains('Lenses available: 35mm f/1.4', $vendor->equipment);
+        $this->assertContains('Lighting gear: Profoto B10', $vendor->equipment);
         $this->assertEqualsCanonicalizing(['wedding', 'corporate'], $vendor->specialties);
-        $this->assertSame(['Sony A7 IV'], $vendor->extras['cameras']);
+        $this->assertSame('Sony A7 IV', $vendor->extras['camera_type']);
+        $this->assertSame(
+            ['Camera type', 'Lenses available', 'Lighting gear', 'Photo extras'],
+            collect(VendorProfile::presentFreeTextGear($vendor))->pluck('label')->all(),
+        );
         $this->assertTrue(Portfolio::query()->where('vendor_id', $vendor->id)->where('title', 'AlUla campaign')->exists());
     }
 
@@ -139,10 +146,16 @@ class VendorOnboardingTest extends TestCase
         $this->assertContains('wedding', array_keys(VendorProfile::specialtyOptions()));
         $this->assertArrayHasKey('cyclorama', VendorProfile::studioRooms());
         $this->assertArrayHasKey('recipe_development', VendorProfile::foodAddons());
-        $this->assertTrue(VendorProfile::filterProfileGroups('photographer')->contains('slug', 'camera'));
+        $this->assertFalse(VendorProfile::filterProfileGroups('photographer')->contains('slug', 'camera'));
+        $this->assertSame('Camera type', VendorProfile::FREE_TEXT_GEAR_FIELDS['camera_type']);
+        $this->assertFalse(VendorProfile::filterProfileGroups('videographer')->contains('slug', 'video_gear'));
+        $this->assertFalse(VendorProfile::filterProfileGroups('reels')->contains('slug', 'reels'));
+        $this->assertFalse(VendorProfile::filterProfileGroups('studio')->contains('slug', 'studio_features'));
         $this->assertTrue(VendorProfile::filterProfileGroups('studio')->contains('slug', 'studio_type'));
         $this->assertFalse(VendorProfile::filterProfileGroups('photographer')->contains('slug', 'studio_type'));
         $this->assertFalse(VendorProfile::filterProfileGroups('studio')->contains('slug', 'studio_hourly'));
+        $this->assertSame('Video gear', VendorProfile::freeTextGearFieldsFor('videographer')['video_gear']);
+        $this->assertSame('Features & equipment', VendorProfile::freeTextGearFieldsFor('studio')['studio_features']);
 
         $photographer = VendorType::query()->where('slug', 'photographer')->firstOrFail();
         $this->assertSame('photographer', VendorProfile::slugFromId($photographer->id));

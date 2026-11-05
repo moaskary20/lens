@@ -68,15 +68,13 @@
 
         <nav class="foot-col foot-cats">
             <h3>Categories</h3>
-            <a href="{{ route('site.search', ['vendor_type' => 'photographer']) }}">@include('site.partials.category-icon', ['slug' => 'photographer']) Photographers</a>
-            <a href="{{ route('site.search', ['vendor_type' => 'videographer']) }}">@include('site.partials.category-icon', ['slug' => 'videographer']) Videographers</a>
-            <a href="{{ route('site.search', ['vendor_type' => 'reels']) }}">@include('site.partials.category-icon', ['slug' => 'reels']) Mobile Reels</a>
-            <a href="{{ route('site.search', ['vendor_type' => 'model']) }}">@include('site.partials.category-icon', ['slug' => 'model']) Models</a>
-            <a href="{{ route('site.search', ['vendor_type' => 'studio']) }}">@include('site.partials.category-icon', ['slug' => 'studio']) Studios</a>
-            <a href="{{ route('site.search', ['vendor_type' => 'ugc']) }}">@include('site.partials.category-icon', ['slug' => 'ugc']) UCC Creators</a>
-            <a href="{{ route('site.search', ['vendor_type' => 'food_stylist']) }}">@include('site.partials.category-icon', ['slug' => 'food_stylist']) Food Stylists</a>
-            <a href="{{ route('site.search', ['q' => 'AI Videos & Motion']) }}">@include('site.partials.category-icon', ['slug' => 'ai_motion']) AI Videos & Motion</a>
-            <a href="{{ route('site.search', ['q' => 'VO (Voice Over)']) }}">@include('site.partials.category-icon', ['slug' => 'voice']) VO (Voice Over)</a>
+            @foreach(collect($data['vendor_types'] ?? []) as $type)
+                <a href="{{ route('site.search', ['vendor_type' => $type['slug'] ?? '']) }}">
+                    @include('site.partials.category-icon', ['slug' => $type['slug'] ?? ''])
+                    {{ $type['label'] ?? ($type['name'] ?? '') }}
+                </a>
+            @endforeach
+            <a href="{{ route('site.explore') }}"><span>›</span> View all categories</a>
         </nav>
 
         <nav class="foot-col">
@@ -144,41 +142,47 @@
     </section>
 
     <section class="foot-bottom">
-        <div class="wrap foot-bar">
-            <div class="foot-bar-row">
-                @include('site.partials.wordmark', ['size' => 'sm'])
-                <p class="foot-copy">© 2025 Lens. All rights reserved.</p>
-                <div class="foot-bar-trust">
-                    <span>
-                        <svg viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9V6z"/><path d="m9.2 12.2 1.8 1.8 3.8-3.8"/></svg>
-                        Safe &amp; Secure<br>Payments
-                    </span>
-                    <span>
-                        <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M7 15.5h3"/></svg>
-                        Multiple<br>Payment Methods
-                    </span>
-                    <span>
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.2 3.6 5.2 3.6 8.5s-1.2 6.3-3.6 8.5c-2.4-2.2-3.6-5.2-3.6-8.5s1.2-6.3 3.6-8.5z"/></svg>
-                        Worldwide<br>Coverage
-                    </span>
-                    <span>
-                        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0"/><rect x="3" y="12" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="12" width="4.5" height="6.5" rx="1.5"/></svg>
-                        24/7<br>Customer Support
-                    </span>
-                </div>
-                <div class="foot-pay" aria-label="We Accept">
-                    <small>We Accept</small>
-                    <div class="foot-pay-logos">
-                        <b class="pay-visa">VISA</b>
-                        <b class="pay-mc"><i></i><i></i></b>
-                        <b class="pay-pp">PayPal</b>
-                        <b class="pay-ap"><svg viewBox="0 0 14 16" aria-hidden="true"><path fill="#fff" d="M11.2 8.4c0-1.6 1.3-2.4 1.4-2.4-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6-.5 0-1.3-.6-2.2-.6-1.1 0-2.2.7-2.7 1.7-1.2 2-.3 5 .8 6.6.6.8 1.2 1.7 2.1 1.7.8 0 1.1-.5 2.2-.5s1.3.5 2.2.5 1.5-.8 2-1.6c.6-.9.9-1.8.9-1.8s-1.8-.7-1.8-2.9zM9.4 3.8c.4-.5.7-1.3.6-2-.6 0-1.4.4-1.8.9-.4.5-.7 1.2-.6 1.9.7.1 1.4-.3 1.8-.8z"/></svg>Pay</b>
+        <div class="foot-bottom-photo">
+            <div class="wrap foot-bar">
+                <div class="foot-bar-row">
+                    @include('site.partials.wordmark', ['size' => 'sm'])
+                    <p class="foot-copy">© {{ now()->year }} Lens. All rights reserved.</p>
+                    <div class="foot-bar-trust">
+                        <span>
+                            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9V6z"/><path d="m9.2 12.2 1.8 1.8 3.8-3.8"/></svg>
+                            Safe &amp; Secure<br>Payments
+                        </span>
+                        <span>
+                            <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M7 15.5h3"/></svg>
+                            Multiple<br>Payment Methods
+                        </span>
+                        <span>
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.2 3.6 5.2 3.6 8.5s-1.2 6.3-3.6 8.5c-2.4-2.2-3.6-5.2-3.6-8.5s1.2-6.3 3.6-8.5z"/></svg>
+                            Worldwide<br>Coverage
+                        </span>
+                        <span>
+                            <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0"/><rect x="3" y="12" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="12" width="4.5" height="6.5" rx="1.5"/></svg>
+                            24/7<br>Customer Support
+                        </span>
+                    </div>
+                    <div class="foot-pay" aria-label="We Accept">
+                        <small>We Accept</small>
+                        <div class="foot-pay-logos">
+                            <b class="pay-visa">VISA</b>
+                            <b class="pay-mc"><i></i><i></i></b>
+                            <b class="pay-pp">PayPal</b>
+                            <b class="pay-ap"><svg viewBox="0 0 14 16" aria-hidden="true"><path fill="#fff" d="M11.2 8.4c0-1.6 1.3-2.4 1.4-2.4-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6-.5 0-1.3-.6-2.2-.6-1.1 0-2.2.7-2.7 1.7-1.2 2-.3 5 .8 6.6.6.8 1.2 1.7 2.1 1.7.8 0 1.1-.5 2.2-.5s1.3.5 2.2.5 1.5-.8 2-1.6c.6-.9.9-1.8.9-1.8s-1.8-.7-1.8-2.9zM9.4 3.8c.4-.5.7-1.3.6-2-.6 0-1.4.4-1.8.9-.4.5-.7 1.2-.6 1.9.7.1 1.4-.3 1.8-.8z"/></svg>Pay</b>
+                        </div>
                     </div>
                 </div>
+                <div class="foot-tagline">
+                    <svg class="foot-curve" viewBox="0 0 920 36" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="M0 18 H420 C520 18 560 30 680 30 H920" fill="none" stroke="#ff5722" stroke-width="2.4" stroke-linecap="round"/>
+                    </svg>
+                </div>
             </div>
-            <svg class="foot-curve" viewBox="0 0 920 34" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M0 8 H520 C590 8 620 26 700 26 H920" fill="none" stroke="#ff5722" stroke-width="2.2" stroke-linecap="round"/>
-            </svg>
+        </div>
+        <div class="wrap foot-community-wrap">
             <p class="foot-community">More than just a booking platform <span>→</span> It’s a creative community.</p>
         </div>
     </section>

@@ -13,14 +13,59 @@
     $filterOpen = $tagSlugs !== [] || $cityId || $minPrice || $maxPrice || $minRating || $verified;
     $count = count($vendors);
     $cities = collect($data['cities'] ?? []);
+    $types = collect($data['vendor_types'] ?? []);
 @endphp
 
 @section('content')
-<section class="cat-page wrap" data-category-page>
+<section class="cat-page wrap search-page" data-category-page>
     <div class="cat-head">
-        <a class="vp-round" href="{{ $slug ? route('site.explore') : route('site.home') }}" aria-label="Back">‹</a>
+        <a class="vp-round" href="{{ route('site.home') }}" aria-label="Back">‹</a>
         <h1>{{ $title }}</h1>
     </div>
+
+    <form class="search-bar search-page-bar" action="{{ route('site.search') }}" method="get" role="search">
+        @if($slug !== '')
+            <input type="hidden" name="vendor_type" value="{{ $slug }}">
+        @endif
+        @if($cityId)
+            <input type="hidden" name="city_id" value="{{ $cityId }}">
+        @endif
+        <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </span>
+        <input type="search" name="q" value="{{ $q }}" placeholder="{{ $data['search_placeholder'] ?? 'Search creators, studios, models...' }}">
+        <button class="ai-btn" type="submit">Search</button>
+        @if(($data['features']['ai_assistant'] ?? true))
+            <a class="ghost-btn" href="{{ route('site.search', array_filter(['q' => $q ?: null, 'ai' => 1, 'vendor_type' => $slug ?: null])) }}">AI</a>
+        @endif
+    </form>
+
+    <div class="search-type-chips">
+        <a class="search-type-chip {{ $slug === '' ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['q' => $q ?: null, 'city_id' => $cityId ?: null])) }}">All</a>
+        @foreach($types as $type)
+            <a
+                class="search-type-chip {{ $slug === ($type['slug'] ?? '') ? 'is-active' : '' }}"
+                href="{{ route('site.search', array_filter(['vendor_type' => $type['slug'] ?? null, 'q' => $q ?: null, 'city_id' => $cityId ?: null])) }}"
+            >
+                @include('site.partials.category-icon', ['slug' => $type['slug'] ?? ''])
+                {{ $type['label'] ?? $type['name'] ?? '' }}
+            </a>
+        @endforeach
+    </div>
+
+    @if($cities->isNotEmpty())
+        <div class="search-city-chips">
+            <a class="search-city-chip {{ ! $cityId ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null])) }}">All cities</a>
+            @foreach($cities as $city)
+                <a
+                    class="search-city-chip {{ (int) $cityId === (int) $city['id'] ? 'is-active' : '' }}"
+                    href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null, 'city_id' => $city['id']])) }}"
+                >
+                    {{ $city['name_en'] ?? $city['name'] }}
+                </a>
+            @endforeach
+        </div>
+    @endif
 
     @if($summary)
         <p class="summary">{{ $summary }}</p>
@@ -33,7 +78,7 @@
     </div>
 
     <div class="cat-count">
-        <span>{{ $count }} {{ $title }}</span>
+        <span>{{ $count }} {{ Str::plural('result', $count) }}</span>
         <button type="button" data-open="sort">{{ $sortLabels[$sort] ?? 'Recommended' }} ▾</button>
     </div>
 
@@ -88,7 +133,7 @@
         <select name="city_id">
             <option value="">All Cities</option>
             @foreach($cities as $city)
-                <option value="{{ $city['id'] }}" @selected((int) $cityId === (int) $city['id'])>{{ $city['name'] }}</option>
+                <option value="{{ $city['id'] }}" @selected((int) $cityId === (int) $city['id'])>{{ $city['name_en'] ?? $city['name'] }}</option>
             @endforeach
         </select>
 

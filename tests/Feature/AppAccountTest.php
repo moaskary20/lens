@@ -174,26 +174,30 @@ class AppAccountTest extends TestCase
 
     public function test_client_needs_current_password_to_change_it(): void
     {
-        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        Storage::fake('public');
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $headers = ['X-Lens-Client' => 'client@lens.app', 'Accept' => 'application/json'];
         $payload = [
             'name' => 'Sarah Bennett',
             'email' => 'client@lens.app',
             'phone' => '01011112233',
             'locale' => 'en',
-            'password' => 'newpass',
+            'city_id' => $client->city_id,
+            'password' => 'Newpass1!',
             'current_password' => 'wrong-pass',
+            'avatar' => UploadedFile::fake()->image('avatar.jpg'),
         ];
 
         $this->withHeaders($headers)
-            ->postJson('/api/app/account/profile', $payload)
+            ->post('/api/app/account/profile', $payload)
             ->assertUnprocessable();
 
         $payload['current_password'] = 'password';
         $this->withHeaders($headers)
-            ->postJson('/api/app/account/profile', $payload)
+            ->post('/api/app/account/profile', $payload)
             ->assertOk();
 
-        $this->assertTrue(Hash::check('newpass', User::query()->where('email', 'client@lens.app')->firstOrFail()->password));
+        $this->assertTrue(Hash::check('Newpass1!', User::query()->where('email', 'client@lens.app')->firstOrFail()->password));
     }
 
     public function test_vendor_updates_profile_and_admin_sees_it(): void
@@ -212,39 +216,48 @@ class AppAccountTest extends TestCase
         $this->assertNotEmpty(data_get($profile, 'vendor.national_id_image'));
         $this->assertNotEmpty(data_get($profile, 'vendor.cover_image'));
 
-        $this->withHeaders($headers)
-            ->postJson('/api/app/account/profile', [
-                'name' => 'Fahad Photography',
-                'email' => 'vendor@lens.app',
-                'phone' => '01022223344',
-                'display_name' => 'Fahad Light Desk',
-                'vendor_type' => 'photographer',
-                'profession' => 'Editorial photographer',
-                'instagram' => 'https://instagram.com/fahadlight',
-                'instagram_followers' => 150000,
-                'tiktok_url' => 'https://tiktok.com/@fahadlight',
-                'tiktok_followers' => 90000,
-                'facebook_url' => 'https://facebook.com/fahadlight',
-                'facebook_followers' => 30000,
-                'address' => 'Zamalek, Cairo',
-                'latitude' => 30.0626,
-                'longitude' => 31.2197,
-                'half_day_price' => 2100,
-                'full_day_price' => 3600,
-                'payout_method' => 'paypal',
-                'paypal_email' => 'fahad@paypal.com',
-                'paypal_name' => 'Fahad',
-                'specialties' => ['wedding', 'editorial'],
-                'projects' => [
-                    [
-                        'type' => 'link',
-                        'title' => 'Gouna editorial',
-                        'external_url' => 'https://instagram.com/p/gouna',
-                        'description' => 'Summer lookbook.',
-                        'is_featured' => true,
-                    ],
+        $vendorPayload = [
+            'name' => 'Fahad Photography',
+            'email' => 'vendor@lens.app',
+            'phone' => '01022223344',
+            'locale' => 'en',
+            'city_id' => $vendor->city_id,
+            'display_name' => 'Fahad Light Desk',
+            'vendor_type' => 'photographer',
+            'date_of_birth' => '1992-04-18',
+            'profession' => 'Editorial photographer',
+            'years_experience' => 7,
+            'bio' => 'Product and wedding photography with portrait lenses and strobe lighting.',
+            'contact_email' => 'vendor@lens.app',
+            'whatsapp' => '01022223344',
+            'instagram' => 'https://instagram.com/fahadlight',
+            'instagram_followers' => 150000,
+            'tiktok_url' => 'https://tiktok.com/@fahadlight',
+            'tiktok_followers' => 90000,
+            'facebook_url' => 'https://facebook.com/fahadlight',
+            'facebook_followers' => 30000,
+            'address' => 'Zamalek, Cairo',
+            'latitude' => 30.0626,
+            'longitude' => 31.2197,
+            'half_day_price' => 2100,
+            'full_day_price' => 3600,
+            'payout_method' => 'paypal',
+            'paypal_email' => 'fahad@paypal.com',
+            'paypal_name' => 'Fahad',
+            'specialties' => ['wedding', 'editorial'],
+            'projects' => [
+                [
+                    'type' => 'link',
+                    'title' => 'Gouna editorial',
+                    'external_url' => 'https://instagram.com/p/gouna',
+                    'description' => 'Summer lookbook.',
+                    'is_featured' => true,
                 ],
-            ])
+            ],
+        ];
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/account/profile', $vendorPayload)
             ->assertOk()
             ->assertJsonPath('vendor.display_name', 'Fahad Light Desk')
             ->assertJsonPath('vendor.payout_method', 'paypal')
@@ -260,18 +273,11 @@ class AppAccountTest extends TestCase
 
         Storage::fake('public');
         $this->withHeaders($headers)
-            ->post('/api/app/account/profile', [
-                'name' => 'Fahad Photography',
-                'email' => 'vendor@lens.app',
-                'phone' => '01022223344',
-                'display_name' => 'Fahad Light Desk',
-                'address' => 'Zamalek, Cairo',
-                'latitude' => 30.0626,
-                'longitude' => 31.2197,
+            ->post('/api/app/account/profile', array_merge($vendorPayload, [
                 'cover_image' => UploadedFile::fake()->image('cover.jpg'),
                 'national_id_image' => UploadedFile::fake()->image('nid.jpg'),
                 'profile_photo' => UploadedFile::fake()->image('photo.jpg'),
-            ])
+            ]))
             ->assertOk();
 
         $vendor->refresh();
@@ -286,6 +292,8 @@ class AppAccountTest extends TestCase
         $this->assertNotEmpty($vendor->cover_image);
         $this->assertNotEmpty($vendor->national_id_image);
         $this->assertNotEmpty($vendor->profile_photo);
+        $this->assertNotEmpty($vendor->user?->fresh()->avatar);
+        $this->assertNotEmpty($vendor->user?->fresh()->avatarUrl());
 
         $this->actingAs(User::query()->where('email', 'admin@lens.app')->firstOrFail())
             ->get('/admin/vendors/'.$vendor->id.'/edit')
@@ -303,4 +311,22 @@ class AppAccountTest extends TestCase
             ->assertSee('TikTok')
             ->assertSee('Facebook');
     }
+
+    public function test_client_and_vendor_can_read_wallet_payload(): void
+    {
+        $client = $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
+            ->getJson('/api/app/account/wallet')
+            ->assertOk()
+            ->assertJsonPath('currency', 'EGP')
+            ->assertJsonPath('role', 'client');
+        $this->assertIsNumeric($client->json('wallet.available'));
+        $this->assertIsArray($client->json('transactions'));
+
+        $vendor = $this->withHeaders(['X-Lens-Client' => 'vendor@lens.app'])
+            ->getJson('/api/app/account/wallet')
+            ->assertOk()
+            ->assertJsonPath('role', 'vendor');
+        $this->assertArrayHasKey('lifetime_earned', $vendor->json('wallet'));
+    }
+
 }

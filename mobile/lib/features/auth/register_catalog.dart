@@ -205,11 +205,11 @@ class RegisterCatalog {
           slug: 'videographer',
           label: 'Videographer',
           profileTitle: 'Videographer profile',
-          profileDescription: 'Same video quality and gear options clients use on the mobile filter screens.',
+          profileDescription: 'Write video quality, gear, and delivery formats freely — shown on your public vendor profile.',
           fields: [
-            RegisterFieldSpec(key: 'filter.video_quality', type: 'multi', label: 'Video quality & formats', options: _videoQuality),
-            RegisterFieldSpec(key: 'filter.video_gear', type: 'multi', label: 'Video gear', options: _videoGear),
-            RegisterFieldSpec(key: 'delivery_formats', type: 'multi', label: 'Supported delivery formats', options: _deliveryFormats),
+            RegisterFieldSpec(key: 'extras.video_quality', type: 'textarea', label: 'Video quality & formats', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.video_gear', type: 'textarea', label: 'Video gear', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.delivery_formats_notes', type: 'textarea', label: 'Delivery formats', placeholder: 'Write freely — brands, models, kits, features, or notes'),
           ],
           pricing: _halfFullPricing,
         ),
@@ -217,11 +217,11 @@ class RegisterCatalog {
           slug: 'reels',
           label: 'Mobile Reels Creator',
           profileTitle: 'Mobile Reels Creator profile',
-          profileDescription: 'Same mobile-reel filter options plus sample links.',
+          profileDescription: 'Write reel quality, gear, and setup freely, then add sample links.',
           fields: [
-            RegisterFieldSpec(key: 'filter.video_quality', type: 'multi', label: 'Video quality & formats', options: _videoQuality),
-            RegisterFieldSpec(key: 'filter.video_gear', type: 'multi', label: 'Video gear', options: _videoGear),
-            RegisterFieldSpec(key: 'filter.reels', type: 'multi', label: 'Mobile reel creators', options: _reelCreators),
+            RegisterFieldSpec(key: 'extras.video_quality', type: 'textarea', label: 'Video quality & formats', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.video_gear', type: 'textarea', label: 'Video gear', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.reels_setup', type: 'textarea', label: 'Mobile reel setup', placeholder: 'Write freely — brands, models, kits, features, or notes'),
             RegisterFieldSpec(key: 'extras.tiktok_url', type: 'url', label: 'TikTok sample link'),
             RegisterFieldSpec(key: 'extras.instagram_url', type: 'url', label: 'Instagram / Reels sample link'),
             RegisterFieldSpec(key: 'extras.standard_session_hours', type: 'number', label: 'Standard session length (hours)'),
@@ -232,12 +232,14 @@ class RegisterCatalog {
           slug: 'studio',
           label: 'Studio',
           profileTitle: 'Studio profile',
-          profileDescription: 'Same studio type, size, area, and equipment options as Filter Studios.',
+          profileDescription: 'Write features, sets, amenities, and equipment freely. Studio type and area stay as search tags.',
           fields: [
             RegisterFieldSpec(key: 'filter.studio_type', type: 'multi', label: 'Studio Type', options: _studioTypes),
             RegisterFieldSpec(key: 'filter.studio_areas', type: 'multi', label: 'Studio areas', options: _studioAreas),
-            RegisterFieldSpec(key: 'filter.studio_features', type: 'multi', label: 'Features & Equipment', options: _studioFeatures),
-            RegisterFieldSpec(key: 'filter.studio_size', type: 'multi', label: 'Studio Size (m²)', options: _studioSizes),
+            RegisterFieldSpec(key: 'extras.studio_features', type: 'textarea', label: 'Features & equipment', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.studio_sets', type: 'textarea', label: 'Studio sets & decoration', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.studio_amenities', type: 'textarea', label: 'Studio amenities', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.studio_equipment', type: 'textarea', label: 'Equipment included', placeholder: 'Write freely — brands, models, kits, features, or notes'),
           ],
           pricing: [
             RegisterFieldSpec(key: 'hourly_price', type: 'number', label: 'Price per hour per location', prefix: 'EGP'),
@@ -247,15 +249,14 @@ class RegisterCatalog {
           slug: 'model',
           label: 'Model',
           profileTitle: 'Model profile',
-          profileDescription: 'Same gender, category, age, height, and size options as Filter Models.',
+          profileDescription: 'Write sizes and experience freely. Gender, category, age, and height stay as search tags.',
           fields: [
             RegisterFieldSpec(key: 'filter.model_identity', type: 'multi', label: 'Gender', options: _modelGenders),
             RegisterFieldSpec(key: 'filter.model_category', type: 'multi', label: 'Category', options: _modelCategories),
             RegisterFieldSpec(key: 'filter.model_age', type: 'multi', label: 'Age Range', options: _modelAges),
             RegisterFieldSpec(key: 'filter.model_height', type: 'multi', label: 'Height (cm)', options: _modelHeights),
-            RegisterFieldSpec(key: 'filter.model_tops', type: 'multi', label: 'T-Shirt / Tops', options: _modelTops),
-            RegisterFieldSpec(key: 'filter.model_pants', type: 'multi', label: 'Pants / Bottoms (Waist)', options: _modelPants),
-            RegisterFieldSpec(key: 'filter.model_shoes', type: 'multi', label: 'Shoes (EU)', options: _modelShoes),
+            RegisterFieldSpec(key: 'extras.model_sizes_notes', type: 'textarea', label: 'Sizes (tops, waist, shoes)', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.model_experience_notes', type: 'textarea', label: 'Work experience', placeholder: 'Write freely — brands, models, kits, features, or notes'),
             RegisterFieldSpec(key: 'extras.hair_color', type: 'text', label: 'Hair color'),
             RegisterFieldSpec(key: 'extras.eye_color', type: 'text', label: 'Eye color'),
           ],
@@ -265,12 +266,13 @@ class RegisterCatalog {
           slug: 'ugc',
           label: 'UGC Creator',
           profileTitle: 'UGC Creator profile',
-          profileDescription: 'Same niche, city, accent, and content options as Filter UGC Creators.',
+          profileDescription: 'Write content capabilities and production notes freely. Niche and city stay as search tags.',
           fields: [
             RegisterFieldSpec(key: 'filter.ugc_niche', type: 'multi', label: 'Category / Niche', options: _ugcNiches),
             RegisterFieldSpec(key: 'filter.ugc_cities', type: 'multi', label: 'City (Egypt)', options: _ugcCities),
-            RegisterFieldSpec(key: 'filter.ugc_content', type: 'multi', label: 'Content Type', options: _ugcContent),
             RegisterFieldSpec(key: 'filter.ugc_gender', type: 'multi', label: 'Gender', options: _modelGenders),
+            RegisterFieldSpec(key: 'extras.ugc_content_notes', type: 'textarea', label: 'Content type & capabilities', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.ugc_gear_notes', type: 'textarea', label: 'Gear & production notes', placeholder: 'Write freely — brands, models, kits, features, or notes'),
           ],
           pricing: [
             RegisterFieldSpec(key: 'per_video_price', type: 'number', label: 'Price per video', prefix: 'EGP'),
@@ -281,13 +283,13 @@ class RegisterCatalog {
           slug: 'food_stylist',
           label: 'Food Stylist',
           profileTitle: 'Food Stylist profile',
-          profileDescription: 'Same expertise, cuisine, city, and content options as Filter Food Stylists.',
+          profileDescription: 'Write expertise, content type, and add-ons freely. Cuisine and city stay as search tags.',
           fields: [
-            RegisterFieldSpec(key: 'filter.food_expertise', type: 'multi', label: 'Category / Expertise', options: _foodExpertise),
             RegisterFieldSpec(key: 'filter.food_cuisine', type: 'multi', label: 'Cuisine / Food Type', options: _foodCuisine),
             RegisterFieldSpec(key: 'filter.food_cities', type: 'multi', label: 'Egyptian Cities', options: _ugcCities),
-            RegisterFieldSpec(key: 'filter.food_content', type: 'multi', label: 'Content Type', options: _ugcContent),
-            RegisterFieldSpec(key: 'extras.addon_notes', type: 'textarea', label: 'Add-on notes'),
+            RegisterFieldSpec(key: 'extras.food_expertise_notes', type: 'textarea', label: 'Expertise & styling', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.food_content_notes', type: 'textarea', label: 'Content type', placeholder: 'Write freely — brands, models, kits, features, or notes'),
+            RegisterFieldSpec(key: 'extras.addon_notes', type: 'textarea', label: 'Add-on notes', placeholder: 'Write freely — brands, models, kits, features, or notes'),
           ],
           pricing: _halfFullPricing,
         ),
@@ -295,12 +297,12 @@ class RegisterCatalog {
           slug: 'photographer',
           label: 'Photographer',
           profileTitle: 'Photographer profile',
-          profileDescription: 'Same camera, lens, and lighting options clients use on the mobile filter screens.',
+          profileDescription: 'Write your camera, lenses, lighting, and photo extras freely — shown on your public vendor profile.',
           fields: [
-            RegisterFieldSpec(key: 'filter.camera', type: 'multi', label: 'Camera type', options: _cameraTypes),
-            RegisterFieldSpec(key: 'filter.lenses', type: 'multi', label: 'Lenses available', options: _lenses),
-            RegisterFieldSpec(key: 'filter.lighting', type: 'multi', label: 'Lighting gear', options: _lighting),
-            RegisterFieldSpec(key: 'filter.photo_extras', type: 'multi', label: 'Photo extras', options: _photoExtras),
+            RegisterFieldSpec(key: 'extras.camera_type', type: 'textarea', label: 'Camera type', placeholder: 'Write freely — brands, models, kits, or notes'),
+            RegisterFieldSpec(key: 'extras.lenses_available', type: 'textarea', label: 'Lenses available', placeholder: 'Write freely — brands, models, kits, or notes'),
+            RegisterFieldSpec(key: 'extras.lighting_gear', type: 'textarea', label: 'Lighting gear', placeholder: 'Write freely — brands, models, kits, or notes'),
+            RegisterFieldSpec(key: 'extras.photo_extras', type: 'textarea', label: 'Photo extras', placeholder: 'Write freely — brands, models, kits, or notes'),
             RegisterFieldSpec(key: 'specialties', type: 'multi', label: 'Primary specialties', options: _specialties),
           ],
           pricing: _halfFullPricing,
@@ -352,29 +354,6 @@ class RegisterCatalog {
     CatalogOption(id: 'ProRes', label: 'ProRes'),
     CatalogOption(id: 'MP4', label: 'MP4'),
     CatalogOption(id: 'Log', label: 'Log / Rec.709'),
-  ];
-
-  static const _cameraTypes = [
-    CatalogOption(id: 'full-frame', label: 'Full-frame camera'),
-    CatalogOption(id: 'medium-format', label: 'Medium format camera'),
-    CatalogOption(id: 'crop-sensor', label: 'Crop sensor camera'),
-  ];
-
-  static const _lenses = [
-    CatalogOption(id: '35mm', label: '35mm'),
-    CatalogOption(id: '50mm', label: '50mm'),
-    CatalogOption(id: '85mm', label: '85mm'),
-  ];
-
-  static const _lighting = [
-    CatalogOption(id: 'strobe', label: 'Strobe / flash'),
-    CatalogOption(id: 'continuous', label: 'Continuous LED'),
-    CatalogOption(id: 'natural', label: 'Natural light'),
-  ];
-
-  static const _photoExtras = [
-    CatalogOption(id: 'retouching', label: 'Retouching'),
-    CatalogOption(id: 'same-day', label: 'Same-day preview'),
   ];
 
   static const _videoQuality = [

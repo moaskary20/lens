@@ -577,9 +577,66 @@ class _ClientCard extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _BookingAction(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: 'In-app chat',
+                onTap: () => _openChat(context),
+              ),
+              if (item.phone?.isNotEmpty == true)
+                _BookingAction(
+                  icon: Icons.call_outlined,
+                  label: 'Call',
+                  onTap: () => _launchContact(
+                    context,
+                    ContactLaunch.tel(item.phone!),
+                    'the phone app',
+                  ),
+                ),
+              if (item.whatsapp?.isNotEmpty == true)
+                _BookingAction(
+                  icon: Icons.message_outlined,
+                  label: 'WhatsApp',
+                  onTap: () => _launchContact(
+                    context,
+                    ContactLaunch.whatsapp(item.whatsapp!),
+                    'WhatsApp',
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _openChat(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VendorChatPage(
+          vendor: vendor,
+          bookingId: item.id,
+          projectName: item.displayProject,
+          dateLabel: item.dateLabel,
+          time: item.timeLabel,
+          location: item.location,
+          status: item.statusLabel,
+          phone: item.phone,
+          whatsapp: item.whatsapp,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchContact(BuildContext context, Uri uri, String appName) async {
+    final opened = await ContactLaunch.open(uri);
+    if (!opened && context.mounted) {
+      _toast(context, 'Could not open $appName.');
+    }
   }
 
   Widget _meta(IconData icon, String text) {
@@ -1641,6 +1698,8 @@ class _VendorCard extends StatelessWidget {
           time: item.timeLabel,
           location: item.location,
           status: item.statusLabel,
+          phone: item.phone,
+          whatsapp: item.whatsapp,
         ),
       ),
     );

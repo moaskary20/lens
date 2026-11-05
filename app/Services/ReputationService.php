@@ -34,10 +34,13 @@ class ReputationService
     {
         $avg = (float) $vendor->reviews()->where('is_visible', true)->avg('rating');
         $count = $vendor->reviews()->where('is_visible', true)->count();
+        // Real client satisfaction % from visible reviews (0–100). Admin can still override later.
+        $satisfaction = $count > 0 ? (int) min(100, max(0, round(($avg / 5) * 100))) : 0;
 
         $vendor->update([
             'rating_avg' => round($avg, 2),
             'rating_count' => $count,
+            'client_satisfaction' => $satisfaction,
         ]);
 
         if (Feature::enabled('badges') && Reputation::settings()['auto_award_badges']) {

@@ -82,11 +82,14 @@ class ApiClient {
     return _decode(response, path);
   }
 
-  Map<String, String> get _headers => {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        if (SessionStore.instance.email != null) 'X-Lens-Client': SessionStore.instance.email!,
-      };
+  Map<String, String> get _headers {
+    final email = SessionStore.instance.email?.trim();
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      if (email != null && email.isNotEmpty) 'X-Lens-Client': email,
+    };
+  }
 
   Map<String, dynamic> _decode(http.Response response, String path) {
     if (response.statusCode < 200 || response.statusCode >= 300) {

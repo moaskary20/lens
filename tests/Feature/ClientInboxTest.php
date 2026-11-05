@@ -77,6 +77,20 @@ class ClientInboxTest extends TestCase
 
         $this->withHeaders($headers)->postJson('/api/app/notifications/read-all')->assertOk()->assertJsonPath('unread', 0);
         $this->withHeaders($headers)->getJson('/api/app/notifications')->assertJsonPath('unread', 0);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/notifications/clear-all')
+            ->assertOk()
+            ->assertJsonPath('unread', 0)
+            ->assertJsonPath('notifications', []);
+
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $this->assertSame(0, $client->notifications()->count());
+        $this->withHeaders($headers)
+            ->getJson('/api/app/notifications')
+            ->assertOk()
+            ->assertJsonPath('unread', 0)
+            ->assertJsonPath('notifications', []);
     }
 
     public function test_client_can_register_and_forget_a_device_token(): void

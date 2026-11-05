@@ -44,13 +44,23 @@ class Message extends Model
             $senderId = (int) $message->sender_id;
 
             if ($conversation->client && (int) $conversation->client_id !== $senderId) {
-                \App\Support\LensNotifier::toUser($conversation->client, \App\Support\LensNotifier::MESSAGE, $title, $body);
+                self::notifyRecipient($conversation->client, $title, $body);
             }
 
             $vendorUser = $conversation->vendor?->user;
             if ($vendorUser && (int) $vendorUser->id !== $senderId) {
-                \App\Support\LensNotifier::toUser($vendorUser, \App\Support\LensNotifier::MESSAGE, $title, $body);
+                self::notifyRecipient($vendorUser, $title, $body);
             }
         });
+    }
+
+    protected static function notifyRecipient(User $user, string $title, string $body): void
+    {
+        $settings = \App\Support\ClientPreferences::merge($user->app_settings, $user->locale ?: 'en');
+        if (! ($settings['chat_alerts'] ?? true)) {
+            return;
+        }
+
+        \App\Support\LensNotifier::toUser($user, \App\Support\LensNotifier::MESSAGE, $title, $body);
     }
 }

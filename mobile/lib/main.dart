@@ -7,6 +7,10 @@ import 'package:lens/core/theme/lens_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(LensTheme.overlay);
-  await PushAlerts.instance.bootstrap();
+  try {
+    await PushAlerts.instance.bootstrap();
+  } catch (_) {
+    // Never block app launch if local notifications fail to initialize.
+  }
   runApp(const LensApp());
 }

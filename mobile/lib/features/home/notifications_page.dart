@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/notifications_store.dart';
@@ -16,11 +18,14 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
+  bool _booting = true;
+  String? _bootError;
+
   @override
   void initState() {
     super.initState();
     SessionStore.instance.addListener(_onSession);
-    _refreshIfSignedIn();
+    unawaited(_boot());
   }
 
   @override
@@ -33,12 +38,61 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (!mounted) {
       return;
     }
-    setState(_refreshIfSignedIn);
+    if (SessionStore.instance.isGuest) {
+      setState(() {
+        _booting = false;
+        _bootError = null;
+      });
+      return;
+    }
+    unawaited(_boot());
   }
 
-  void _refreshIfSignedIn() {
-    if (!SessionStore.instance.isGuest) {
-      NotificationsStore.instance.refresh();
+  Future<void> _boot() async {
+    if (SessionStore.instance.isGuest) {
+      if (mounted) {
+        setState(() {
+          _booting = false;
+          _bootError = null;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _booting = NotificationsStore.instance.items.isEmpty;
+      _bootError = null;
+    });
+
+    try {
+      await NotificationsStore.instance.openAndClear().timeout(const Duration(seconds: 12));
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _booting = false;
+        _bootError = NotificationsStore.instance.items.isEmpty ? NotificationsStore.instance.error : null;
+      });
+    } on TimeoutException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _booting = false;
+        _bootError = NotificationsStore.instance.items.isEmpty
+            ? 'Loading took too long. Pull to retry.'
+            : null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _booting = false;
+        _bootError = NotificationsStore.instance.items.isEmpty
+            ? error.toString().replaceFirst('ApiException: ', '')
+            : null;
+      });
     }
   }
 
@@ -80,8 +134,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     child: Text('Notifications', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
                   ),
                   TextButton(
-                    onPressed: () => NotificationsStore.instance.markAllRead(),
-                    child: const Text('Mark all read', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700)),
+                    onPressed: () => NotificationsStore.instance.clearAll(),
+                    child: const Text('Clear message', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
@@ -91,32 +145,90 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 listenable: NotificationsStore.instance,
                 builder: (context, _) {
                   final items = NotificationsStore.instance.items;
-                  if (items.isEmpty) {
+                  final storeError = NotificationsStore.instance.error;
+                  final error = _bootError ?? (items.isEmpty ? storeError : null);
+
+                  if (_booting && items.isEmpty) {
                     return const Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2.4, color: LensColors.primary),
+                      ),
+                    );
+                  }
+
+                  if (error != null && items.isEmpty) {
+                    return Center(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 36),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.notifications_none_rounded, color: LensColors.primary, size: 42),
-                            SizedBox(height: 14),
-                            Text('You are up to date', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                            SizedBox(height: 8),
+                            const Icon(Icons.wifi_off_rounded, color: LensColors.primary, size: 42),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Could not load notifications',
+                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 8),
                             Text(
-                              'Booking, payment, and offer alerts from Lens will land here.',
+                              error,
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: LensColors.slate, height: 1.4),
+                              style: const TextStyle(color: LensColors.slate, height: 1.4),
+                            ),
+                            const SizedBox(height: 18),
+                            TextButton(
+                              onPressed: () => unawaited(_boot()),
+                              child: const Text('Try again', style: TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700)),
                             ),
                           ],
                         ),
                       ),
                     );
                   }
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) => _NoticeCard(notice: items[index]),
+
+                  if (items.isEmpty) {
+                    return RefreshIndicator(
+                      color: LensColors.primary,
+                      backgroundColor: const Color(0xFF1A1B1F),
+                      onRefresh: _boot,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 120),
+                          Icon(Icons.notifications_none_rounded, color: LensColors.primary, size: 42),
+                          SizedBox(height: 14),
+                          Text(
+                            'You are up to date',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                          ),
+                          SizedBox(height: 8),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 36),
+                            child: Text(
+                              'Booking, payment, and offer alerts from Lens will land here.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: LensColors.slate, height: 1.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    color: LensColors.primary,
+                    backgroundColor: const Color(0xFF1A1B1F),
+                    onRefresh: _boot,
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) => _NoticeCard(notice: items[index]),
+                    ),
                   );
                 },
               ),
