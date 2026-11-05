@@ -68,7 +68,7 @@ class AdminPanelTest extends TestCase
             ->assertDontSee('Filter options', false)
             ->assertDontSee('Marketplace loop', false)
             ->assertDontSee('Previous work', false)
-            ->assertDontSee('Availability calendar', false)
+            ->assertSee('Availability calendar', false)
             ->assertSee('Operations', false)
             ->assertSee('class="fi dark"', false)
             ->assertDontSee('fi-theme-switcher', false);
