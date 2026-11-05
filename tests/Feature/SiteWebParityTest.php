@@ -71,6 +71,26 @@ class SiteWebParityTest extends TestCase
         ])->assertSessionHasErrors('email');
     }
 
+    public function test_marketplace_vendor_cards_expose_cover_and_profile_images(): void
+    {
+        $html = $this->get('/marketplace')
+            ->assertOk()
+            ->assertSee('Popular Photographer')
+            ->assertSee('vendor-card', false)
+            ->getContent();
+
+        $this->assertGreaterThanOrEqual(10, substr_count($html, 'vendor-card'));
+        $this->assertDoesNotMatchRegularExpression(
+            "#src=\"(?:/storage/portfolios/|/storage/vendors/)[^\"]+\"#",
+            $html,
+            'Seeded vendor cards should not point at missing local portfolio/vendor files.',
+        );
+        $this->assertMatchesRegularExpression(
+            '#class="cover"[\\s\\S]*?<img[^>]+src="https?://[^"]+"#',
+            $html,
+        );
+    }
+
     public function test_vendor_profile_book_cta_points_to_web_booking(): void
     {
         $vendor = Vendor::query()->where('is_active', true)->where('verification_status', 'verified')->first()

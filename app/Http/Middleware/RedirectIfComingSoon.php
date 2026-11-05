@@ -14,7 +14,7 @@ class RedirectIfComingSoon
             return $next($request);
         }
 
-        if ($request->routeIs('site.home', 'site.marketplace', 'site.newsletter', 'site.coming-soon')) {
+        if ($request->routeIs('site.home', 'site.marketplace', 'site.newsletter', 'site.coming-soon', 'site.help', 'site.help.report')) {
             return $next($request);
         }
 

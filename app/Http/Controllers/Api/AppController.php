@@ -24,6 +24,7 @@ use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class AppController extends Controller
 {
@@ -89,9 +90,11 @@ class AppController extends Controller
      */
     protected function bootstrapCatalog($types): array
     {
-        $version = (string) $types->pluck('id')->sort()->implode('-');
+        // Include marketplace vendor count so reseed / visibility changes bust stale popular cards.
+        $version = (string) $types->pluck('id')->sort()->implode('-')
+            .'.v'.Vendor::query()->marketplaceVisible()->count();
 
-        return Cache::store('file')->remember('lens.app.bootstrap.catalog.v7.'.$version, now()->addMinutes(5), function () use ($types): array {
+        return Cache::store('file')->remember('lens.app.bootstrap.catalog.v8.'.$version, now()->addMinutes(5), function () use ($types): array {
             $categories = Category::query()
                 ->where('is_active', true)
                 ->orderBy('sort_order')
@@ -514,7 +517,18 @@ class AppController extends Controller
             return $path;
         }
 
-        return asset('storage/'.$path);
+        $relative = ltrim(str_replace('\\', '/', $path), '/');
+        if (str_starts_with($relative, 'storage/')) {
+            $relative = substr($relative, strlen('storage/'));
+        }
+
+        // Missing local uploads should fall through to VendorPhotos placeholders.
+        // Use the public disk so Storage::fake() in tests still works.
+        if (! Storage::disk('public')->exists($relative)) {
+            return null;
+        }
+
+        return asset('storage/'.$relative);
     }
 
     protected function initials(string $name): string

@@ -5,10 +5,14 @@
     $top = $badges->contains('top-rated') || $badges->contains('verified');
     $user = $authUser ?? null;
     $reveal = $reveal ?? true;
+    $cover = $vendor['cover_url'] ?? $vendor['cover_image'] ?? null;
+    $face = $vendor['profile_photo_url'] ?? $vendor['profile_photo'] ?? null;
 @endphp
 <article class="vendor-card" @if($reveal) data-reveal @endif>
     <a class="cover" href="{{ route('site.vendor', $vendor['id']) }}">
-        <img src="{{ $vendor['cover_url'] ?? $vendor['cover_image'] ?? asset('branding/lenslogo_mark.png') }}" alt="{{ $vendor['display_name'] }}">
+        @if(filled($cover))
+            <img src="{{ $cover }}" alt="{{ $vendor['display_name'] }}" loading="lazy">
+        @endif
         @if($top)
             <span class="badge">Top Rated</span>
         @endif
@@ -38,7 +42,9 @@
         <a class="heart" href="{{ route('site.login') }}" aria-label="Sign in to favorite">♡</a>
     @endif
     <div class="meta">
-        <img class="face" src="{{ $vendor['profile_photo_url'] ?? $vendor['profile_photo'] ?? asset('branding/lenslogo_mark.png') }}" alt="">
+        @if(filled($face))
+            <img class="face" src="{{ $face }}" alt="" loading="lazy">
+        @endif
         <div>
             <strong>{{ $vendor['display_name'] }}</strong>
             <p>{{ $vendor['vendor_type_name'] ?? $kind }}</p>

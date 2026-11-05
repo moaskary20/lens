@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Site\Concerns\InteractsWithSite;
 use App\Models\Booking;
 use App\Models\Vendor;
+use App\Support\BookProjectCatalog;
 use App\Support\SiteAuth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -34,8 +35,22 @@ class BookingFlowController extends Controller
 
         $this->shareShell('bookings');
 
+        $profile = $this->app->publicProfile($vendor, false);
+        $vendorType = (string) ($vendor->vendorType?->slug ?? '');
+        $remoteTypes = collect($profile['project_types'] ?? [])
+            ->map(fn ($item): string => trim((string) (is_array($item) ? ($item['label'] ?? '') : $item)))
+            ->filter()
+            ->values()
+            ->all();
+
         return view('site.book.start', [
-            'vendor' => $this->app->publicProfile($vendor, false),
+            'vendor' => $profile,
+            'vendorType' => $vendorType,
+            'typeLabel' => BookProjectCatalog::typeLabel($vendorType),
+            'typeOptions' => $remoteTypes !== [] ? $remoteTypes : BookProjectCatalog::typeOptions($vendorType),
+            'extraFields' => BookProjectCatalog::extraFields($vendorType),
+            'timeSlots' => BookProjectCatalog::timeSlots(),
+            'quoteUrl' => route('site.book.quote'),
         ]);
     }
 

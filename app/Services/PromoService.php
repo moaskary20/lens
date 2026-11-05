@@ -98,6 +98,11 @@ class PromoService
             }
         }
 
+        // Persist fee/total fields after fill — create flows call this after insert.
+        if ($booking->exists) {
+            $booking->save();
+        }
+
         return $booking;
     }
 

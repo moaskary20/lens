@@ -6,6 +6,7 @@ use App\Filament\Auth\PanelLoginResponse;
 use App\Notifications\Channels\FcmChannel;
 use App\Support\BrevoMail;
 use App\Support\SiteAuth;
+use App\Support\SiteStats;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
@@ -40,6 +41,9 @@ class AppServiceProvider extends ServiceProvider
         View::composer('site.*', function ($view): void {
             if (! array_key_exists('authUser', $view->getData())) {
                 $view->with('authUser', SiteAuth::user());
+            }
+            if (! array_key_exists('siteStats', $view->getData())) {
+                $view->with('siteStats', SiteStats::marketplace());
             }
         });
     }

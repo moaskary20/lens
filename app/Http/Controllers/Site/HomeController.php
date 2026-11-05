@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Api\AppController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\IssueController;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\IssueReport;
 use App\Models\NewsletterSubscriber;
 use App\Models\User;
 use App\Models\Vendor;
@@ -13,6 +15,7 @@ use App\Services\AiAssistant;
 use App\Services\VendorSearch;
 use App\Support\SearchQuery;
 use App\Support\SiteAuth;
+use App\Support\SitePages;
 use App\Support\VendorPhotos;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -268,22 +271,91 @@ class HomeController extends Controller
         return SiteAuth::user();
     }
 
-    public function page(string $slug): View
+    public function help(): View
     {
-        $pages = [
-            'about' => ['title' => 'About Us', 'lede' => 'Lens is the creatives marketplace for Egypt.', 'body' => 'We connect clients with photographers, videographers, studios and creators through protected bookings and a clear brief-to-delivery flow.'],
-            'contact' => ['title' => 'Contact Us', 'lede' => 'We are here when the shoot needs a human.', 'body' => 'Write to support@lens.app or use Help & Support in the app. Staff review bookings, disputes and payout questions from the admin console.'],
-            'help' => ['title' => 'Help & Support', 'lede' => 'Answers for clients and creators.', 'body' => 'Search a category, book a package, pay into escrow, and release funds when the work is approved. Creators manage availability, portfolio and payouts from the vendor console.'],
-            'terms' => ['title' => 'Terms & Conditions', 'lede' => 'How Lens bookings work.', 'body' => 'Bookings are held in escrow until the client approves delivery or the session is completed under the listed package. Misuse, no-shows and unpaid penalties are handled by Lens staff.'],
-            'privacy' => ['title' => 'Privacy Policy', 'lede' => 'Your data stays on the job.', 'body' => 'Lens stores account, booking and payout details to run the marketplace. We do not sell client lists. Contact numbers stay hidden until a booking is confirmed.'],
-            'guidelines' => ['title' => 'Creator Guidelines', 'lede' => 'What great Lens profiles look like.', 'body' => 'Keep your cover, portfolio and packages current. Reply fast, show real work, and complete identity checks so clients can book with confidence.'],
-            'pricing' => ['title' => 'Pricing & Commission', 'lede' => 'Clear fees, escrow-backed payouts.', 'body' => 'Clients see starting-from prices on each profile. Lens commission is taken when funds are released. Travel, extras and revisions follow the package you published.'],
-            'resources' => ['title' => 'Creator Resources', 'lede' => 'Tools for running a calmer studio.', 'body' => 'Use the vendor console for availability, portfolio, payouts, disputes and messages. The Lens app is the fastest way to reply on the day of the shoot.'],
-            'faqs' => ['title' => 'FAQs', 'lede' => 'The questions we hear first.', 'body' => 'Yes, you can book from web or app. Yes, payment is protected. Yes, contact details unlock after a confirmed booking. Download the app for chat, call and WhatsApp on the day.'],
-        ];
-        abort_unless(isset($pages[$slug]), 404);
+        $user = SiteAuth::user();
 
-        return view('site.page', array_merge($pages[$slug], [
+        return view('site.help', [
+            'data' => $this->bootstrap(),
+            'active' => 'home',
+            'user' => $user,
+            'topics' => IssueReport::TOPICS,
+            'guides' => [
+                [
+                    'key' => 'booking',
+                    'title' => 'Bookings',
+                    'body' => 'Search a category, open a creator profile, pick a package and date, then pay into escrow. Contact details unlock after the booking is confirmed.',
+                ],
+                [
+                    'key' => 'payment',
+                    'title' => 'Payments & escrow',
+                    'body' => 'Funds stay protected until you approve delivery. Lens staff can review disputes, no-shows, and refunds from the booking desk.',
+                ],
+                [
+                    'key' => 'account',
+                    'title' => 'Account & profile',
+                    'body' => 'Update your photo, phone, addresses, and notification settings from Account. Creators manage portfolio, pricing, and availability in the vendor console.',
+                ],
+                [
+                    'key' => 'app',
+                    'title' => 'App & chat',
+                    'body' => 'Use the Lens app for chat, call, and WhatsApp on shoot day. Push alerts cover bookings, messages, and review prompts.',
+                ],
+                [
+                    'key' => 'creator',
+                    'title' => 'Creators',
+                    'body' => 'Verified creators publish packages, portfolio, and calendar. Keep response times fast and delivery clear so clients can release funds confidently.',
+                ],
+                [
+                    'key' => 'other',
+                    'title' => 'What is Lens?',
+                    'body' => 'Lens helps you find, book, and chat with verified creators in Egypt. Payments stay in escrow until you approve the work.',
+                ],
+            ],
+        ]);
+    }
+
+    public function helpReport(Request $request): RedirectResponse
+    {
+        $user = SiteAuth::user();
+        if ($user) {
+            SiteAuth::applyClientHeader($request);
+            $request->merge([
+                'name' => $request->input('name') ?: $user->name,
+                'email' => $request->input('email') ?: $user->email,
+                'phone' => $request->input('phone') ?: $user->phone,
+                'platform' => 'web',
+            ]);
+        } else {
+            $request->merge([
+                'guest' => true,
+                'platform' => 'web',
+            ]);
+        }
+
+        $response = app(IssueController::class)->store($request);
+        $payload = $response->getData(true);
+        if ($response->getStatusCode() >= 400) {
+            return back()
+                ->withErrors($payload['errors'] ?? ['form' => $payload['message'] ?? 'Could not send report.'])
+                ->withInput();
+        }
+
+        return redirect()
+            ->route('site.help')
+            ->with('help_report_ok', $payload['reference'] ?? true)
+            ->with('status', $payload['message'] ?? 'Your report is with Lens support.');
+    }
+
+    public function page(string $slug): View|RedirectResponse
+    {
+        if ($slug === 'help') {
+            return redirect()->route('site.help');
+        }
+
+        $page = SitePages::resolve($slug);
+
+        return view('site.page', array_merge($page, [
             'data' => $this->bootstrap(),
             'active' => 'home',
         ]));
@@ -381,8 +453,8 @@ class HomeController extends Controller
 
         $images = [
             '/branding/hero-pyramids.jpg',
-            'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=1800&q=80',
-            'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1800&q=80',
+            '/branding/hero-egypt-studio.jpg',
+            '/branding/hero-egypt-creators.jpg',
             'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=80',
         ];
 

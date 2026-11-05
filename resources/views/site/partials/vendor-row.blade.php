@@ -1,10 +1,14 @@
 @php
     $vendor = $vendor ?? [];
     $location = $vendor['location'] ?: ($vendor['city'] ?? 'Egypt');
-    $thumb = $vendor['cover_url'] ?? $vendor['profile_photo_url'] ?? '';
+    $thumb = $vendor['cover_url'] ?? $vendor['profile_photo_url'] ?? null;
 @endphp
 <a class="listing-row" href="{{ route('site.vendor', $vendor['id']) }}">
-    <img class="listing-thumb" src="{{ $thumb }}" alt="">
+    @if(filled($thumb))
+        <img class="listing-thumb" src="{{ $thumb }}" alt="" loading="lazy">
+    @else
+        <span class="listing-thumb" aria-hidden="true"></span>
+    @endif
     <div class="listing-copy">
         <div class="listing-top">
             <strong>{{ $vendor['display_name'] }}</strong>

@@ -827,7 +827,16 @@ class VendorAppProfile
             return $path;
         }
 
-        return asset('storage/'.$path);
+        $relative = ltrim(str_replace('\\', '/', $path), '/');
+        if (str_starts_with($relative, 'storage/')) {
+            $relative = substr($relative, strlen('storage/'));
+        }
+
+        if (! Storage::disk('public')->exists($relative)) {
+            return null;
+        }
+
+        return asset('storage/'.$relative);
     }
 
     protected static function number(mixed $value): ?float

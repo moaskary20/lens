@@ -61,7 +61,7 @@
             <a href="{{ route('site.explore') }}"><span>›</span> Explore</a>
             <a href="{{ route('site.page', 'about') }}"><span>›</span> About Us</a>
             <a href="{{ route('site.page', 'contact') }}"><span>›</span> Contact Us</a>
-            <a href="{{ route('site.page', 'help') }}"><span>›</span> Help & Support</a>
+            <a href="{{ route('site.help') }}"><span>›</span> Help & Support</a>
             <a href="{{ route('site.page', 'terms') }}"><span>›</span> Terms & Conditions</a>
             <a href="{{ route('site.page', 'privacy') }}"><span>›</span> Privacy Policy</a>
         </nav>
@@ -93,7 +93,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M16.37 12.32c.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.63-1.71-3.2-1.73-1.36-.14-2.66.8-3.35.8-.7 0-1.76-.78-2.9-.76-1.49.02-2.87.87-3.64 2.2-1.55 2.69-.4 6.67 1.11 8.86.74 1.07 1.62 2.27 2.77 2.23 1.11-.05 1.53-.72 2.88-.72 1.34 0 1.72.72 2.9.69 1.2-.02 1.95-1.08 2.68-2.16.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.52zM14.7 6.3c.61-.74 1.02-1.77.91-2.8-.88.04-1.94.59-2.57 1.32-.56.65-1.06 1.69-.93 2.69.98.08 1.98-.5 2.59-1.21z"/></svg>
                 <span><small>Download on the</small><strong>App Store</strong></span>
             </a>
-            <a class="store-badge store-play" href="#app">
+            <a class="store-badge store-play" href="https://play.google.com/store/apps/details?id=app.lens.lens" target="_blank" rel="noopener noreferrer">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M3.4 20.7V3.3c0-.5.3-.8.7-.9l10.4 9.6L3.4 20.7z"/>
                     <path fill="#34A853" d="m14.5 12 2.5 2.4-8.8 5.1c-.6.3-1.2.1-1.5-.3L14.5 12z"/>
@@ -117,25 +117,46 @@
             <h3>Follow Us</h3>
             <p>Stay connected for the latest updates, inspiration and more.</p>
             <div class="foot-social">
-                <a href="#facebook" aria-label="Facebook"><svg viewBox="0 0 24 24"><path d="M14 8h3M13.2 8.2V6.4A2.4 2.4 0 0 1 15.6 4h1.2M10 12h5.2M10 12v7M13.2 8.2V19"/></svg></a>
-                <a href="#instagram" aria-label="Instagram"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.5"/><circle cx="17.2" cy="6.8" r=".8" fill="currentColor" stroke="none"/></svg></a>
-                <a href="#x" aria-label="X"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></a>
-                <a href="#youtube" aria-label="YouTube"><svg viewBox="0 0 24 24"><rect x="3" y="6.5" width="18" height="11" rx="3"/><path d="m10 9.5 5.5 2.5L10 14.5z"/></svg></a>
-                <a href="#tiktok" aria-label="TikTok"><svg viewBox="0 0 24 24"><path d="M14 7c.8 2.4 2.4 3.8 4.6 4v2.3A7 7 0 0 1 14 12v4.2a4.2 4.2 0 1 1-4.2-4.2c.3 0 .6 0 .8.1v2.4a1.8 1.8 0 1 0 1.2 1.7V7H14z"/></svg></a>
-                <a href="#linkedin" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="1.1" fill="currentColor" stroke="none"/><path d="M7 10.5V18M11.2 18v-4.4c0-1.8 1-2.8 2.5-2.8s2.4 1.1 2.4 2.9V18M11.2 10.5V18"/></svg></a>
+                <a href="https://www.facebook.com/profile.php?id=61595790683189" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><svg viewBox="0 0 24 24"><path d="M14 8h3M13.2 8.2V6.4A2.4 2.4 0 0 1 15.6 4h1.2M10 12h5.2M10 12v7M13.2 8.2V19"/></svg></a>
+                <a href="https://www.instagram.com/lensapp2026?srtk=amc0MmE3NWpleWR1" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.5"/><circle cx="17.2" cy="6.8" r=".8" fill="currentColor" stroke="none"/></svg></a>
+                <a href="https://www.tiktok.com/@lens.app?_r=1&_t=ZS-9B4RZFl5Up7" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><svg viewBox="0 0 24 24"><path d="M14 7c.8 2.4 2.4 3.8 4.6 4v2.3A7 7 0 0 1 14 12v4.2a4.2 4.2 0 1 1-4.2-4.2c.3 0 .6 0 .8.1v2.4a1.8 1.8 0 1 0 1.2 1.7V7H14z"/></svg></a>
             </div>
+            @php
+                $stats = $siteStats ?? \App\Support\SiteStats::marketplace();
+            @endphp
             <ul class="foot-stats">
                 <li>
-                    <span class="stat-ico"><svg viewBox="0 0 24 24"><path d="M9 8.2h1.1l.7-1.4h2.4l.7 1.4H15a1.6 1.6 0 0 1 1.6 1.6v4.6A1.6 1.6 0 0 1 15 16H9a1.6 1.6 0 0 1-1.6-1.6V9.8A1.6 1.6 0 0 1 9 8.2z"/><circle cx="12" cy="12.2" r="2"/></svg></span>
-                    <div><strong>50K+</strong><span>Active Creators</span></div>
+                    <span class="stat-ico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd">
+                            <path d="M9.15 5.2h1l.55-1.05A1.2 1.2 0 0 1 11.75 3.5h.5a1.2 1.2 0 0 1 1.05.65l.55 1.05h1a2.85 2.85 0 0 1 2.85 2.85v8.1A2.85 2.85 0 0 1 14.85 19H9.15A2.85 2.85 0 0 1 6.3 16.15v-8.1A2.85 2.85 0 0 1 9.15 5.2Zm2.85 10.55a3.35 3.35 0 1 0 0-6.7 3.35 3.35 0 0 0 0 6.7Zm0-2.1a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <strong>{{ $stats['creators_label'] }}</strong>
+                        <span>Active Creators</span>
+                    </div>
                 </li>
                 <li>
-                    <span class="stat-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="2"/><circle cx="7.2" cy="9.2" r="1.5"/><circle cx="16.8" cy="9.2" r="1.5"/><path d="M8.4 17.6c.5-2 1.8-3.1 3.6-3.1s3.1 1.1 3.6 3.1"/><path d="M4.6 17.2c.4-1.4 1.3-2.3 2.5-2.7"/><path d="M19.4 17.2c-.4-1.4-1.3-2.3-2.5-2.7"/></svg></span>
-                    <div><strong>1M+</strong><span>Happy Clients</span></div>
+                    <span class="stat-ico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 3.8a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8Zm7.15 1.35a2.7 2.7 0 1 1 0 5.4 2.7 2.7 0 0 1 0-5.4ZM2.55 19.4c.7-3.55 3.35-5.55 6.45-5.55s5.75 2 6.45 5.55H2.55Zm11.85-.55c.55-2.35 2.2-3.85 4.55-4.05 1.15.2 2.05.75 2.55 1.55.55.85.8 1.9.9 2.5h-8Z"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <strong>{{ $stats['clients_label'] }}</strong>
+                        <span>Happy Clients</span>
+                    </div>
                 </li>
                 <li>
-                    <span class="stat-ico"><svg viewBox="0 0 24 24"><path d="m12 4.2 2.1 4.6 5 .6-3.7 3.4.9 5-4.3-2.4-4.3 2.4.9-5L4.9 9.4l5-.6z"/></svg></span>
-                    <div><strong>4.8 / 5</strong><span>Average Rating</span></div>
+                    <span class="stat-ico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="m12 2.4 2.95 5.95 6.55.95-4.75 4.65 1.12 6.55L12 17.4l-5.87 3.1 1.12-6.55-4.75-4.65 6.55-.95z"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <strong>{{ $stats['rating_label'] }}</strong>
+                        <span>Average Rating{{ ($stats['reviews'] ?? 0) > 0 ? ' · '.number_format((int) $stats['reviews']).' reviews' : '' }}</span>
+                    </div>
                 </li>
             </ul>
         </div>

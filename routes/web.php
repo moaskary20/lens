@@ -18,6 +18,8 @@ Route::middleware(RedirectIfComingSoon::class)->group(function (): void {
     Route::get('/explore', [HomeController::class, 'explore'])->name('site.explore');
     Route::get('/ai', [AiController::class, 'show'])->name('site.ai');
     Route::get('/creatives/{vendor}', [HomeController::class, 'vendor'])->name('site.vendor');
+    Route::get('/help', [HomeController::class, 'help'])->name('site.help');
+    Route::post('/help/report', [HomeController::class, 'helpReport'])->name('site.help.report');
     Route::get('/p/{slug}', [HomeController::class, 'page'])->name('site.page')
         ->whereIn('slug', ['about', 'contact', 'help', 'terms', 'privacy', 'guidelines', 'pricing', 'resources', 'faqs']);
     Route::post('/newsletter', [HomeController::class, 'newsletter'])->name('site.newsletter');

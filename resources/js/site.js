@@ -13,32 +13,460 @@ const prefersReducedMotion = () =>
 
 window.Alpine = Alpine;
 
+const BOOK_MAP_PLACES = [
+    { label: 'Zamalek, Cairo', lat: 30.0626, lng: 31.2197 },
+    { label: 'New Cairo, Cairo', lat: 30.03, lng: 31.47 },
+    { label: 'Maadi, Cairo', lat: 29.9602, lng: 31.2569 },
+    { label: 'Alexandria, Egypt', lat: 31.2001, lng: 29.9187 },
+    { label: 'Giza, Egypt', lat: 30.0131, lng: 31.2089 },
+];
+
+function ensureLeaflet() {
+    if (window.L) {
+        return Promise.resolve(window.L);
+    }
+    if (window.__lensLeafletPromise) {
+        return window.__lensLeafletPromise;
+    }
+    window.__lensLeafletPromise = new Promise((resolve, reject) => {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(css);
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => resolve(window.L);
+        script.onerror = () => reject(new Error('Could not load map'));
+        document.body.appendChild(script);
+    });
+    return window.__lensLeafletPromise;
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('bookFlow', (config = {}) => ({
-        step: config.step || 1,
+        step: Number(config.step || 1),
         vendorId: config.vendorId || null,
+        quoteUrl: config.quoteUrl || '',
+        csrf: config.csrf || '',
+        packages: Array.isArray(config.packages) ? config.packages : [],
+        timeSlots: Array.isArray(config.timeSlots) ? config.timeSlots : ['10:00 AM', '12:00 PM', '2:00 PM', '4:00 PM', '6:00 PM'],
+        typeLabel: config.typeLabel || 'Project type',
+        extraFields: Array.isArray(config.extraFields) ? config.extraFields : [],
         packageType: config.packageType || '',
-        sessionPrice: config.sessionPrice || '',
+        packageLabel: config.packageLabel || '',
+        sessionPrice: Number(config.sessionPrice || 0),
+        durationHours: Number(config.durationHours || 0) || null,
+        dateValue: config.dateValue || '',
+        timeValue: config.timeValue || '10:00 AM',
         scheduledAt: config.scheduledAt || '',
-        durationHours: config.durationHours || 2,
         projectName: config.projectName || '',
         projectType: config.projectType || '',
         clientBrief: config.clientBrief || '',
+        notes: config.notes || '',
         locationText: config.locationText || '',
+        locationLat: config.locationLat || '',
+        locationLng: config.locationLng || '',
+        details: config.details || {},
         paymentMethod: config.paymentMethod || 'card',
         promoCode: config.promoCode || '',
         quote: config.quote || null,
+        quoteError: '',
+        payment: {
+            card_holder: '',
+            card_brand: '',
+            card_last4: '',
+            card_expiry: '',
+            card_number: '',
+            card_cvv: '',
+            wallet_phone: '',
+            wallet_telecom: '',
+            paypal_email: '',
+            paypal_name: '',
+        },
         busy: false,
+        locating: false,
+        mapOpen: false,
+        mapSearch: '',
+        mapSearching: false,
+        mapGeocoding: false,
+        mapSuggestions: [],
+        mapPlaces: BOOK_MAP_PLACES,
+        mapDraft: {
+            label: config.locationText || 'Cairo, Egypt',
+            lat: Number(config.locationLat || 30.0444),
+            lng: Number(config.locationLng || 31.2357),
+        },
+        _map: null,
+        _marker: null,
         error: '',
+        init() {
+            if (!this.dateValue) {
+                const today = new Date();
+                this.dateValue = today.toISOString().slice(0, 10);
+            }
+            if (!this.packageType && this.packages.length) {
+                this.selectPackage(this.packages[0]);
+            }
+            this.syncScheduledAt();
+            this.extraFields.forEach((field) => {
+                if (this.details[field.key] === undefined) {
+                    this.details[field.key] = '';
+                }
+            });
+        },
         next() {
-            this.step = Math.min(5, this.step + 1);
+            if (!this.validateStep(this.step)) {
+                return;
+            }
+            this.error = '';
+            this.step = Math.min(4, this.step + 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (this.step === 4) {
+                this.refreshQuote();
+            }
         },
         prev() {
+            this.error = '';
             this.step = Math.max(1, this.step - 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         },
-        selectPackage(type, price) {
-            this.packageType = type;
-            this.sessionPrice = price;
+        selectPackage(pkg) {
+            this.packageType = pkg.key || pkg.type || '';
+            this.packageLabel = pkg.label || pkg.name || this.packageType;
+            this.sessionPrice = Number(pkg.price || 0);
+            this.durationHours = pkg.duration_hours != null ? Number(pkg.duration_hours) : this.durationFromKey(this.packageType);
+        },
+        durationFromKey(key) {
+            const value = String(key || '');
+            if (value.includes('full')) return 12;
+            if (value.includes('hour')) return 1;
+            if (value.includes('video')) return null;
+            return 6;
+        },
+        syncScheduledAt() {
+            if (!this.dateValue || !this.timeValue) {
+                this.scheduledAt = '';
+                return;
+            }
+            const match = String(this.timeValue).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (!match) {
+                this.scheduledAt = `${this.dateValue}T10:00`;
+                return;
+            }
+            let hour = Number(match[1]);
+            const minute = Number(match[2]);
+            const meridiem = match[3].toUpperCase();
+            if (meridiem === 'PM' && hour < 12) hour += 12;
+            if (meridiem === 'AM' && hour === 12) hour = 0;
+            this.scheduledAt = `${this.dateValue}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        },
+        setDate(value) {
+            this.dateValue = value;
+            this.syncScheduledAt();
+        },
+        setTime(value) {
+            this.timeValue = value;
+            this.syncScheduledAt();
+        },
+        validateStep(step) {
+            const missing = [];
+            if (step === 1) {
+                if (!this.dateValue) missing.push('date');
+                if (!this.timeValue) missing.push('time');
+            }
+            if (step === 2) {
+                if (!String(this.projectName || '').trim()) missing.push('project name');
+                if (!String(this.projectType || '').trim()) missing.push(String(this.typeLabel || 'project type').toLowerCase());
+                this.extraFields.forEach((field) => {
+                    if (field.required && !String(this.details[field.key] || '').trim()) {
+                        missing.push(String(field.label || field.key).toLowerCase());
+                    }
+                });
+                if (!this.packageType || !(Number(this.sessionPrice) > 0)) missing.push('session price');
+                if (!String(this.locationText || '').trim() || !(Number(this.locationLat) && Number(this.locationLng))) {
+                    missing.push('map location');
+                }
+                if (!String(this.clientBrief || '').trim()) missing.push('short brief');
+            }
+            if (step === 4) {
+                if (!this.paymentDetailsComplete()) {
+                    this.error = `Open ${this.methodTitle(this.paymentMethod)} and enter the payment details first.`;
+                    return false;
+                }
+            }
+            if (missing.length) {
+                this.error = `Please enter ${missing.join(', ')}.`;
+                return false;
+            }
+            return true;
+        },
+        methodTitle(id) {
+            return ({ wallet: 'Mobile wallet', paypal: 'PayPal', card: 'Bank card' })[id] || 'payment';
+        },
+        paymentDetailsComplete() {
+            const p = this.payment;
+            if (this.paymentMethod === 'card') {
+                const last4 = String(p.card_last4 || p.card_number || '').replace(/\D+/g, '').slice(-4);
+                return String(p.card_holder || '').trim() && last4.length === 4 && String(p.card_expiry || '').trim();
+            }
+            if (this.paymentMethod === 'wallet') {
+                return String(p.wallet_phone || '').replace(/\D+/g, '').length === 11 && String(p.wallet_telecom || '').trim();
+            }
+            if (this.paymentMethod === 'paypal') {
+                return String(p.paypal_email || '').includes('@') && String(p.paypal_name || '').trim();
+            }
+            return false;
+        },
+        paymentSummary() {
+            const p = this.payment;
+            if (this.paymentMethod === 'card') {
+                const last4 = String(p.card_last4 || p.card_number || '').replace(/\D+/g, '').slice(-4);
+                return [p.card_brand || 'Card', last4 ? `•••• ${last4}` : '', p.card_expiry].filter(Boolean).join('  ·  ');
+            }
+            if (this.paymentMethod === 'wallet') {
+                return [p.wallet_telecom, p.wallet_phone].filter(Boolean).join('  ·  ');
+            }
+            return p.paypal_email || '';
+        },
+        async openMapPicker() {
+            this.error = '';
+            this.mapOpen = true;
+            this.mapSearch = '';
+            this.mapSuggestions = [];
+            this.mapDraft = {
+                label: this.locationText || 'Cairo, Egypt',
+                lat: Number(this.locationLat || 30.0444),
+                lng: Number(this.locationLng || 31.2357),
+            };
+            await this.$nextTick();
+            try {
+                await this.mountBookMap();
+                if (!this.locationLat || !this.locationLng) {
+                    this.locateOnMap(false);
+                }
+            } catch (_) {
+                this.error = 'Could not load the map. Try again.';
+                this.mapOpen = false;
+            }
+        },
+        closeMapPicker() {
+            this.mapOpen = false;
+            if (this._map) {
+                this._map.remove();
+                this._map = null;
+                this._marker = null;
+            }
+        },
+        async mountBookMap() {
+            const el = this.$refs.bookMap;
+            if (!el) {
+                return;
+            }
+            const L = await ensureLeaflet();
+            if (this._map) {
+                this._map.remove();
+                this._map = null;
+                this._marker = null;
+            }
+            this._map = L.map(el, { zoomControl: true }).setView([this.mapDraft.lat, this.mapDraft.lng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap',
+                maxZoom: 19,
+            }).addTo(this._map);
+            this._marker = L.marker([this.mapDraft.lat, this.mapDraft.lng], { draggable: true }).addTo(this._map);
+            this._marker.on('dragend', () => {
+                const point = this._marker.getLatLng();
+                this.dropMapPin(point.lat, point.lng, true);
+            });
+            this._map.on('click', (event) => {
+                this.dropMapPin(event.latlng.lat, event.latlng.lng, true);
+            });
+            requestAnimationFrame(() => this._map?.invalidateSize());
+            window.setTimeout(() => this._map?.invalidateSize(), 180);
+        },
+        setMapPlace(place) {
+            this.mapDraft = {
+                label: place.label,
+                lat: Number(place.lat),
+                lng: Number(place.lng),
+            };
+            if (this._map && this._marker) {
+                const point = [this.mapDraft.lat, this.mapDraft.lng];
+                this._marker.setLatLng(point);
+                this._map.setView(point, Math.max(this._map.getZoom(), 13));
+            }
+        },
+        async dropMapPin(lat, lng, reverse = false) {
+            const nextLat = Number(Number(lat).toFixed(6));
+            const nextLng = Number(Number(lng).toFixed(6));
+            this.mapDraft = {
+                label: reverse ? 'Moving pin…' : this.mapDraft.label,
+                lat: nextLat,
+                lng: nextLng,
+            };
+            if (this._marker) {
+                this._marker.setLatLng([nextLat, nextLng]);
+            }
+            if (this._map) {
+                this._map.panTo([nextLat, nextLng]);
+            }
+            if (!reverse) {
+                return;
+            }
+            this.mapGeocoding = true;
+            try {
+                const label = await this.reverseGeocode(nextLat, nextLng);
+                this.mapDraft = { label, lat: nextLat, lng: nextLng };
+            } finally {
+                this.mapGeocoding = false;
+            }
+        },
+        async reverseGeocode(lat, lng) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`;
+                const res = await fetch(url, { headers: { Accept: 'application/json' } });
+                if (!res.ok) {
+                    throw new Error('geocode failed');
+                }
+                const data = await res.json();
+                return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            } catch (_) {
+                return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+            }
+        },
+        async searchMap() {
+            const query = String(this.mapSearch || '').trim();
+            if (!query) {
+                return;
+            }
+            this.mapSearching = true;
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=eg&q=${encodeURIComponent(query)}`;
+                const res = await fetch(url, { headers: { Accept: 'application/json' } });
+                const rows = res.ok ? await res.json() : [];
+                const remote = (Array.isArray(rows) ? rows : []).map((row) => ({
+                    label: row.display_name,
+                    lat: Number(row.lat),
+                    lng: Number(row.lon),
+                })).filter((row) => row.label && row.lat && row.lng);
+                const local = this.mapPlaces.filter((place) => place.label.toLowerCase().includes(query.toLowerCase()));
+                this.mapSuggestions = remote.length ? remote : local;
+                if (this.mapSuggestions.length) {
+                    this.setMapPlace(this.mapSuggestions[0]);
+                }
+            } catch (_) {
+                this.mapSuggestions = this.mapPlaces.filter((place) => place.label.toLowerCase().includes(query.toLowerCase()));
+            } finally {
+                this.mapSearching = false;
+            }
+        },
+        async locateOnMap(moveDraft = true) {
+            if (!navigator.geolocation) {
+                this.error = 'Location is not supported in this browser.';
+                return;
+            }
+            this.locating = true;
+            this.error = '';
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000 });
+                });
+                const lat = Number(position.coords.latitude.toFixed(6));
+                const lng = Number(position.coords.longitude.toFixed(6));
+                if (moveDraft || this.mapOpen) {
+                    await this.dropMapPin(lat, lng, true);
+                }
+            } catch (_) {
+                if (moveDraft) {
+                    this.error = 'Could not read GPS. Search the map or pick a place.';
+                }
+            } finally {
+                this.locating = false;
+            }
+        },
+        confirmMapLocation() {
+            if (!(this.mapDraft?.lat && this.mapDraft?.lng)) {
+                this.error = 'Drop a pin on the map first.';
+                return;
+            }
+            this.locationText = this.mapDraft.label || `${this.mapDraft.lat}, ${this.mapDraft.lng}`;
+            this.locationLat = this.mapDraft.lat;
+            this.locationLng = this.mapDraft.lng;
+            this.error = '';
+            this.closeMapPicker();
+        },
+        async pinLocation() {
+            await this.openMapPicker();
+        },
+        async refreshQuote() {
+            if (!this.quoteUrl || !this.vendorId) {
+                return;
+            }
+            this.quoteError = '';
+            try {
+                const res = await fetch(this.quoteUrl, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': this.csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({
+                        vendor_id: this.vendorId,
+                        package_type: this.packageType,
+                        session_price: this.sessionPrice,
+                        duration_hours: this.durationHours || this.durationFromKey(this.packageType),
+                        promo_code: this.promoCode || null,
+                        location_text: this.locationText,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    this.quote = null;
+                    this.quoteError = data.message || data.errors?.promo_code?.[0] || 'Quote failed.';
+                    return;
+                }
+                this.quote = data;
+                if (data.session_price) {
+                    this.sessionPrice = Number(data.session_price);
+                }
+            } catch (_) {
+                this.quoteError = 'Could not refresh quote.';
+            }
+        },
+        async applyPromo() {
+            await this.refreshQuote();
+        },
+        beforeSubmit(event) {
+            this.syncScheduledAt();
+            if (!this.validateStep(4)) {
+                event.preventDefault();
+                return false;
+            }
+            const last4 = String(this.payment.card_last4 || this.payment.card_number || '').replace(/\D+/g, '').slice(-4);
+            this.payment.card_last4 = last4;
+            this.busy = true;
+            return true;
+        },
+        money(value) {
+            const amount = Math.round(Number(value || 0));
+            return `EGP ${amount.toLocaleString('en-EG')}`;
+        },
+        get platformFee() {
+            return Number(this.quote?.client_fee_amount ?? this.sessionPrice * 0.1);
+        },
+        get travelFee() {
+            return Number(this.quote?.travel_fee ?? 0);
+        },
+        get discount() {
+            return Number(this.quote?.discount_amount ?? 0);
+        },
+        get totalPaid() {
+            if (this.quote?.total_paid != null) {
+                return Number(this.quote.total_paid);
+            }
+            return Number(this.sessionPrice) + this.platformFee + this.travelFee - this.discount;
         },
     }));
 
@@ -260,13 +688,37 @@ function bootHeroSwiper() {
         return;
     }
     const reduced = prefersReducedMotion();
+    const delay = 5600;
+    const progress = root.querySelector('[data-hero-progress]');
+
+    const restartProgress = () => {
+        if (!progress || reduced) {
+            return;
+        }
+        progress.style.transition = 'none';
+        progress.style.width = '0%';
+        // Force reflow so the width reset applies before the fill animation.
+        void progress.offsetWidth;
+        progress.style.transition = `width ${delay}ms linear`;
+        progress.style.width = '100%';
+    };
+
+    const pauseProgress = () => {
+        if (!progress || reduced) {
+            return;
+        }
+        const computed = getComputedStyle(progress).width;
+        progress.style.transition = 'none';
+        progress.style.width = computed;
+    };
+
     const swiper = new Swiper(root, {
         modules: [Navigation, Pagination, Autoplay, EffectFade],
         loop: true,
         effect: reduced ? 'slide' : 'fade',
         fadeEffect: { crossFade: true },
         speed: reduced ? 350 : 900,
-        autoplay: reduced ? false : { delay: 5600, disableOnInteraction: false },
+        autoplay: reduced ? false : { delay, disableOnInteraction: false },
         pagination: { el: root.querySelector('.swiper-pagination'), clickable: true },
         navigation: {
             nextEl: root.querySelector('.swiper-button-next'),
@@ -275,32 +727,21 @@ function bootHeroSwiper() {
         on: {
             init(instance) {
                 animateHeroSlide(instance.slides[instance.activeIndex], { immediate: true });
+                restartProgress();
             },
             slideChangeTransitionStart(instance) {
                 animateHeroSlide(instance.slides[instance.activeIndex]);
+                restartProgress();
+            },
+            autoplayStop() {
+                pauseProgress();
+            },
+            autoplayStart() {
+                restartProgress();
             },
         },
     });
     window.__lensHeroSwiper = swiper;
-}
-
-function bootMagnetic(root = document) {
-    if (prefersReducedMotion() || window.matchMedia('(pointer: coarse)').matches) {
-        return;
-    }
-    root.querySelectorAll('[data-magnetic]').forEach((el) => {
-        const child = el.querySelector('[data-magnetic-child]') || el;
-        const strength = 18;
-        el.addEventListener('pointermove', (event) => {
-            const rect = el.getBoundingClientRect();
-            const x = ((event.clientX - rect.left) / rect.width - 0.5) * strength;
-            const y = ((event.clientY - rect.top) / rect.height - 0.5) * strength;
-            gsap.to(child, { x, y, duration: 0.35, ease: 'power3.out' });
-        });
-        el.addEventListener('pointerleave', () => {
-            gsap.to(child, { x: 0, y: 0, duration: 0.55, ease: 'power3.out' });
-        });
-    });
 }
 
 function bootCategoryParallax(root) {
@@ -332,26 +773,6 @@ function bootHomeMotion() {
         return;
     }
     const reduced = prefersReducedMotion();
-
-    const ai = home.querySelector('[data-home-ai]');
-    if (ai) {
-        if (reduced) {
-            gsap.set(ai, { clearProps: 'all' });
-        } else {
-            gsap.fromTo(
-                ai,
-                { autoAlpha: 0, y: 40 },
-                {
-                    autoAlpha: 1,
-                    y: 0,
-                    duration: 0.85,
-                    ease: 'power3.out',
-                    delay: 0.25,
-                },
-            );
-        }
-        bootMagnetic(ai);
-    }
 
     const cats = home.querySelector('[data-home-cats]');
     if (cats) {
@@ -710,36 +1131,25 @@ function bootCardSliders() {
     });
 }
 
-function bootHomeBg3d() {
-    const mounts = [...document.querySelectorAll('[data-home-bg3d]')];
-    if (mounts.length === 0) {
-        return;
-    }
-    if (prefersReducedMotion()) {
-        mounts.forEach((mount) => mount.classList.add('is-fallback'));
-        return;
-    }
-    import('./home-bg3d')
-        .then(({ createHomeBg3d }) => {
-            window.__lensHomeBg3d = mounts.map((mount) => {
-                const scene = createHomeBg3d(mount, {
-                    reducedMotion: false,
-                    intensity: mount.dataset.homeBg3d === 'stage' ? 1.15 : 0.85,
-                });
-                if (!scene?.ok) {
-                    mount.classList.add('is-fallback');
+
+function bootCmsAccordion() {
+    document.querySelectorAll('[data-cms-acc]').forEach((root) => {
+        root.addEventListener('toggle', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLDetailsElement) || !target.open) {
+                return;
+            }
+            root.querySelectorAll('details.cms-acc-item').forEach((item) => {
+                if (item !== target) {
+                    item.open = false;
                 }
-                return scene;
             });
-        })
-        .catch(() => {
-            mounts.forEach((mount) => mount.classList.add('is-fallback'));
-        });
+        }, true);
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     bootLenis();
-    bootHomeBg3d();
     bootHeroSwiper();
     bootHomeMotion();
     bootLegacySliderFallback();
@@ -748,4 +1158,5 @@ document.addEventListener('DOMContentLoaded', () => {
     bootCategorySheets();
     bootCardSliders();
     bootReveals();
+    bootCmsAccordion();
 });

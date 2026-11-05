@@ -479,9 +479,51 @@ class LensSeeder extends Seeder
         }
 
         foreach ([
-            ['slug' => 'terms', 'title' => 'Terms of Service', 'body' => 'Terms for using Lens for booking, payments, and protected delivery.'],
-            ['slug' => 'privacy', 'title' => 'Privacy Policy', 'body' => 'How Lens stores client and vendor data.'],
-            ['slug' => 'escrow', 'title' => 'Escrow Policy', 'body' => 'Funds stay held until client approval or check-in, depending on vendor type.'],
+            [
+                'slug' => 'about',
+                'title' => 'About Us',
+                'body' => '<p>A multi-vendor marketplace connecting clients with photographers, studios, and creators through escrow-backed bookings and protected delivery.</p><p>Lens brings clients and creative vendors together in one protected marketplace across Egypt.</p>',
+            ],
+            [
+                'slug' => 'contact',
+                'title' => 'Contact Us',
+                'body' => '<p>Staff review bookings, disputes, payouts, and issue reports from the admin console.</p><p><strong>Support email:</strong> support@lens.app</p><p>Use Help &amp; Support to send a topic-based report.</p>',
+            ],
+            [
+                'slug' => 'terms',
+                'title' => 'Terms & Conditions',
+                'body' => '<p>Terms for using Lens for booking, payments, and protected delivery.</p><p>By using Lens you agree to book through the marketplace, pay into escrow, and follow package, cancellation, and delivery rules published on each creator profile.</p>',
+            ],
+            [
+                'slug' => 'privacy',
+                'title' => 'Privacy Policy',
+                'body' => '<p>How Lens stores client and vendor data.</p><p>Lens stores account, booking, chat, payout, and support data needed to run sessions. Full card numbers are never saved. Contact numbers stay hidden until a booking is confirmed.</p>',
+            ],
+            [
+                'slug' => 'faqs',
+                'title' => 'FAQs',
+                'body' => '<p>Yes — you can browse as a guest, book from web or the Lens app, and keep payment protected in escrow until approval or check-in depending on the creator type.</p>',
+            ],
+            [
+                'slug' => 'pricing',
+                'title' => 'Pricing & Commission',
+                'body' => '<p>Clients see starting-from prices on each profile. Checkout adds the client platform fee from Fees &amp; escrow. Lens commission is taken from the creator only when funds are released successfully.</p>',
+            ],
+            [
+                'slug' => 'guidelines',
+                'title' => 'Creator Guidelines',
+                'body' => '<p>Creators publish cover, portfolio, packages, availability, and payout details. Marketplace listing requires Verification = Verified. Reply fast, show real work, and deliver through Lens.</p>',
+            ],
+            [
+                'slug' => 'resources',
+                'title' => 'Creator Resources',
+                'body' => '<p>Use the vendor console for availability, portfolio, payouts, disputes and messages. The Lens app is the fastest way to reply on the day of the shoot.</p>',
+            ],
+            [
+                'slug' => 'escrow',
+                'title' => 'Escrow Policy',
+                'body' => '<p>Funds stay held until client approval or check-in, depending on vendor type. 100% of collected funds are held in the Lens escrow wallet at checkout.</p>',
+            ],
         ] as $page) {
             CmsPage::query()->updateOrCreate(['slug' => $page['slug']], $page + ['is_active' => true]);
         }

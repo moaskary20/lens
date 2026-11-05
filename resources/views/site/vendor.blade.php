@@ -15,6 +15,8 @@
     $followers = collect($vendor['social'] ?? [])
         ->filter(fn ($row) => ! empty($row['followers']))
         ->values();
+    $coverUrl = $vendor['cover_url'] ?? null;
+    $avatarUrl = $vendor['profile_photo_url'] ?? null;
     $formatFollowers = function (int $count): string {
         if ($count >= 1_000_000) {
             return rtrim(rtrim(number_format($count / 1_000_000, 1), '0'), '.').'M';
@@ -29,7 +31,7 @@
 
 @section('content')
 <article class="vp" data-vendor-profile>
-    <section class="vp-hero" style="background-image: url('{{ $vendor['cover_url'] }}')">
+    <section class="vp-hero" @if(filled($coverUrl)) style="background-image: url('{{ $coverUrl }}')" @endif>
         <div class="wrap vp-hero-tools">
             <a class="vp-round" href="{{ url()->previous(route('site.home')) }}" aria-label="Back">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
@@ -77,7 +79,9 @@
     </section>
 
     <section class="wrap vp-identity">
-        <img class="vp-avatar" src="{{ $vendor['profile_photo_url'] }}" alt="">
+        @if(filled($avatarUrl))
+            <img class="vp-avatar" src="{{ $avatarUrl }}" alt="" loading="lazy">
+        @endif
         <div class="vp-id-copy">
             <div class="vp-id-top">
                 <div class="vp-title-row">

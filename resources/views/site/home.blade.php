@@ -11,7 +11,6 @@
 <div class="home-shell" data-home-motion>
     <div class="home-fg">
     <section class="hero swiper swiper-hero" data-hero-swiper>
-        <div class="hero-bg3d" data-home-bg3d="hero" aria-hidden="true"></div>
         <div class="swiper-wrapper">
             @foreach($slides as $slide)
                 <article class="swiper-slide">
@@ -27,25 +26,19 @@
         <div class="swiper-button-prev" aria-label="Previous slide"></div>
         <div class="swiper-button-next" aria-label="Next slide"></div>
         <div class="swiper-pagination"></div>
+        <div class="hero-progress" aria-hidden="true">
+            <span class="hero-progress-bar" data-hero-progress></span>
+        </div>
     </section>
 
     <section class="ai-search wrap" id="ai-search" data-home-ai>
-        <a class="ai-prompt" href="{{ route('site.ai') }}" data-magnetic>
+        <a class="ai-prompt" href="{{ route('site.ai') }}">
             <span class="ai-prompt-copy">
                 <strong>✨ What will you create today?</strong>
                 <small>{{ $data['ai_helper'] ?? 'Describe your idea and let AI find the right creatives for you.' }}</small>
             </span>
-            <span class="ai-btn" data-magnetic-child>✨ AI Search →</span>
+            <span class="ai-btn">✨ AI Search →</span>
         </a>
-    </section>
-
-    <section class="home-stage3d" aria-label="Lens 3D stage">
-        <div class="home-stage3d-mount" data-home-bg3d="stage"></div>
-        <div class="wrap home-stage3d-copy">
-            <p class="kicker">Lens space</p>
-            <h2>Creative world in motion</h2>
-            <p class="lede">Move your cursor — the Lens field reacts in real time.</p>
-        </div>
     </section>
 
     <section class="wrap block" data-home-cats>
