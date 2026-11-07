@@ -541,8 +541,14 @@ document.addEventListener('alpine:init', () => {
         total: config.total || 6,
         editing: Boolean(config.editing),
         stepError: '',
+        rootEl() {
+            if (this.$el?.matches?.('section.vendor-join')) {
+                return this.$el;
+            }
+            return this.$el?.closest?.('section.vendor-join') || this.$el;
+        },
         joinForm() {
-            return this.$el.querySelector('form.vendor-join-form, form.acc-sub-form');
+            return this.rootEl()?.querySelector('form.vendor-join-form, form.acc-sub-form') || null;
         },
         joinData() {
             const form = this.joinForm();
@@ -560,7 +566,7 @@ document.addEventListener('alpine:init', () => {
         validateBeforeLeave(fromStep) {
             const join = this.joinData();
             if (!join?.validateStep) {
-                return this.clearError();
+                return this.fail('Complete the required fields before continuing.');
             }
             const error = join.validateStep(fromStep, this.editing);
             if (error) {
@@ -570,15 +576,17 @@ document.addEventListener('alpine:init', () => {
         },
         next() {
             if (!this.validateBeforeLeave(this.step)) {
-                return;
+                return false;
             }
             this.step = Math.min(this.total, this.step + 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            return true;
         },
         prev() {
             this.clearError();
             this.step = Math.max(1, this.step - 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            return true;
         },
         goTo(target) {
             const next = Math.min(this.total, Math.max(1, Number(target) || 1));
@@ -586,21 +594,23 @@ document.addEventListener('alpine:init', () => {
                 this.clearError();
                 this.step = next;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-                return;
+                return true;
             }
             for (let current = this.step; current < next; current += 1) {
                 if (!this.validateBeforeLeave(current)) {
                     this.step = current;
-                    return;
+                    return false;
                 }
                 this.step = current + 1;
             }
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            return true;
         },
         beforeSubmit(event) {
             const join = this.joinData();
             if (!join?.validateStep) {
-                return true;
+                event.preventDefault();
+                return this.fail('Complete the required fields before submitting.');
             }
             for (let current = 1; current <= this.total; current += 1) {
                 const error = join.validateStep(current, this.editing);
@@ -657,6 +667,16 @@ document.addEventListener('alpine:init', () => {
                 const options = (field.options || []).map((option) => option.id);
                 this.lists[field.key] = this.filterTags.filter((slug) => options.includes(slug));
             });
+        },
+        wizard() {
+            const root = this.$el?.closest?.('section.vendor-join');
+            return root ? window.Alpine.$data(root) : null;
+        },
+        next() {
+            return this.wizard()?.next() ?? false;
+        },
+        prev() {
+            return this.wizard()?.prev() ?? false;
         },
         get spec() {
             return this.catalog.find((item) => item.slug === this.vendorType) || null;
