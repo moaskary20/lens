@@ -578,6 +578,12 @@ class AppController extends Controller
             'studio' => 'Featured Studios',
             'photographer' => 'Popular Photographer',
             'videographer' => 'Popular Videographer',
+            'reels' => 'Popular Reels',
+            'ugc' => 'Popular UGC',
+            'food_stylist' => 'Popular Food Stylist',
+            'ai_motion' => 'Popular AI Motion',
+            'bloggers' => 'Popular Bloggers',
+            'voice' => 'Popular Voice Over',
             default => 'Popular '.$name,
         };
     }
