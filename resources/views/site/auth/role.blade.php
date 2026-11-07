@@ -12,7 +12,7 @@
             <p class="lede" style="margin:0">Find creatives, book packages, pay into escrow, and chat through delivery.</p>
         </a>
         <a class="site-shell-card" href="{{ route('site.vendors.join') }}" style="display:block">
-            <h2 style="margin:0 0 8px;color:var(--orange)">I’m a creator</h2>
+            <h2 style="margin:0 0 8px;color:var(--orange)">I’m a vendor</h2>
             <p class="lede" style="margin:0">Publish your portfolio, pricing, calendar, and get verified for marketplace bookings.</p>
         </a>
     </div>
