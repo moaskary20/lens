@@ -32,7 +32,7 @@
                 </div>
                 <div class="bookings-auth-links">
                     <a href="{{ route('site.search') }}">Browse creatives</a>
-                    <a href="{{ route('site.vendors.join') }}">Join as creator</a>
+                    <a href="{{ route('site.vendors.join') }}">Join as vendor</a>
                 </div>
             </div>
             <div class="bookings-auth-side">

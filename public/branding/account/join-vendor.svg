@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" role="img" aria-label="Join as a vendor">
+  <defs>
+    <linearGradient id="jBg" x1="40" y1="20" x2="780" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1a1410"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="jGlow" cx="420" cy="250" r="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff5a1f" stop-opacity=".34"/><stop offset="1" stop-color="#ff5a1f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#jBg)"/>
+  <rect width="800" height="520" fill="url(#jGlow)"/>
+  <rect x="170" y="120" width="280" height="280" rx="32" fill="#1c1f27" stroke="#2a2d34" stroke-width="3"/>
+  <rect x="200" y="150" width="220" height="140" rx="18" fill="#2f3540"/>
+  <circle cx="310" cy="210" r="36" fill="#c45a32"/>
+  <circle cx="310" cy="200" r="14" fill="#ff8a50"/>
+  <path d="M280 240c10-16 20-24 30-24s20 8 30 24" fill="none" stroke="#ff8a50" stroke-width="8" stroke-linecap="round"/>
+  <rect x="220" y="316" width="120" height="14" rx="7" fill="#d8d3ca" opacity=".45"/>
+  <rect x="220" y="346" width="80" height="12" rx="6" fill="#d8d3ca" opacity=".25"/>
+  <rect x="430" y="160" width="200" height="220" rx="28" fill="#c45a32"/>
+  <rect x="450" y="180" width="160" height="180" rx="20" fill="#111318"/>
+  <path d="M490 240h80M530 200v80" stroke="#ff5a1f" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="530" cy="320" r="28" fill="#ff8a50"/>
+  <path d="M518 320h24M530 308v24" stroke="#111318" stroke-width="5" stroke-linecap="round"/>
+</svg>

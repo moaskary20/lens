@@ -24,7 +24,7 @@ class SiteWebParityTest extends TestCase
         $this->get('/login')->assertOk()->assertSee('Welcome back');
         $this->get('/join')->assertOk()->assertSee('How will you use Lens');
         $this->get('/register')->assertOk()->assertSee('Create your client account');
-        $this->get('/vendors/join')->assertOk()->assertSee('Become a Lens creator');
+        $this->get('/vendors/join')->assertOk()->assertSee('Become a Lens vendor');
 
         $this->post('/login', [
             'email' => 'client@lens.app',
