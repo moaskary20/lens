@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" role="img" aria-label="App settings">
+  <defs>
+    <linearGradient id="sBg" x1="40" y1="20" x2="780" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16141a"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="sGlow" cx="400" cy="250" r="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b07cff" stop-opacity=".28"/><stop offset="1" stop-color="#b07cff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#sBg)"/>
+  <rect width="800" height="520" fill="url(#sGlow)"/>
+  <circle cx="400" cy="250" r="118" fill="#1c1f27" stroke="#2a2d34" stroke-width="4"/>
+  <circle cx="400" cy="250" r="42" fill="#ff5a1f"/>
+  <g fill="#c45a32">
+    <rect x="382" y="118" width="36" height="54" rx="12"/>
+    <rect x="382" y="328" width="36" height="54" rx="12"/>
+    <rect x="268" y="232" width="54" height="36" rx="12"/>
+    <rect x="478" y="232" width="54" height="36" rx="12"/>
+    <rect x="300" y="150" width="40" height="54" rx="12" transform="rotate(-45 320 177)"/>
+    <rect x="460" y="316" width="40" height="54" rx="12" transform="rotate(-45 480 343)"/>
+    <rect x="300" y="316" width="40" height="54" rx="12" transform="rotate(45 320 343)"/>
+    <rect x="460" y="150" width="40" height="54" rx="12" transform="rotate(45 480 177)"/>
+  </g>
+</svg>

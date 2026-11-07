@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" role="img" aria-label="Addresses">
+  <defs>
+    <linearGradient id="aBg" x1="40" y1="20" x2="780" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12161a"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="aGlow" cx="400" cy="240" r="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4f8cff" stop-opacity=".28"/><stop offset="1" stop-color="#4f8cff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#aBg)"/>
+  <rect width="800" height="520" fill="url(#aGlow)"/>
+  <path d="M400 110c-70 0-126 56-126 126 0 92 126 194 126 194s126-102 126-194c0-70-56-126-126-126z" fill="#c45a32"/>
+  <circle cx="400" cy="236" r="54" fill="#1c1f27"/>
+  <circle cx="400" cy="236" r="22" fill="#ff8a50"/>
+  <rect x="250" y="390" width="300" height="48" rx="16" fill="#2a2d34"/>
+  <rect x="278" y="406" width="160" height="10" rx="5" fill="#d8d3ca" opacity=".45"/>
+  <rect x="278" y="422" width="100" height="8" rx="4" fill="#d8d3ca" opacity=".25"/>
+</svg>

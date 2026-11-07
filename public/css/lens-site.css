@@ -579,9 +579,286 @@ main { padding-bottom: 8px; }
     color: #fff;
 }
 
+.acc-sub {
+    padding: 28px 0 64px;
+}
+.acc-sub-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(220px, .85fr);
+    gap: 18px;
+    align-items: stretch;
+    margin-bottom: 18px;
+}
+.acc-sub-hero-copy {
+    padding: 22px;
+    border-radius: 24px;
+    border: 1px solid #2a2d34;
+    background:
+        linear-gradient(155deg, rgba(196, 90, 50, .12), transparent 48%),
+        #111318;
+    display: grid;
+    gap: 16px;
+    align-content: start;
+}
+.acc-sub-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: fit-content;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+.acc-sub-back svg { width: 16px; height: 16px; }
+.acc-sub-back:hover { color: #fff; }
+.acc-sub-title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+.acc-sub-ico,
+.acc-sub-card-ico,
+.acc-sub-row-ico,
+.acc-sub-toggle-ico {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    background: rgba(255, 90, 31, .12);
+    color: var(--orange);
+    border: 1px solid rgba(255, 90, 31, .28);
+}
+.acc-sub-ico svg,
+.acc-sub-card-ico svg,
+.acc-sub-row-ico svg,
+.acc-sub-toggle-ico svg,
+.acc-sub-label svg {
+    width: 22px;
+    height: 22px;
+}
+.acc-sub-title-row h1 {
+    margin: 0;
+    font-size: clamp(24px, 3.4vw, 34px);
+    letter-spacing: -.03em;
+    line-height: 1.1;
+}
+.acc-sub-title-row p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    line-height: 1.45;
+    max-width: 36em;
+}
+.acc-sub-tips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.acc-sub-tips li {
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid #2a2d34;
+    background: rgba(255, 255, 255, .03);
+    color: #d0cbc3;
+    font-size: 12px;
+    font-weight: 700;
+}
+.acc-sub-hero-art {
+    margin: 0;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid #2a2d34;
+    background: #0a0b0e;
+    min-height: 220px;
+}
+.acc-sub-hero-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.acc-sub-body { max-width: 760px; }
+.acc-sub-stack { display: grid; gap: 14px; }
+.acc-sub-card {
+    padding: 22px;
+    border-radius: 24px;
+    border: 1px solid #2a2d34;
+    background:
+        linear-gradient(160deg, rgba(196, 90, 50, .07), transparent 42%),
+        #111318;
+}
+.acc-sub-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.acc-sub-card-head h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    letter-spacing: -.02em;
+}
+.acc-sub-card-head p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: .9rem;
+    line-height: 1.4;
+}
+.acc-sub-form {
+    display: grid;
+    gap: 14px;
+}
+.acc-sub-form label {
+    display: grid;
+    gap: 7px;
+}
+.acc-sub-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #d0cbc3;
+}
+.acc-sub-form input,
+.acc-sub-form select,
+.acc-sub-form textarea {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 14px;
+    border: 1px solid #2a2d34;
+    background: #0f1116;
+    color: #fff;
+    padding: 0 14px;
+    font: inherit;
+}
+.acc-sub-form textarea {
+    min-height: 130px;
+    padding: 12px 14px;
+    resize: vertical;
+}
+.acc-sub-form input:focus,
+.acc-sub-form select:focus,
+.acc-sub-form textarea:focus {
+    outline: none;
+    border-color: rgba(255, 90, 31, .65);
+}
+.acc-sub-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.acc-sub-span-2 { grid-column: 1 / -1; }
+.acc-sub-list { display: grid; gap: 10px; }
+.acc-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid #2a2d34;
+    background: #0f1116;
+}
+.acc-sub-row-ico {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+}
+.acc-sub-row-copy {
+    min-width: 0;
+    flex: 1;
+    display: grid;
+    gap: 2px;
+}
+.acc-sub-row-copy strong {
+    font-size: .95rem;
+}
+.acc-sub-row-copy small {
+    color: var(--muted);
+    font-size: .8rem;
+    line-height: 1.35;
+}
+.acc-sub-remove {
+    margin: 0;
+    flex-shrink: 0;
+    min-height: 40px;
+    padding: 0 14px;
+}
+.acc-sub-empty {
+    padding: 22px 16px;
+    border-radius: 16px;
+    border: 1px dashed #2a2d34;
+    text-align: center;
+}
+.acc-sub-empty strong { display: block; margin-bottom: 6px; }
+.acc-sub-empty p { margin: 0; color: var(--muted); font-size: .9rem; }
+.acc-sub-toggles { display: grid; gap: 10px; }
+.acc-sub-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid #2a2d34;
+    background: #0f1116;
+    cursor: pointer;
+}
+.acc-sub-toggle-text {
+    flex: 1;
+    min-width: 0;
+    font-weight: 700;
+    font-size: .95rem;
+}
+.acc-sub-switch {
+    width: 46px;
+    height: 28px;
+    appearance: none;
+    border-radius: 999px;
+    background: #2a2d34;
+    border: 1px solid #3a3e46;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background .2s ease, border-color .2s ease;
+}
+.acc-sub-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform .2s ease;
+}
+.acc-sub-switch:checked {
+    background: var(--orange);
+    border-color: transparent;
+}
+.acc-sub-switch:checked::after { transform: translateX(18px); }
+.acc-sub-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+.acc-sub-links .ghost-btn { margin: 0; }
+
 @media (max-width: 960px) {
     .acc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .acc-lower { grid-template-columns: 1fr; }
+    .acc-sub-hero {
+        grid-template-columns: 1fr;
+    }
+    .acc-sub-hero-art {
+        min-height: 180px;
+        order: -1;
+    }
 }
 @media (max-width: 640px) {
     .acc-identity { align-items: flex-start; }
@@ -619,6 +896,64 @@ main { padding-bottom: 8px; }
     .acc-link-ico { width: 40px; height: 40px; border-radius: 12px; }
     .acc-aside-photo,
     .acc-aside-copy { min-height: 240px; }
+
+    .acc-sub { padding: 18px 0 56px; }
+    .acc-sub-hero { gap: 12px; margin-bottom: 14px; }
+    .acc-sub-hero-copy {
+        padding: 16px;
+        border-radius: 20px;
+        gap: 12px;
+    }
+    .acc-sub-hero-art {
+        min-height: 148px;
+        border-radius: 18px;
+    }
+    .acc-sub-title-row { gap: 12px; }
+    .acc-sub-ico {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+    }
+    .acc-sub-title-row h1 { font-size: 22px; }
+    .acc-sub-title-row p { font-size: 13px; margin-top: 6px; }
+    .acc-sub-tips { gap: 6px; }
+    .acc-sub-tips li { padding: 6px 10px; font-size: 11px; }
+    .acc-sub-card {
+        padding: 16px;
+        border-radius: 20px;
+    }
+    .acc-sub-card-head { gap: 12px; margin-bottom: 14px; }
+    .acc-sub-card-ico {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+    }
+    .acc-sub-card-head h2 { font-size: 1rem; }
+    .acc-sub-card-head p { font-size: .82rem; }
+    .acc-sub-grid { grid-template-columns: 1fr; gap: 12px; }
+    .acc-sub-form { gap: 12px; }
+    .acc-sub-form input,
+    .acc-sub-form select,
+    .acc-sub-form textarea {
+        min-height: 46px;
+        border-radius: 12px;
+    }
+    .acc-sub-row {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px;
+    }
+    .acc-sub-remove { width: 100%; }
+    .acc-sub-toggle { padding: 11px; gap: 10px; }
+    .acc-sub-toggle-ico {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+    }
+    .acc-sub-links .ghost-btn {
+        flex: 1 1 calc(50% - 8px);
+        justify-content: center;
+    }
 }
 
 .cms-hero {

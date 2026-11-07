@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" role="img" aria-label="Report an issue">
+  <defs>
+    <linearGradient id="rBg" x1="40" y1="20" x2="780" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1a1212"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="rGlow" cx="400" cy="240" r="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff5a5a" stop-opacity=".28"/><stop offset="1" stop-color="#ff5a5a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#rBg)"/>
+  <rect width="800" height="520" fill="url(#rGlow)"/>
+  <path d="M400 120l150 260H250z" fill="#c45a32"/>
+  <path d="M400 160l110 200H290z" fill="#1c1f27"/>
+  <rect x="388" y="220" width="24" height="80" rx="12" fill="#ff8a50"/>
+  <circle cx="400" cy="330" r="14" fill="#ff8a50"/>
+  <rect x="260" y="400" width="280" height="44" rx="16" fill="#2a2d34"/>
+  <rect x="290" y="416" width="150" height="10" rx="5" fill="#d8d3ca" opacity=".4"/>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" role="img" aria-label="Payment methods">
+  <defs>
+    <linearGradient id="payBg" x1="40" y1="20" x2="780" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14181a"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="payGlow" cx="420" cy="250" r="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5ac4a0" stop-opacity=".28"/><stop offset="1" stop-color="#5ac4a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#payBg)"/>
+  <rect width="800" height="520" fill="url(#payGlow)"/>
+  <rect x="210" y="150" width="320" height="200" rx="28" fill="#1c1f27" stroke="#2a2d34" stroke-width="3"/>
+  <rect x="210" y="186" width="320" height="36" fill="#c45a32"/>
+  <rect x="238" y="250" width="72" height="18" rx="5" fill="#e8c87a"/>
+  <rect x="238" y="286" width="140" height="12" rx="6" fill="#d8d3ca" opacity=".4"/>
+  <rect x="238" y="310" width="96" height="12" rx="6" fill="#d8d3ca" opacity=".24"/>
+  <circle cx="560" cy="340" r="54" fill="#ff5a1f"/>
+  <path d="M540 340h40M560 320v40" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+  <rect x="470" y="120" width="150" height="94" rx="18" fill="#2f3540" transform="rotate(12 545 167)" stroke="#5ac4a0" stroke-width="3"/>
+</svg>
