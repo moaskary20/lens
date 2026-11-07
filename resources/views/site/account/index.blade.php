@@ -83,7 +83,7 @@
     } else {
         $links[] = [
             'href' => route('site.vendors.join'),
-            'label' => 'Become a creator',
+            'label' => 'Become a vendor',
             'copy' => 'Publish your work on Lens',
             'icon' => 'spark',
         ];

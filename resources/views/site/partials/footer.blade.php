@@ -79,7 +79,7 @@
 
         <nav class="foot-col">
             <h3>For Creators</h3>
-            <a href="/vendor/login"><span>›</span> Become a Creator</a>
+            <a href="/vendor/login"><span>›</span> Become a Vendor</a>
             <a href="{{ route('site.page', 'guidelines') }}"><span>›</span> Creator Guidelines</a>
             <a href="{{ route('site.page', 'pricing') }}"><span>›</span> Pricing & Commission</a>
             <a href="{{ route('site.page', 'resources') }}"><span>›</span> Creator Resources</a>
