@@ -115,7 +115,9 @@ class SiteHomeTest extends TestCase
         $masked = \App\Support\VendorNamePrivacy::mask((string) $vendor->display_name);
         $this->get('/creatives/'.$vendor->id)
             ->assertOk()
-            ->assertSee($masked);
+            ->assertSee($masked)
+            ->assertSee('Assisted')
+            ->assertSee('Projects Completed');
     }
 
     public function test_search_explore_and_bookings_match_mobile_features(): void

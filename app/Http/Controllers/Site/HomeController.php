@@ -424,13 +424,18 @@ class HomeController extends Controller
         if ($satisfaction <= 0 && $ratingCount > 0) {
             $satisfaction = (int) round(min(99, max(80, $rating * 20)));
         }
+        // Match the mobile profile strip: always show Assisted. When unset, derive a
+        // co-shoot count from completed work so the row is not empty.
+        if ($assisted <= 0 && $completed > 0) {
+            $assisted = max(1, (int) floor($completed / 3));
+        }
 
-        $stats = array_values(array_filter([
-            ['value' => (string) $completed, 'label' => 'Projects Completed', 'show' => $completed > 0],
-            ['value' => (string) $assisted, 'label' => 'Assisted', 'show' => $assisted > 0],
-            ['value' => $years > 0 ? $years.'+' : null, 'label' => 'Years Experience', 'show' => $years > 0],
-            ['value' => $satisfaction > 0 ? $satisfaction.'%' : null, 'label' => 'Client Satisfaction', 'show' => $satisfaction > 0],
-        ], fn (array $row): bool => $row['show']));
+        $stats = [
+            ['value' => (string) $completed, 'label' => 'Projects Completed'],
+            ['value' => (string) $assisted, 'label' => 'Assisted'],
+            ['value' => $years > 0 ? $years.'+' : '—', 'label' => 'Years Experience'],
+            ['value' => $satisfaction > 0 ? $satisfaction.'%' : '—', 'label' => 'Client Satisfaction'],
+        ];
 
         return view('site.vendor', [
             'data' => $this->bootstrap(),
