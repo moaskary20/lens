@@ -272,6 +272,31 @@ class AppAuthTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('phone');
     }
 
+    public function test_register_rejects_duplicate_mobile_numbers(): void
+    {
+        $cairo = City::query()->where('name_en', 'Cairo')->firstOrFail();
+
+        $this->postJson('/api/app/auth/register', [
+            'name' => 'First Phone',
+            'email' => 'first.phone@lens.app',
+            'password' => 'Password1!',
+            'role' => 'client',
+            'phone' => '01077776655',
+            'city_id' => $cairo->id,
+        ])->assertCreated();
+
+        $this->postJson('/api/app/auth/register', [
+            'name' => 'Second Phone',
+            'email' => 'second.phone@lens.app',
+            'password' => 'Password1!',
+            'role' => 'client',
+            'phone' => '01077776655',
+            'city_id' => $cairo->id,
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('phone')
+            ->assertJsonPath('errors.phone.0', 'This mobile number is already registered.');
+    }
+
     public function test_staff_can_sign_in_on_the_app_as_a_client(): void
     {
         $this->postJson('/api/app/auth/login', [

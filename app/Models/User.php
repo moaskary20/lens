@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\WalletService;
+use App\Support\Egypt;
 use App\Support\LensNotifier;
 use App\Support\Roles;
 use Database\Factories\UserFactory;
@@ -61,6 +62,11 @@ class User extends Authenticatable implements FilamentUser
             'vendor' => $this->isVendor() && $this->vendor()->exists(),
             default => false,
         };
+    }
+
+    public function setPhoneAttribute(?string $value): void
+    {
+        $this->attributes['phone'] = Egypt::normalizeMobile($value);
     }
 
     public function isAdmin(): bool

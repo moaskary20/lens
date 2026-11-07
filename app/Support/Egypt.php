@@ -138,4 +138,30 @@ class Egypt
     {
         return 'Use an Egyptian mobile number of 11 digits starting with 010, 011, 012, or 015.';
     }
+
+    public static function mobileUniqueMessage(): string
+    {
+        return 'This mobile number is already registered.';
+    }
+
+    /**
+     * Normalize Egyptian mobiles to 01XXXXXXXXX digits for storage and uniqueness.
+     */
+    public static function normalizeMobile(?string $raw): ?string
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw) ?: '';
+        if ($digits === '') {
+            return null;
+        }
+
+        if (str_starts_with($digits, '20') && strlen($digits) === 12) {
+            $digits = '0'.substr($digits, 2);
+        }
+
+        return $digits;
+    }
 }

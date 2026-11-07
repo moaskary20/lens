@@ -165,6 +165,13 @@ class AccountController extends Controller
     public function updateProfile(Request $request): JsonResponse
     {
         $user = $this->member();
+        $request->merge([
+            'phone' => Egypt::normalizeMobile($request->input('phone')),
+            'contact_phone' => Egypt::normalizeMobile($request->input('contact_phone')),
+            'whatsapp' => Egypt::normalizeMobile($request->input('whatsapp')),
+            'wallet_phone' => Egypt::normalizeMobile($request->input('wallet_phone')),
+        ]);
+
         $data = $request->validate(array_merge([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
@@ -177,6 +184,7 @@ class AccountController extends Controller
         ], $user->isVendor() ? VendorAppProfile::rules(true) : []), array_merge(AppPassword::messages(), [
             'phone.required' => Egypt::mobileMessage(),
             'phone.regex' => Egypt::mobileMessage(),
+            'phone.unique' => Egypt::mobileUniqueMessage(),
             'contact_phone.regex' => Egypt::mobileMessage(),
             'whatsapp.required' => 'Enter a WhatsApp number.',
             'whatsapp.regex' => Egypt::mobileMessage(),

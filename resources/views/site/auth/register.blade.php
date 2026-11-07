@@ -23,7 +23,8 @@
             </label>
             <label>
                 <span>Phone</span>
-                <input name="phone" value="{{ old('phone') }}" required placeholder="01xxxxxxxxx">
+                <input name="phone" value="{{ old('phone') }}" required placeholder="01xxxxxxxxx" inputmode="numeric" autocomplete="tel">
+                <small style="color:var(--muted)">Egyptian mobile only — each number can be used once.</small>
             </label>
             <label>
                 <span>Governorate</span>

@@ -157,12 +157,19 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $isVendor = $request->input('role') === 'vendor';
+        $request->merge([
+            'phone' => Egypt::normalizeMobile($request->input('phone')),
+            'contact_phone' => Egypt::normalizeMobile($request->input('contact_phone')),
+            'whatsapp' => Egypt::normalizeMobile($request->input('whatsapp')),
+            'wallet_phone' => Egypt::normalizeMobile($request->input('wallet_phone')),
+        ]);
+
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => AppPassword::rule(),
             'role' => ['required', Rule::in(['client', 'vendor'])],
-            'phone' => ['required', 'string', Egypt::mobileRule()],
+            'phone' => ['required', 'string', Egypt::mobileRule(), Rule::unique('users', 'phone')],
             'locale' => ['nullable', Rule::in(['en', 'ar'])],
             'city_id' => ['required', 'integer', 'exists:cities,id'],
         ];
@@ -174,6 +181,7 @@ class AuthController extends Controller
         $data = $request->validate($rules, array_merge(AppPassword::messages(), [
             'phone.required' => Egypt::mobileMessage(),
             'phone.regex' => Egypt::mobileMessage(),
+            'phone.unique' => Egypt::mobileUniqueMessage(),
             'contact_phone.regex' => Egypt::mobileMessage(),
             'whatsapp.required' => 'Enter a WhatsApp number.',
             'whatsapp.regex' => Egypt::mobileMessage(),
