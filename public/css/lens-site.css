@@ -2197,8 +2197,36 @@ main { padding-bottom: 8px; }
     .cards { grid-template-columns: 1fr; }
     .card-rail { grid-auto-columns: minmax(240px, 82%); }
     .block { padding: 28px 0 4px; }
-    .block-head { margin-bottom: 14px; gap: 10px; }
-    .block-head h2, .page-head h1 { font-size: 22px; }
+    .block-head { margin-bottom: 12px; gap: 8px; }
+    .block-head h2, .page-head h1 {
+        font-size: clamp(15px, 4.2vw, 17px);
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+    }
+    .block-head h2 {
+        min-width: 0;
+        flex: 1 1 auto;
+        white-space: nowrap;
+        gap: 7px;
+    }
+    .block-head h2::before {
+        width: 3px;
+        height: 14px;
+    }
+    .block-head-actions {
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .block-head a {
+        font-size: 12px;
+        white-space: nowrap;
+    }
+    .block-head .card-nav { gap: 6px; }
+    .block-head .card-nav-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 17px;
+    }
     .page-head { padding: 22px 0 4px; }
     .page-head .lede { font-size: 14px; line-height: 1.45; }
     .cms-hero {
