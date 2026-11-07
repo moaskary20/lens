@@ -55,6 +55,9 @@
             @if($cityId)
                 <input type="hidden" name="city_id" value="{{ $cityId }}">
             @endif
+            @foreach($tagSlugs as $tag)
+                <input type="hidden" name="tags[]" value="{{ $tag }}">
+            @endforeach
             <span class="srch-bar-ico" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             </span>
@@ -99,13 +102,52 @@
 
     @if($cities->isNotEmpty())
         <div class="srch-cities">
-            <a class="srch-city {{ ! $cityId ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null])) }}">All cities</a>
+            <a class="srch-city {{ ! $cityId ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null, 'tags' => $tagSlugs ?: null])) }}">All cities</a>
             @foreach($cities as $city)
                 <a
                     class="srch-city {{ (int) $cityId === (int) $city['id'] ? 'is-active' : '' }}"
-                    href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null, 'city_id' => $city['id']])) }}"
+                    href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null, 'city_id' => $city['id'], 'tags' => $tagSlugs ?: null])) }}"
                 >
                     {{ $city['name_en'] ?? $city['name'] }}
+                </a>
+            @endforeach
+        </div>
+    @endif
+
+    @if($slug === 'model')
+        @php
+            $genderTagSlugs = collect($modelGenders ?? [])->pluck('slug')->all();
+            $nonGenderTags = collect($tagSlugs)->reject(fn ($tag) => in_array($tag, $genderTagSlugs, true))->values()->all();
+        @endphp
+        <div class="srch-genders" role="tablist" aria-label="Model category">
+            @foreach(($modelGenders ?? []) as $gender)
+                @php
+                    $isActive = ($activeModelGender ?? null) === $gender['slug'];
+                    $genderTags = $isActive ? $nonGenderTags : array_values(array_merge($nonGenderTags, [$gender['slug']]));
+                    $genderHref = route('site.search', array_filter([
+                        'vendor_type' => 'model',
+                        'q' => $q ?: null,
+                        'city_id' => $cityId ?: null,
+                        'sort' => $sort !== 'recommended' ? $sort : null,
+                        'view' => $view !== 'list' ? $view : null,
+                        'tags' => $genderTags ?: null,
+                        'min_price' => $minPrice,
+                        'max_price' => $maxPrice,
+                        'min_rating' => $minRating,
+                        'verified' => $verified ? 1 : null,
+                    ]));
+                @endphp
+                <a class="srch-gender {{ $isActive ? 'is-active' : '' }}" href="{{ $genderHref }}" role="tab" aria-selected="{{ $isActive ? 'true' : 'false' }}">
+                    <span class="srch-gender-ico" aria-hidden="true">
+                        @if(($gender['icon'] ?? '') === 'women')
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M12 11.2v8.3M9.2 16.2h5.6"/></svg>
+                        @elseif(($gender['icon'] ?? '') === 'kids')
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="2.4"/><circle cx="16" cy="8.2" r="2"/><path d="M4.8 19.2c.5-3 2.3-4.8 4.2-4.8s3.4 1.2 4 3.2M12.8 19.2c.4-2.2 1.6-3.6 3.2-3.6 1.5 0 2.7 1.2 3.2 3.6"/></svg>
+                        @else
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.2" cy="9.2" r="3.2"/><path d="M14.2 5.2 18.8 9.8M15.8 5.2h3v3M10.2 12.4V19M7.4 16.2h5.6"/></svg>
+                        @endif
+                    </span>
+                    {{ $gender['label'] }}
                 </a>
             @endforeach
         </div>

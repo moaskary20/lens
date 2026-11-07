@@ -110,10 +110,22 @@ class HomeController extends Controller
         }
         $vendors = $this->sortVendors($vendors, $sort)->values()->all();
 
+        $modelGenders = [
+            ['label' => 'Men', 'slug' => 'model-male', 'icon' => 'men'],
+            ['label' => 'Women', 'slug' => 'model-female', 'icon' => 'women'],
+            ['label' => 'Kids', 'slug' => 'model-kids', 'icon' => 'kids'],
+        ];
+        $modelGenderSlugs = array_column($modelGenders, 'slug');
+        $activeModelGender = collect($tagSlugs)->first(fn (string $tag): bool => in_array($tag, $modelGenderSlugs, true));
+
         $filterGroups = collect($data['filter_catalog'] ?? [])
             ->filter(function (array $group) use ($slug): bool {
                 $options = $group['options'] ?? [];
                 if ($options === []) {
+                    return false;
+                }
+                // Men / Women / Kids are shown as dedicated pills on Models search.
+                if ($slug === 'model' && ($group['slug'] ?? '') === 'model_identity') {
                     return false;
                 }
                 if ($slug === '') {
@@ -149,6 +161,8 @@ class HomeController extends Controller
             'minRating' => $minRating,
             'verified' => $verified,
             'filterGroups' => $filterGroups,
+            'modelGenders' => $modelGenders,
+            'activeModelGender' => $activeModelGender,
             'mapVendors' => collect($vendors)->map(fn (array $vendor): array => [
                 'id' => $vendor['id'],
                 'name' => $vendor['display_name'],

@@ -1433,6 +1433,42 @@ main { padding-bottom: 8px; }
     color: #fff;
     background: #1a140f;
 }
+.srch-genders {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 14px;
+}
+.srch-gender {
+    height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 10px;
+    border-radius: 16px;
+    background: #141518;
+    border: 1px solid #2a2d34;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    text-decoration: none;
+    min-width: 0;
+}
+.srch-gender-ico {
+    width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    color: inherit;
+    flex-shrink: 0;
+}
+.srch-gender-ico svg { width: 18px; height: 18px; stroke-linecap: round; stroke-linejoin: round; }
+.srch-gender.is-active {
+    border-color: var(--orange);
+    color: var(--orange);
+    background: #1a140f;
+}
 .srch-summary {
     margin: 0 0 12px;
     padding: 12px 14px;
