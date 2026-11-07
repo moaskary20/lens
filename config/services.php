@@ -43,6 +43,8 @@ return [
     'google' => [
         // Web OAuth client ID from Firebase / Google Cloud (aud check for ID tokens).
         'client_id' => env('GOOGLE_CLIENT_ID', '165894637736-lil7v98s08ndt4munuj7885iv8nmsos1.apps.googleusercontent.com'),
+        // Same Maps key used by the mobile app (Places + Maps JS). Prefer env override in production.
+        'maps_key' => env('GOOGLE_MAPS_API_KEY', 'AIzaSyDijsR3eTz9oM39y8V0fejOh5LW-IAfPRY'),
     ],
 
     'slack' => [

@@ -42,6 +42,36 @@ function ensureLeaflet() {
     return window.__lensLeafletPromise;
 }
 
+function ensureGoogleMaps(mapsKey) {
+    if (window.google?.maps?.places) {
+        return Promise.resolve(window.google.maps);
+    }
+    if (!mapsKey) {
+        return Promise.reject(new Error('Missing Google Maps key'));
+    }
+    if (window.__lensGoogleMapsPromise) {
+        return window.__lensGoogleMapsPromise;
+    }
+    window.__lensGoogleMapsPromise = new Promise((resolve, reject) => {
+        const previous = window.initLensGoogleMaps;
+        window.initLensGoogleMaps = () => {
+            window.initLensGoogleMaps = previous;
+            if (window.google?.maps) {
+                resolve(window.google.maps);
+                return;
+            }
+            reject(new Error('Google Maps failed to load'));
+        };
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&libraries=places&callback=initLensGoogleMaps`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = () => reject(new Error('Could not load Google Maps'));
+        document.head.appendChild(script);
+    });
+    return window.__lensGoogleMapsPromise;
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('bookFlow', (config = {}) => ({
         step: Number(config.step || 1),
@@ -480,6 +510,259 @@ document.addEventListener('alpine:init', () => {
         prev() {
             this.step = Math.max(1, this.step - 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+    }));
+
+    Alpine.data('addressMapPicker', (config = {}) => ({
+        mapsKey: config.mapsKey || '',
+        open: false,
+        searching: false,
+        locating: false,
+        geocoding: false,
+        search: '',
+        suggestions: [],
+        places: Array.isArray(config.places) ? config.places : BOOK_MAP_PLACES,
+        address: config.address || '',
+        lat: config.lat != null ? Number(config.lat) : 30.0444,
+        lng: config.lng != null ? Number(config.lng) : 31.2357,
+        draft: {
+            label: config.address || 'Cairo, Egypt',
+            lat: config.lat != null ? Number(config.lat) : 30.0444,
+            lng: config.lng != null ? Number(config.lng) : 31.2357,
+        },
+        _map: null,
+        _marker: null,
+        _autocomplete: null,
+        get hasPin() {
+            return Boolean(this.address && this.lat && this.lng);
+        },
+        get preview() {
+            return this.address || 'Pick your address on Google Maps';
+        },
+        get coordsLabel() {
+            if (!(this.lat && this.lng)) {
+                return 'No pin yet';
+            }
+            return `${Number(this.lat).toFixed(5)}, ${Number(this.lng).toFixed(5)}`;
+        },
+        async openPicker() {
+            this.open = true;
+            this.draft = {
+                label: this.address || this.draft.label || 'Cairo, Egypt',
+                lat: Number(this.lat || this.draft.lat || 30.0444),
+                lng: Number(this.lng || this.draft.lng || 31.2357),
+            };
+            this.search = '';
+            this.suggestions = [];
+            await this.$nextTick();
+            await this.mountMap();
+        },
+        closePicker() {
+            this.open = false;
+        },
+        confirm() {
+            if (!(this.draft?.lat && this.draft?.lng)) {
+                return;
+            }
+            this.address = this.draft.label || `${this.draft.lat}, ${this.draft.lng}`;
+            this.lat = Number(Number(this.draft.lat).toFixed(6));
+            this.lng = Number(Number(this.draft.lng).toFixed(6));
+            this.closePicker();
+        },
+        async mountMap() {
+            const el = this.$refs.mapCanvas;
+            if (!el) {
+                return;
+            }
+            try {
+                const maps = await ensureGoogleMaps(this.mapsKey);
+                const center = { lat: Number(this.draft.lat), lng: Number(this.draft.lng) };
+                if (!this._map) {
+                    this._map = new maps.Map(el, {
+                        center,
+                        zoom: 13,
+                        mapTypeControl: false,
+                        streetViewControl: false,
+                        fullscreenControl: false,
+                    });
+                    this._marker = new maps.Marker({
+                        map: this._map,
+                        position: center,
+                        draggable: true,
+                    });
+                    this._map.addListener('click', (event) => {
+                        if (!event.latLng) {
+                            return;
+                        }
+                        this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
+                    });
+                    this._marker.addListener('dragend', (event) => {
+                        if (!event.latLng) {
+                            return;
+                        }
+                        this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
+                    });
+                } else {
+                    this._map.setCenter(center);
+                    this._marker.setPosition(center);
+                }
+                maps.event.trigger(this._map, 'resize');
+                this._map.setCenter(center);
+                if (this.$refs.searchInput && !this._autocomplete) {
+                    this._autocomplete = new maps.places.Autocomplete(this.$refs.searchInput, {
+                        fields: ['formatted_address', 'geometry', 'name'],
+                        componentRestrictions: { country: ['eg'] },
+                    });
+                    this._autocomplete.addListener('place_changed', () => {
+                        const place = this._autocomplete.getPlace();
+                        const loc = place?.geometry?.location;
+                        if (!loc) {
+                            return;
+                        }
+                        this.setPlace({
+                            label: place.formatted_address || place.name || this.search,
+                            lat: loc.lat(),
+                            lng: loc.lng(),
+                        });
+                    });
+                }
+            } catch (_) {
+                await this.mountLeafletFallback(el);
+            }
+        },
+        async mountLeafletFallback(el) {
+            const L = await ensureLeaflet();
+            if (this._map?.setView) {
+                return;
+            }
+            this._map = L.map(el, { zoomControl: true }).setView([this.draft.lat, this.draft.lng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap',
+            }).addTo(this._map);
+            this._marker = L.marker([this.draft.lat, this.draft.lng], { draggable: true }).addTo(this._map);
+            this._map.on('click', (event) => this.dropPin(event.latlng.lat, event.latlng.lng, true));
+            this._marker.on('dragend', () => {
+                const point = this._marker.getLatLng();
+                this.dropPin(point.lat, point.lng, true);
+            });
+            window.setTimeout(() => this._map?.invalidateSize?.(), 120);
+        },
+        setPlace(place) {
+            this.draft = {
+                label: place.label,
+                lat: Number(place.lat),
+                lng: Number(place.lng),
+            };
+            this.dropPin(place.lat, place.lng, false);
+            if (this._map?.setCenter) {
+                this._map.setCenter({ lat: this.draft.lat, lng: this.draft.lng });
+                this._map.setZoom(Math.max(this._map.getZoom?.() || 13, 14));
+                this._marker?.setPosition?.({ lat: this.draft.lat, lng: this.draft.lng });
+            } else if (this._map?.setView) {
+                this._map.setView([this.draft.lat, this.draft.lng], Math.max(this._map.getZoom(), 14));
+                this._marker?.setLatLng([this.draft.lat, this.draft.lng]);
+            }
+        },
+        async dropPin(lat, lng, reverse = false) {
+            const nextLat = Number(Number(lat).toFixed(6));
+            const nextLng = Number(Number(lng).toFixed(6));
+            this.draft = {
+                label: reverse ? (this.geocoding ? 'Looking up address…' : this.draft.label) : this.draft.label,
+                lat: nextLat,
+                lng: nextLng,
+            };
+            if (this._marker?.setPosition) {
+                this._marker.setPosition({ lat: nextLat, lng: nextLng });
+            } else if (this._marker?.setLatLng) {
+                this._marker.setLatLng([nextLat, nextLng]);
+            }
+            if (this._marker?.setPosition && this._map?.panTo) {
+                this._map.panTo({ lat: nextLat, lng: nextLng });
+            } else if (this._map?.panTo && this._marker?.setLatLng) {
+                this._map.panTo([nextLat, nextLng]);
+            }
+            if (!reverse) {
+                return;
+            }
+            this.geocoding = true;
+            try {
+                this.draft = {
+                    label: await this.reverseGeocode(nextLat, nextLng),
+                    lat: nextLat,
+                    lng: nextLng,
+                };
+            } finally {
+                this.geocoding = false;
+            }
+        },
+        async reverseGeocode(lat, lng) {
+            if (this.mapsKey) {
+                try {
+                    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${encodeURIComponent(this.mapsKey)}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    const label = data?.results?.[0]?.formatted_address;
+                    if (label) {
+                        return label;
+                    }
+                } catch (_) {
+                    // fall through
+                }
+            }
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`;
+                const res = await fetch(url, { headers: { Accept: 'application/json' } });
+                const data = await res.json();
+                return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            } catch (_) {
+                return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+            }
+        },
+        async searchPlaces() {
+            const query = String(this.search || '').trim();
+            if (!query) {
+                return;
+            }
+            this.searching = true;
+            try {
+                if (this.mapsKey) {
+                    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:eg&key=${encodeURIComponent(this.mapsKey)}`;
+                    // Browser calls to Places REST are often blocked by CORS; Autocomplete widget handles search.
+                    // Keep local chips as backup.
+                }
+                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=eg&q=${encodeURIComponent(query)}`;
+                const res = await fetch(url, { headers: { Accept: 'application/json' } });
+                const rows = res.ok ? await res.json() : [];
+                const remote = (Array.isArray(rows) ? rows : []).map((row) => ({
+                    label: row.display_name,
+                    lat: Number(row.lat),
+                    lng: Number(row.lon),
+                })).filter((row) => row.label && row.lat && row.lng);
+                const local = this.places.filter((place) => place.label.toLowerCase().includes(query.toLowerCase()));
+                this.suggestions = remote.length ? remote : local;
+                if (this.suggestions.length) {
+                    this.setPlace(this.suggestions[0]);
+                }
+            } catch (_) {
+                this.suggestions = this.places.filter((place) => place.label.toLowerCase().includes(query.toLowerCase()));
+            } finally {
+                this.searching = false;
+            }
+        },
+        async locate() {
+            if (!navigator.geolocation) {
+                return;
+            }
+            this.locating = true;
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000 });
+                });
+                await this.dropPin(position.coords.latitude, position.coords.longitude, true);
+            } finally {
+                this.locating = false;
+            }
         },
     }));
 
