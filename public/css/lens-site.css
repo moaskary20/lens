@@ -3725,9 +3725,33 @@ main { padding-bottom: 8px; }
     .foot-col a { font-size: 12.5px; gap: 6px; }
     .foot-trust { grid-template-columns: repeat(2, 1fr); gap: 14px 8px; }
     .foot-trust span { border-right: 0; padding: 0; }
-    .foot-social { flex-wrap: wrap; }
-    .foot-app .store-badge { width: 100%; }
-    .foot-qr-wrap { width: 100%; }
+    .foot-social { flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-bottom: 12px; }
+    .foot-app {
+        display: grid;
+        gap: 0;
+        align-content: start;
+    }
+    .foot-app > p {
+        max-width: none;
+        margin: 0 0 10px;
+        font-size: 12.5px;
+        line-height: 1.4;
+    }
+    .foot-app .store-badge {
+        width: 100%;
+        max-width: 220px;
+        margin-top: 6px;
+    }
+    .foot-app .store-badge:first-of-type { margin-top: 0; }
+    .foot-qr-wrap { display: none; }
+    .foot-follow > p {
+        max-width: none;
+        margin: 0 0 2px;
+        font-size: 12.5px;
+        line-height: 1.4;
+    }
+    .foot-stats { margin-top: 12px; gap: 12px; }
+    .foot-stats strong { font-size: 18px; }
     .foot-cta-copy h2 { font-size: 22px; }
     .foot-bar-trust { grid-template-columns: 1fr; gap: 12px; }
     .foot-pay-logos { flex-wrap: wrap; }
