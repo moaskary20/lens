@@ -1091,7 +1091,7 @@ void main() {
     expect(find.text('English'), findsOneWidget);
     expect(find.text('Arabic'), findsOneWidget);
     expect(find.text('My Bookings'), findsOneWidget);
-    expect(find.text('Saved Creators'), findsOneWidget);
+    expect(find.text('Saved Vendors'), findsOneWidget);
     expect(find.text('Payment Methods'), findsOneWidget);
     expect(find.text('Addresses'), findsOneWidget);
     await tester.tap(find.text('Payment Methods'));

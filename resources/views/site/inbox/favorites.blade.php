@@ -3,7 +3,7 @@
 @section('content')
 <section class="account-page wrap" data-reveal>
     <div class="page-head">
-        <h1>Saved creators</h1>
+        <h1>Saved vendors</h1>
         <p class="lede">Creatives you hearted across web and app.</p>
     </div>
     <div class="cards" style="margin-top:18px">

@@ -18,7 +18,7 @@
         ],
         [
             'href' => route('site.favorites'),
-            'label' => 'Saved creators',
+            'label' => 'Saved vendors',
             'copy' => 'Your shortlist for the next shoot',
             'image' => asset('branding/account/favorites.svg'),
         ],

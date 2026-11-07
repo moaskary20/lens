@@ -16,7 +16,7 @@ class FavoritesRelationManager extends RelationManager
 {
     protected static string $relationship = 'favorites';
 
-    protected static ?string $title = 'Saved creators';
+    protected static ?string $title = 'Saved vendors';
 
     protected static bool $isLazy = false;
 

@@ -68,7 +68,7 @@ class ProfilePage extends StatelessWidget {
                   onTap: () => _guard(context, () => openWallet(context, data)),
                 ),
               if (data.on('favorites'))
-                _row(context, Icons.favorite_border_rounded, 'Saved Creators', onTap: () => openFavorites(context, data)),
+                _row(context, Icons.favorite_border_rounded, 'Saved Vendors', onTap: () => openFavorites(context, data)),
               _row(context, Icons.credit_card_outlined, 'Payment Methods', onTap: () => _guard(context, () => _openPage(context, PaymentMethodsPage(home: data)))),
               _row(context, Icons.location_on_outlined, 'Addresses', onTap: () => _guard(context, () => _openPage(context, const AddressesPage()))),
               if (data.on('notifications'))

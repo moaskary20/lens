@@ -99,7 +99,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                           children: [
                             Icon(Icons.favorite_border_rounded, color: LensColors.primary, size: 42),
                             SizedBox(height: 14),
-                            Text('No saved creators yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                            Text('No saved vendors yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
                             SizedBox(height: 8),
                             Text(
                               'Tap the heart on a photographer, studio, or creator to keep them here.',

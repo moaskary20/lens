@@ -59,7 +59,7 @@ class Roles
                 'filter_location' => ['label' => 'Filter by location', 'description' => 'Egyptian governorate and distance', 'default' => true, 'group' => 'discovery'],
                 'filter_availability' => ['label' => 'Filter by availability', 'description' => 'Today, weekend, or a specific slot', 'default' => true, 'group' => 'discovery'],
                 'view_map' => ['label' => 'Use the map', 'description' => 'Mini map of nearby creators in the app', 'default' => true, 'group' => 'discovery'],
-                'save_favorites' => ['label' => 'Save favorites', 'description' => 'Heart creators and reopen them from Saved Creators', 'default' => true, 'group' => 'discovery'],
+                'save_favorites' => ['label' => 'Save favorites', 'description' => 'Heart vendors and reopen them from Saved Vendors', 'default' => true, 'group' => 'discovery'],
                 'book_sessions' => ['label' => 'Book sessions', 'description' => 'Checkout into Lens escrow', 'default' => true, 'group' => 'bookings'],
                 'review_watermarked' => ['label' => 'Review watermarked deliverables', 'description' => 'Protected previewer before approval', 'default' => true, 'group' => 'bookings'],
                 'request_revisions' => ['label' => 'Request revisions', 'description' => 'Ask for edits over in-app chat', 'default' => true, 'group' => 'bookings'],

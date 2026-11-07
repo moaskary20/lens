@@ -148,6 +148,6 @@ class ClientInboxTest extends TestCase
 
         $this->actingAs($admin)->get('/admin/clients/'.$client->id.'/edit')
             ->assertOk()
-            ->assertSee('Saved creators', false);
+            ->assertSee('Saved vendors', false);
     }
 }
