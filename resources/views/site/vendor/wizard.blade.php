@@ -9,7 +9,7 @@
         ['label' => 'Type & bio', 'hint' => 'Your craft'],
         ['label' => 'Portfolio', 'hint' => 'Your work'],
         ['label' => 'Pricing', 'hint' => 'Your rates'],
-        ['label' => 'Calendar', 'hint' => 'Availability'],
+        ['label' => 'Availability', 'hint' => 'Working hours'],
         ['label' => 'Payouts', 'hint' => 'Get paid'],
     ];
 @endphp
@@ -270,53 +270,15 @@
                 x-show="step === 5"
                 x-cloak
                 class="vj-pane"
-                x-data="{
-                    days: [
-                        { key: 'Sun', full: 'Sunday', on: true, start: '10:00', end: '18:00' },
-                        { key: 'Mon', full: 'Monday', on: true, start: '10:00', end: '18:00' },
-                        { key: 'Tue', full: 'Tuesday', on: true, start: '10:00', end: '18:00' },
-                        { key: 'Wed', full: 'Wednesday', on: true, start: '10:00', end: '18:00' },
-                        { key: 'Thu', full: 'Thursday', on: true, start: '10:00', end: '18:00' },
-                        { key: 'Fri', full: 'Friday', on: false, start: '10:00', end: '18:00' },
-                        { key: 'Sat', full: 'Saturday', on: true, start: '10:00', end: '18:00' },
-                    ],
-                    get activeCount() { return this.days.filter(d => d.on).length; },
-                    setWeekdays() {
-                        this.days.forEach((d, i) => { d.on = i >= 1 && i <= 5; });
-                    },
-                    setAll(on) {
-                        this.days.forEach(d => { d.on = on; });
-                    },
-                    slotIso(weekday, time, weeksAhead = 0) {
-                        const now = new Date();
-                        const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-                        const delta = (weekday - date.getDay() + 7) % 7;
-                        date.setDate(date.getDate() + delta + (weeksAhead * 7));
-                        const [hh, mm] = String(time || '10:00').split(':');
-                        date.setHours(Number(hh) || 0, Number(mm) || 0, 0, 0);
-                        return date.toISOString();
-                    },
-                    payloadSlots() {
-                        const out = [];
-                        this.days.forEach((day, weekday) => {
-                            if (!day.on) return;
-                            out.push({
-                                starts_at: this.slotIso(weekday, day.start, 0),
-                                ends_at: this.slotIso(weekday, day.end, 0),
-                                status: 'open',
-                            });
-                        });
-                        return out;
-                    },
-                }"
+                x-data="vendorAvailability()"
             >
                 <header class="acc-sub-card-head">
                     <span class="acc-sub-card-ico" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
                     </span>
                     <div>
-                        <h2>Calendar</h2>
-                        <p>Pick your open days and hours — you can refine later in Vendor studio.</p>
+                        <h2>Availability</h2>
+                        <p>Set your weekly working hours — clients book inside these windows.</p>
                     </div>
                 </header>
 
@@ -327,43 +289,111 @@
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg>
                             </span>
                             <div>
-                                <strong x-text="activeCount + ' day' + (activeCount === 1 ? '' : 's') + ' open this week'"></strong>
-                                <small>Tap a day to toggle · edit hours when open</small>
+                                <strong x-text="activeCount + ' open day' + (activeCount === 1 ? '' : 's') + ' · ' + (Number.isInteger(totalHours) ? totalHours : totalHours.toFixed(1)) + 'h / week'"></strong>
+                                <small x-text="'Publishes the next ' + weeksAhead + ' weeks · refine anytime in Vendor studio'"></small>
                             </div>
                         </div>
-                        <div class="vj-cal-presets">
-                            <button type="button" class="ghost-btn" @click="setWeekdays()">Weekdays</button>
-                            <button type="button" class="ghost-btn" @click="setAll(true)">All days</button>
-                            <button type="button" class="ghost-btn" @click="setAll(false)">Clear</button>
+                        <div class="vj-cal-stats" aria-hidden="true">
+                            <span><em x-text="activeCount"></em> days</span>
+                            <span><em x-text="Number.isInteger(totalHours) ? totalHours : totalHours.toFixed(1)"></em> hrs</span>
                         </div>
                     </div>
 
-                    <div class="vj-days" role="group" aria-label="Weekly availability">
+                    <div class="vj-cal-defaults">
+                        <div class="vj-cal-defaults-copy">
+                            <strong>Default hours</strong>
+                            <small>Apply one schedule to every open day</small>
+                        </div>
+                        <div class="vj-cal-defaults-controls">
+                            <label>
+                                <span>From</span>
+                                <select x-model="defaultStart">
+                                    <template x-for="t in timeOptions" :key="'ds-' + t">
+                                        <option :value="t" x-text="t"></option>
+                                    </template>
+                                </select>
+                            </label>
+                            <span class="vj-day-hours-sep" aria-hidden="true">→</span>
+                            <label>
+                                <span>To</span>
+                                <select x-model="defaultEnd">
+                                    <template x-for="t in timeOptions" :key="'de-' + t">
+                                        <option :value="t" x-text="t"></option>
+                                    </template>
+                                </select>
+                            </label>
+                            <button type="button" class="ai-btn vj-cal-apply" @click="applyDefault()">Apply to open days</button>
+                        </div>
+                    </div>
+
+                    <div class="vj-cal-presets" role="group" aria-label="Schedule presets">
+                        <button type="button" class="ghost-btn" @click="applyPreset('standard')">Standard 10–18</button>
+                        <button type="button" class="ghost-btn" @click="applyPreset('early')">Early 9–17</button>
+                        <button type="button" class="ghost-btn" @click="applyPreset('late')">Late 12–20</button>
+                        <button type="button" class="ghost-btn" @click="applyPreset('weekend')">Weekends</button>
+                        <button type="button" class="ghost-btn" @click="setWeekdays()">Weekdays</button>
+                        <button type="button" class="ghost-btn" @click="setAll(true)">All days</button>
+                        <button type="button" class="ghost-btn" @click="setAll(false)">Clear</button>
+                    </div>
+
+                    <div class="vj-cal-legend" aria-hidden="true">
+                        <span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span>
+                    </div>
+
+                    <div class="vj-schedule" role="group" aria-label="Weekly working hours">
                         <template x-for="(day, i) in days" :key="day.key">
-                            <div class="vj-day" :class="{ 'is-on': day.on }">
-                                <button type="button" class="vj-day-card" @click="day.on = !day.on" :aria-pressed="day.on.toString()" :aria-label="day.full">
-                                    <span class="vj-day-badge" x-text="day.key"></span>
-                                    <strong x-text="day.full"></strong>
-                                    <span class="vj-day-meta">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg>
-                                        <small x-show="day.on" x-text="day.start + ' – ' + day.end"></small>
-                                        <small x-show="!day.on" class="is-off">Day off</small>
-                                    </span>
-                                    <span class="vj-day-check" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>
-                                    </span>
+                            <div class="vj-sched-row" :class="{ 'is-on': day.on, 'is-invalid': day.on && dayHours(day) <= 0 }">
+                                <button
+                                    type="button"
+                                    class="vj-sched-toggle"
+                                    @click="day.on = !day.on"
+                                    :aria-pressed="day.on.toString()"
+                                    :aria-label="day.full + (day.on ? ' open' : ' closed')"
+                                >
+                                    <span class="vj-sched-switch" aria-hidden="true"></span>
                                 </button>
 
-                                <div class="vj-day-hours" x-show="day.on" x-cloak @click.stop>
+                                <div class="vj-sched-day">
+                                    <strong x-text="day.full"></strong>
+                                    <small x-text="day.key"></small>
+                                </div>
+
+                                <div class="vj-sched-bar" aria-hidden="true">
+                                    <span class="vj-sched-bar-track"></span>
+                                    <span class="vj-sched-bar-fill" :style="barStyle(day)"></span>
+                                </div>
+
+                                <div class="vj-sched-times" x-show="day.on" x-cloak>
                                     <label>
                                         <span>From</span>
-                                        <input type="time" x-model="day.start">
+                                        <select x-model="day.start">
+                                            <template x-for="t in timeOptions" :key="day.key + '-s-' + t">
+                                                <option :value="t" x-text="t"></option>
+                                            </template>
+                                        </select>
                                     </label>
                                     <span class="vj-day-hours-sep" aria-hidden="true">→</span>
                                     <label>
                                         <span>To</span>
-                                        <input type="time" x-model="day.end">
+                                        <select x-model="day.end">
+                                            <template x-for="t in timeOptions" :key="day.key + '-e-' + t">
+                                                <option :value="t" x-text="t"></option>
+                                            </template>
+                                        </select>
                                     </label>
+                                </div>
+                                <div class="vj-sched-closed" x-show="!day.on" x-cloak>Closed</div>
+
+                                <div class="vj-sched-meta">
+                                    <span class="vj-sched-hours" x-text="dayHoursLabel(day)"></span>
+                                    <button
+                                        type="button"
+                                        class="vj-sched-copy"
+                                        x-show="day.on"
+                                        x-cloak
+                                        @click="copyToOpen(i)"
+                                        title="Copy these hours to other open days"
+                                    >Copy</button>
                                 </div>
                             </div>
                         </template>
