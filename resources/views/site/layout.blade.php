@@ -16,7 +16,9 @@
     <div class="app-open-banner" data-app-open-banner hidden>
         <div class="app-open-banner-inner wrap">
             <div class="app-open-banner-copy">
-                <img src="{{ asset('branding/lenslogo_mark.png') }}" alt="" width="36" height="36">
+                <span class="app-open-banner-logo" aria-hidden="true">
+                    <img src="{{ asset('branding/lenslogo_mark.png') }}" alt="">
+                </span>
                 <div>
                     <strong>Lens app</strong>
                     <small>Open the full mobile experience</small>

@@ -285,12 +285,24 @@ main { padding-bottom: 8px; }
     gap: 10px;
     min-width: 0;
 }
-.app-open-banner-copy img {
-    width: 36px;
+.app-open-banner-logo {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 78px;
     height: 36px;
+    padding: 5px 8px;
     border-radius: 10px;
-    object-fit: cover;
-    background: #1a140f;
+    background: #000;
+    border: 1px solid rgba(255, 87, 34, .28);
+    overflow: hidden;
+}
+.app-open-banner-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    display: block;
 }
 .app-open-banner-copy strong {
     display: block;
