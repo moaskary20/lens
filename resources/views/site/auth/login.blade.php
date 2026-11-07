@@ -47,7 +47,7 @@
                 <li>Chat with creatives after you book</li>
                 <li>Same account on web and mobile</li>
             </ul>
-            <a class="ghost-btn" href="{{ route('site.vendors.join') }}" style="display:inline-flex;margin-top:18px">Join as a creator →</a>
+            <a class="ghost-btn" href="{{ route('site.vendors.join') }}" style="display:inline-flex;margin-top:18px">Join as a vendor →</a>
         </aside>
     </div>
 </section>
