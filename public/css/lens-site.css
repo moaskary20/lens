@@ -586,8 +586,33 @@ main { padding-bottom: 8px; }
 @media (max-width: 640px) {
     .acc-identity { align-items: flex-start; }
     .acc-avatar { width: 58px; height: 58px; border-radius: 18px; }
-    .acc-tiles { grid-template-columns: 1fr; }
-    .acc-tile { min-height: 152px; }
+    .acc-hub { padding: 22px 0 56px; }
+    .acc-hub-head { margin-bottom: 14px; }
+    .acc-hub-head h2 { font-size: 22px; }
+    .acc-tiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .acc-tile {
+        min-height: 148px;
+        border-radius: 16px;
+    }
+    .acc-tile-copy {
+        padding: 12px;
+        gap: 3px;
+    }
+    .acc-tile-copy strong {
+        font-size: .92rem;
+        line-height: 1.2;
+    }
+    .acc-tile-copy small {
+        font-size: .72rem;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
     .acc-hero-copy { padding: 36px 0 28px; }
     .acc-secondary { padding: 16px; border-radius: 20px; }
     .acc-link { gap: 12px; padding: 12px 12px; }
