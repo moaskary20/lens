@@ -549,6 +549,88 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    Alpine.data('vendorProjects', (config = {}) => ({
+        projects: (() => {
+            const incoming = Array.isArray(config.projects) ? config.projects : [];
+            if (!incoming.length) {
+                return [{
+                    type: 'image',
+                    title: '',
+                    completed_on: '',
+                    external_url: '',
+                    description: '',
+                    is_featured: false,
+                    ids: [],
+                    existing: [],
+                }];
+            }
+            return incoming.map((project) => ({
+                type: project.type || 'image',
+                title: project.title || '',
+                completed_on: project.completed_on || '',
+                external_url: project.external_url || '',
+                description: project.description || '',
+                is_featured: Boolean(project.is_featured),
+                ids: Array.isArray(project.ids) ? project.ids : (project.id ? [project.id] : []),
+                existing: Array.isArray(project.files)
+                    ? project.files.map((file) => ({
+                        id: file.id,
+                        name: file.name || 'Media',
+                        url: file.url || null,
+                        kind: file.kind || file.type || 'image',
+                    }))
+                    : [],
+            }));
+        })(),
+        add() {
+            this.projects.push({
+                type: 'image',
+                title: '',
+                completed_on: '',
+                external_url: '',
+                description: '',
+                is_featured: false,
+                ids: [],
+                existing: [],
+            });
+        },
+        remove(index) {
+            if (this.projects.length <= 1) {
+                this.projects[0] = {
+                    type: 'image',
+                    title: '',
+                    completed_on: '',
+                    external_url: '',
+                    description: '',
+                    is_featured: false,
+                    ids: [],
+                    existing: [],
+                };
+                return;
+            }
+            this.projects.splice(index, 1);
+        },
+        removeExisting(projectIndex, fileIndex) {
+            const project = this.projects[projectIndex];
+            if (!project) {
+                return;
+            }
+            const removed = project.existing.splice(fileIndex, 1)[0];
+            if (removed?.id) {
+                project.ids = project.ids.filter((id) => Number(id) !== Number(removed.id));
+            }
+        },
+        acceptFor(type) {
+            if (type === 'video') {
+                return 'video/*';
+            }
+            if (type === 'link') {
+                return '';
+            }
+            return 'image/*';
+        },
+    }));
+
     Alpine.data('vendorAvailability', () => ({
         defaultStart: '10:00',
         defaultEnd: '18:00',

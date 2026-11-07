@@ -7,7 +7,7 @@
     $steps = [
         ['label' => 'Identity', 'hint' => 'Who you are'],
         ['label' => 'Type & bio', 'hint' => 'Your craft'],
-        ['label' => 'Portfolio', 'hint' => 'Your work'],
+        ['label' => 'Previous projects', 'hint' => 'Your work'],
         ['label' => 'Pricing', 'hint' => 'Your rates'],
         ['label' => 'Availability', 'hint' => 'Working hours'],
         ['label' => 'Payouts', 'hint' => 'Get paid'],
@@ -71,7 +71,13 @@
         <form method="post"
               action="{{ $editing ? route('site.vendors.profile.update') : route('site.vendors.join.submit') }}"
               enctype="multipart/form-data"
-              class="acc-sub-card vj-card acc-sub-form">
+              class="acc-sub-card vj-card acc-sub-form"
+              @submit="document.querySelectorAll('[data-vj-project]').forEach((card) => {
+                  const title = (card.querySelector('[data-vj-title]')?.value || '').trim();
+                  if (!title) {
+                      card.querySelectorAll('input, select, textarea').forEach((el) => { el.disabled = true; });
+                  }
+              })">
             @csrf
             @unless($editing)
                 <input type="hidden" name="role" value="vendor">
@@ -217,16 +223,22 @@
                 </div>
             </div>
 
-            <div x-show="step === 3" x-cloak class="vj-pane">
+            <div
+                x-show="step === 3"
+                x-cloak
+                class="vj-pane"
+                x-data="vendorProjects({ projects: @js(old('projects', $vendor['projects'] ?? [])) })"
+            >
                 <header class="acc-sub-card-head">
                     <span class="acc-sub-card-ico" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 16-5-4-4 3-3-2-4 4"/></svg>
                     </span>
                     <div>
-                        <h2>Portfolio</h2>
-                        <p>Add a cover — polish projects later in Vendor studio.</p>
+                        <h2>Previous projects</h2>
+                        <p>Upload photos, a gallery, videos, or social links — same as the app and admin.</p>
                     </div>
                 </header>
+
                 <div class="vj-upload">
                     <span class="vj-upload-ico" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V6m0 0 4 4m-4-4-4 4"/><path d="M4 18h16"/></svg>
@@ -237,6 +249,89 @@
                     </div>
                     <input type="file" name="cover_image" accept="image/*">
                 </div>
+
+                <div class="vj-projects">
+                    <template x-for="(project, index) in projects" :key="'project-' + index">
+                        <article class="vj-project" data-vj-project>
+                            <header class="vj-project-head">
+                                <strong x-text="'Project ' + (index + 1)"></strong>
+                                <button type="button" class="ghost-btn vj-project-remove" @click="remove(index)">Remove</button>
+                            </header>
+
+                            <div class="vj-project-type" role="group" :aria-label="'Project ' + (index + 1) + ' type'">
+                                <template x-for="opt in [
+                                    { id: 'image', label: 'Photo' },
+                                    { id: 'video', label: 'Video' },
+                                    { id: 'link', label: 'Social / link' },
+                                ]" :key="opt.id">
+                                    <button
+                                        type="button"
+                                        class="book-chip"
+                                        :class="project.type === opt.id && 'is-active'"
+                                        @click="project.type = opt.id"
+                                        x-text="opt.label"
+                                    ></button>
+                                </template>
+                            </div>
+                            <input type="hidden" :name="'projects[' + index + '][type]'" :value="project.type">
+
+                            <div class="acc-sub-grid vj-project-grid">
+                                <label>
+                                    <span class="acc-sub-label">Project title</span>
+                                    <input type="text" data-vj-title :name="'projects[' + index + '][title]'" x-model="project.title" placeholder="Wedding film · Brand shoot">
+                                </label>
+                                <label>
+                                    <span class="acc-sub-label">Completed on</span>
+                                    <input type="text" :name="'projects[' + index + '][completed_on]'" x-model="project.completed_on" placeholder="2025 · March 2026">
+                                </label>
+                                <label class="acc-sub-span-2" x-show="project.type !== 'image'" x-cloak>
+                                    <span class="acc-sub-label" x-text="project.type === 'link' ? 'Sample URL' : 'Sample URL (optional)'"></span>
+                                    <input type="url" :name="'projects[' + index + '][external_url]'" x-model="project.external_url" placeholder="https://">
+                                </label>
+                                <label class="acc-sub-span-2">
+                                    <span class="acc-sub-label">Description</span>
+                                    <textarea :name="'projects[' + index + '][description]'" x-model="project.description" rows="2" placeholder="Brief about the job"></textarea>
+                                </label>
+                                <label class="acc-sub-check">
+                                    <input type="checkbox" :name="'projects[' + index + '][is_featured]'" value="1" x-model="project.is_featured">
+                                    <span>Featured on profile</span>
+                                </label>
+                            </div>
+
+                            <template x-for="id in project.ids" :key="'id-' + index + '-' + id">
+                                <input type="hidden" :name="'projects[' + index + '][ids][]'" :value="id">
+                            </template>
+
+                            <div class="vj-project-media" x-show="project.type !== 'link'" x-cloak>
+                                <label class="vj-upload vj-upload-inline">
+                                    <span class="vj-upload-ico" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V6m0 0 4 4m-4-4-4 4"/><path d="M4 18h16"/></svg>
+                                    </span>
+                                    <div>
+                                        <strong x-text="project.type === 'video' ? 'Add videos' : 'Add photos / gallery'"></strong>
+                                        <p x-text="project.type === 'video' ? 'MP4 or MOV · multiple allowed' : 'JPG or PNG · multiple allowed'"></p>
+                                    </div>
+                                    <input type="file" :name="'projects[' + index + '][files][]'" :accept="acceptFor(project.type)" multiple>
+                                </label>
+
+                                <div class="vj-project-files" x-show="project.existing.length" x-cloak>
+                                    <template x-for="(file, fileIndex) in project.existing" :key="'file-' + index + '-' + fileIndex">
+                                        <span class="vj-project-file">
+                                            <span x-text="file.name"></span>
+                                            <button type="button" @click="removeExisting(index, fileIndex)" aria-label="Remove media">×</button>
+                                        </span>
+                                    </template>
+                                </div>
+                            </div>
+                        </article>
+                    </template>
+
+                    <button type="button" class="ghost-btn vj-project-add" @click="add()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Add previous project
+                    </button>
+                </div>
+
                 <div class="vj-actions">
                     <button class="ghost-btn" type="button" @click="prev()">Back</button>
                     <button class="ai-btn" type="button" @click="next()">Continue</button>
