@@ -167,7 +167,7 @@
                             </span>
                             <span class="book-map-trigger-copy">
                                 <strong x-text="preview"></strong>
-                                <small x-text="hasPin ? coordsLabel : 'Search or drop a pin on Google Maps'"></small>
+                                <small x-text="hasPin ? coordsLabel : 'Search or drop a pin on the map'"></small>
                             </span>
                             <span class="book-map-trigger-cta">Open map</span>
                         </button>
@@ -185,7 +185,7 @@
                                         type="search"
                                         x-ref="searchInput"
                                         x-model="search"
-                                        placeholder="Search Google Maps in Egypt…"
+                                        placeholder="Search places in Egypt…"
                                         @keydown.enter.prevent="searchPlaces()"
                                     >
                                     <button type="button" class="ai-btn" @click="searchPlaces()" :disabled="searching" x-text="searching ? '…' : 'Search'"></button>

@@ -83,7 +83,7 @@
                                 </span>
                                 <span class="book-map-trigger-copy">
                                     <strong x-text="preview"></strong>
-                                    <small x-text="hasPin ? coordsLabel : 'Search or drop a pin on Google Maps'"></small>
+                                    <small x-text="hasPin ? coordsLabel : 'Search or drop a pin on the map'"></small>
                                 </span>
                                 <span class="book-map-trigger-cta">Open map</span>
                             </button>
@@ -95,7 +95,7 @@
                                         <button type="button" class="ghost-btn" style="margin:0" @click="locate()" :disabled="locating" x-text="locating ? 'Locating…' : 'GPS'"></button>
                                     </header>
                                     <div class="book-map-search">
-                                        <input type="search" x-ref="searchInput" x-model="search" placeholder="Search Google Maps in Egypt…" @keydown.enter.prevent="searchPlaces()">
+                                        <input type="search" x-ref="searchInput" x-model="search" placeholder="Search places in Egypt…" @keydown.enter.prevent="searchPlaces()">
                                         <button type="button" class="ai-btn" @click="searchPlaces()" :disabled="searching" x-text="searching ? '…' : 'Search'"></button>
                                     </div>
                                     <div class="book-chip-row book-map-chips">

@@ -790,83 +790,27 @@ document.addEventListener('alpine:init', () => {
             if (!el) {
                 return;
             }
-            if (this._map && this._engine) {
-                if (this._engine === 'google') {
-                    const center = { lat: Number(this.draft.lat), lng: Number(this.draft.lng) };
-                    this._map.setCenter(center);
-                    this._marker?.setPosition?.(center);
-                    window.google?.maps?.event?.trigger?.(this._map, 'resize');
-                    return;
-                }
+            // Do not mount Google Maps JS here: the mobile key loads but then paints
+            // "Sorry! Something went wrong" when Maps JavaScript API / referrers are not set for web.
+            // Leaflet + server /maps/* (Google key then Nominatim) is the reliable web path.
+            if (this._map && this._engine === 'leaflet') {
                 this._map.setView([this.draft.lat, this.draft.lng], Math.max(this._map.getZoom?.() || 13, 13));
                 this._marker?.setLatLng?.([this.draft.lat, this.draft.lng]);
                 window.setTimeout(() => this._map?.invalidateSize?.(), 80);
+                window.setTimeout(() => this._map?.invalidateSize?.(), 280);
                 return;
             }
-            // Google Maps JS key matches mobile, but Maps JavaScript / Places / Geocoding
-            // are often restricted or not enabled for browser referrers — try Google briefly,
-            // then fall back to a working OpenStreetMap canvas.
-            try {
-                const maps = await Promise.race([
-                    ensureGoogleMaps(this.mapsKey),
-                    new Promise((_, reject) => window.setTimeout(() => reject(new Error('Google Maps slow')), 1800)),
-                ]);
-                const center = { lat: Number(this.draft.lat), lng: Number(this.draft.lng) };
-                this._engine = 'google';
-                this.engine = 'google';
-                this._map = new maps.Map(el, {
-                    center,
-                    zoom: 13,
-                    mapTypeControl: false,
-                    streetViewControl: false,
-                    fullscreenControl: false,
-                });
-                this._marker = new maps.Marker({
-                    map: this._map,
-                    position: center,
-                    draggable: true,
-                });
-                this._map.addListener('click', (event) => {
-                    if (!event.latLng) {
-                        return;
-                    }
-                    this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
-                });
-                this._marker.addListener('dragend', (event) => {
-                    if (!event.latLng) {
-                        return;
-                    }
-                    this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
-                });
-                maps.event.trigger(this._map, 'resize');
-                if (this.$refs.searchInput && maps.places?.Autocomplete && !this._autocomplete) {
-                    this._autocomplete = new maps.places.Autocomplete(this.$refs.searchInput, {
-                        fields: ['formatted_address', 'geometry', 'name'],
-                        componentRestrictions: { country: ['eg'] },
-                    });
-                    this._autocomplete.addListener('place_changed', () => {
-                        const place = this._autocomplete.getPlace();
-                        const loc = place?.geometry?.location;
-                        if (!loc) {
-                            return;
-                        }
-                        this.setPlace({
-                            label: place.formatted_address || place.name || this.search,
-                            lat: loc.lat(),
-                            lng: loc.lng(),
-                        });
-                    });
-                }
-            } catch (_) {
-                this.resetMapCanvas(el);
-                await this.mountLeafletFallback(el);
-            }
+            this.resetMapCanvas(el);
+            await this.mountLeaflet(el);
         },
-        async mountLeafletFallback(el) {
+        async mountLeaflet(el) {
             const L = await ensureLeaflet();
             this._engine = 'leaflet';
             this.engine = 'leaflet';
-            this._map = L.map(el, { zoomControl: true }).setView([this.draft.lat, this.draft.lng], 13);
+            this._map = L.map(el, { zoomControl: true, scrollWheelZoom: true }).setView(
+                [this.draft.lat, this.draft.lng],
+                13,
+            );
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; OpenStreetMap',
@@ -877,8 +821,8 @@ document.addEventListener('alpine:init', () => {
                 const point = this._marker.getLatLng();
                 this.dropPin(point.lat, point.lng, true);
             });
-            window.setTimeout(() => this._map?.invalidateSize?.(), 120);
-            window.setTimeout(() => this._map?.invalidateSize?.(), 360);
+            window.setTimeout(() => this._map?.invalidateSize?.(), 80);
+            window.setTimeout(() => this._map?.invalidateSize?.(), 280);
         },
         setPlace(place) {
             this.draft = {
@@ -887,11 +831,7 @@ document.addEventListener('alpine:init', () => {
                 lng: Number(place.lng),
             };
             this.dropPin(place.lat, place.lng, false);
-            if (this._engine === 'google' && this._map?.setCenter) {
-                this._map.setCenter({ lat: this.draft.lat, lng: this.draft.lng });
-                this._map.setZoom(Math.max(this._map.getZoom?.() || 13, 14));
-                this._marker?.setPosition?.({ lat: this.draft.lat, lng: this.draft.lng });
-            } else if (this._map?.setView) {
+            if (this._map?.setView) {
                 this._map.setView([this.draft.lat, this.draft.lng], Math.max(this._map.getZoom?.() || 13, 14));
                 this._marker?.setLatLng([this.draft.lat, this.draft.lng]);
             }
@@ -904,10 +844,7 @@ document.addEventListener('alpine:init', () => {
                 lat: nextLat,
                 lng: nextLng,
             };
-            if (this._engine === 'google' && this._marker?.setPosition) {
-                this._marker.setPosition({ lat: nextLat, lng: nextLng });
-                this._map?.panTo?.({ lat: nextLat, lng: nextLng });
-            } else if (this._marker?.setLatLng) {
+            if (this._marker?.setLatLng) {
                 this._marker.setLatLng([nextLat, nextLng]);
                 this._map?.panTo?.([nextLat, nextLng]);
             }
