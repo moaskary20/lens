@@ -1095,6 +1095,62 @@ main { padding-bottom: 8px; }
     padding: 10px 12px;
 }
 
+.client-register-hint {
+    color: var(--muted);
+    font-size: .78rem;
+    line-height: 1.35;
+}
+.client-register-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+.client-register-actions .ai-btn,
+.client-register-actions .ghost-btn {
+    margin: 0;
+}
+.client-register-perks {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+.client-register-perk {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid #2a2d34;
+    background:
+        linear-gradient(160deg, rgba(196, 90, 50, .08), transparent 48%),
+        #111318;
+}
+.client-register-perk > span {
+    display: grid;
+    place-items: center;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(255, 90, 31, .12);
+    color: var(--orange);
+    border: 1px solid rgba(255, 90, 31, .28);
+}
+.client-register-perk svg { width: 18px; height: 18px; }
+.client-register-perk strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: .92rem;
+}
+.client-register-perk p {
+    margin: 0;
+    color: var(--muted);
+    font-size: .78rem;
+    line-height: 1.35;
+}
+
 @media (max-width: 960px) {
     .acc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .acc-lower { grid-template-columns: 1fr; }
@@ -1132,6 +1188,9 @@ main { padding-bottom: 8px; }
     }
     .vendor-join .vj-days {
         grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .client-register-perks {
+        grid-template-columns: 1fr;
     }
 }
 @media (max-width: 640px) {
@@ -1275,6 +1334,19 @@ main { padding-bottom: 8px; }
     .vendor-join .vj-actions .ai-btn {
         width: 100%;
         justify-content: center;
+    }
+    .client-register-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .client-register-actions .ai-btn,
+    .client-register-actions .ghost-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    .client-register-perks {
+        grid-template-columns: 1fr;
+        gap: 8px;
     }
 }
 

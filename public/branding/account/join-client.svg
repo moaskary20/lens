@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" role="img" aria-label="Create client account">
+  <defs>
+    <linearGradient id="cBg" x1="40" y1="20" x2="780" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14181a"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="cGlow" cx="420" cy="240" r="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff5a1f" stop-opacity=".32"/><stop offset="1" stop-color="#ff5a1f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#cBg)"/>
+  <rect width="800" height="520" fill="url(#cGlow)"/>
+  <rect x="180" y="130" width="260" height="260" rx="32" fill="#1c1f27" stroke="#2a2d34" stroke-width="3"/>
+  <circle cx="310" cy="230" r="58" fill="#c45a32"/>
+  <circle cx="310" cy="218" r="22" fill="#ff8a50"/>
+  <path d="M268 278c14-26 28-38 42-38s28 12 42 38" fill="none" stroke="#ff8a50" stroke-width="10" stroke-linecap="round"/>
+  <rect x="220" y="320" width="140" height="14" rx="7" fill="#d8d3ca" opacity=".4"/>
+  <rect x="240" y="348" width="100" height="12" rx="6" fill="#d8d3ca" opacity=".22"/>
+  <rect x="470" y="160" width="180" height="220" rx="28" fill="#c45a32"/>
+  <rect x="490" y="180" width="140" height="180" rx="20" fill="#111318"/>
+  <path d="M520 250h80M560 210v80" stroke="#ff5a1f" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="560" cy="320" r="26" fill="#ff8a50"/>
+  <path d="M548 320h24M560 308v24" stroke="#111318" stroke-width="5" stroke-linecap="round"/>
+</svg>
