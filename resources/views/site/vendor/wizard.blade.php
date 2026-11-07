@@ -200,30 +200,118 @@
                 </div>
             </div>
 
-            <div x-show="step === 5" x-cloak class="vj-pane">
+            <div
+                x-show="step === 5"
+                x-cloak
+                class="vj-pane"
+                x-data="{
+                    days: [
+                        { key: 'Sun', full: 'Sunday', on: true, start: '10:00', end: '18:00' },
+                        { key: 'Mon', full: 'Monday', on: true, start: '10:00', end: '18:00' },
+                        { key: 'Tue', full: 'Tuesday', on: true, start: '10:00', end: '18:00' },
+                        { key: 'Wed', full: 'Wednesday', on: true, start: '10:00', end: '18:00' },
+                        { key: 'Thu', full: 'Thursday', on: true, start: '10:00', end: '18:00' },
+                        { key: 'Fri', full: 'Friday', on: false, start: '10:00', end: '18:00' },
+                        { key: 'Sat', full: 'Saturday', on: true, start: '10:00', end: '18:00' },
+                    ],
+                    get activeCount() { return this.days.filter(d => d.on).length; },
+                    setWeekdays() {
+                        this.days.forEach((d, i) => { d.on = i >= 1 && i <= 5; });
+                    },
+                    setAll(on) {
+                        this.days.forEach(d => { d.on = on; });
+                    },
+                    slotIso(weekday, time, weeksAhead = 0) {
+                        const now = new Date();
+                        const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+                        const delta = (weekday - date.getDay() + 7) % 7;
+                        date.setDate(date.getDate() + delta + (weeksAhead * 7));
+                        const [hh, mm] = String(time || '10:00').split(':');
+                        date.setHours(Number(hh) || 0, Number(mm) || 0, 0, 0);
+                        return date.toISOString();
+                    },
+                    payloadSlots() {
+                        const out = [];
+                        this.days.forEach((day, weekday) => {
+                            if (!day.on) return;
+                            out.push({
+                                starts_at: this.slotIso(weekday, day.start, 0),
+                                ends_at: this.slotIso(weekday, day.end, 0),
+                                status: 'open',
+                            });
+                        });
+                        return out;
+                    },
+                }"
+            >
                 <header class="acc-sub-card-head">
                     <span class="acc-sub-card-ico" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
                     </span>
                     <div>
                         <h2>Calendar</h2>
-                        <p>Default week — refine later in Vendor studio.</p>
+                        <p>Pick your open days and hours — you can refine later in Vendor studio.</p>
                     </div>
                 </header>
-                <div class="vj-days">
-                    @foreach(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $i => $day)
-                        <label class="vj-day">
-                            <input type="hidden" name="availabilities[{{ $i }}][weekday]" value="{{ $i }}">
-                            <input type="checkbox" name="availabilities[{{ $i }}][enabled]" value="1" checked>
-                            <span class="vj-day-card">
-                                <strong>{{ $day }}</strong>
-                                <small>10:00–18:00</small>
+
+                <div class="vj-cal">
+                    <div class="vj-cal-toolbar">
+                        <div class="vj-cal-summary">
+                            <span class="vj-cal-summary-ico" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg>
                             </span>
-                            <input type="hidden" name="availabilities[{{ $i }}][start_time]" value="10:00">
-                            <input type="hidden" name="availabilities[{{ $i }}][end_time]" value="18:00">
-                        </label>
-                    @endforeach
+                            <div>
+                                <strong x-text="activeCount + ' day' + (activeCount === 1 ? '' : 's') + ' open this week'"></strong>
+                                <small>Tap a day to toggle · edit hours when open</small>
+                            </div>
+                        </div>
+                        <div class="vj-cal-presets">
+                            <button type="button" class="ghost-btn" @click="setWeekdays()">Weekdays</button>
+                            <button type="button" class="ghost-btn" @click="setAll(true)">All days</button>
+                            <button type="button" class="ghost-btn" @click="setAll(false)">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="vj-days" role="group" aria-label="Weekly availability">
+                        <template x-for="(day, i) in days" :key="day.key">
+                            <div class="vj-day" :class="{ 'is-on': day.on }">
+                                <button type="button" class="vj-day-card" @click="day.on = !day.on" :aria-pressed="day.on.toString()" :aria-label="day.full">
+                                    <span class="vj-day-badge" x-text="day.key"></span>
+                                    <strong x-text="day.full"></strong>
+                                    <span class="vj-day-meta">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg>
+                                        <small x-show="day.on" x-text="day.start + ' – ' + day.end"></small>
+                                        <small x-show="!day.on" class="is-off">Day off</small>
+                                    </span>
+                                    <span class="vj-day-check" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5L20 7"/></svg>
+                                    </span>
+                                </button>
+
+                                <div class="vj-day-hours" x-show="day.on" x-cloak @click.stop>
+                                    <label>
+                                        <span>From</span>
+                                        <input type="time" x-model="day.start">
+                                    </label>
+                                    <span class="vj-day-hours-sep" aria-hidden="true">→</span>
+                                    <label>
+                                        <span>To</span>
+                                        <input type="time" x-model="day.end">
+                                    </label>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <template x-for="(slot, index) in payloadSlots()" :key="'slot-' + index">
+                        <div hidden>
+                            <input type="hidden" :name="'availabilities[' + index + '][starts_at]'" :value="slot.starts_at">
+                            <input type="hidden" :name="'availabilities[' + index + '][ends_at]'" :value="slot.ends_at">
+                            <input type="hidden" :name="'availabilities[' + index + '][status]'" :value="slot.status">
+                        </div>
+                    </template>
                 </div>
+
                 <div class="vj-actions">
                     <button class="ghost-btn" type="button" @click="prev()">Back</button>
                     <button class="ai-btn" type="button" @click="next()">Continue</button>
