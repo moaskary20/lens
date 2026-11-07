@@ -9,6 +9,7 @@ use App\Services\AiAssistant;
 use App\Support\Feature;
 use App\Support\SearchEngine;
 use App\Support\SiteAuth;
+use App\Support\VendorNamePrivacy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -75,12 +76,17 @@ class AiController extends Controller
             'locale' => $request->input('locale'),
         ]);
 
-        $vendors = collect($result['vendors'] ?? [])->map(function ($vendor): array {
+        $viewer = SiteAuth::user();
+        $vendors = collect($result['vendors'] ?? [])->map(function ($vendor) use ($viewer): array {
             $row = is_array($vendor) ? $vendor : [];
+            $presented = VendorNamePrivacy::present([
+                'id' => $row['id'] ?? null,
+                'display_name' => $row['display_name'] ?? $row['public_name'] ?? 'Creator',
+            ], $viewer);
 
             return [
                 'id' => $row['id'] ?? null,
-                'display_name' => $row['display_name'] ?? $row['public_name'] ?? 'Creator',
+                'display_name' => $presented['display_name'],
                 'vendor_type' => $row['vendor_type'] ?? $row['vendor_type_name'] ?? $row['profession'] ?? '',
                 'city' => $row['city'] ?? '',
                 'rating_avg' => $row['rating_avg'] ?? null,

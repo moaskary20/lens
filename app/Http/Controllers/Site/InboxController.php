@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Site\Concerns\InteractsWithSite;
 use App\Models\Vendor;
 use App\Support\SiteAuth;
+use App\Support\VendorNamePrivacy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,9 +28,13 @@ class InboxController extends Controller
         SiteAuth::applyClientHeader(request());
         $payload = $this->jsonData($this->api->favorites());
         $this->shareShell('account');
+        $favorites = $payload['favorites'] ?? $payload['vendors'] ?? $payload;
+        if (is_array($favorites)) {
+            $favorites = VendorNamePrivacy::presentMany($favorites, $this->webUser());
+        }
 
         return view('site.inbox.favorites', [
-            'favorites' => $payload['favorites'] ?? $payload['vendors'] ?? $payload,
+            'favorites' => $favorites,
         ]);
     }
 

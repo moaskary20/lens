@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Site\Concerns;
 use App\Http\Controllers\Api\AppController;
 use App\Models\User;
 use App\Support\SiteAuth;
+use App\Support\VendorNamePrivacy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\View;
@@ -13,7 +14,10 @@ trait InteractsWithSite
 {
     protected function bootstrap(): array
     {
-        return app(AppController::class)->bootstrap()->getData(true);
+        return VendorNamePrivacy::presentBootstrap(
+            app(AppController::class)->bootstrap()->getData(true),
+            $this->webUser(),
+        );
     }
 
     protected function webUser(?Request $request = null): ?User

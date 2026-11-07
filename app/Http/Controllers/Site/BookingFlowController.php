@@ -9,6 +9,7 @@ use App\Http\Controllers\Site\Concerns\InteractsWithSite;
 use App\Models\Booking;
 use App\Models\Vendor;
 use App\Support\BookProjectCatalog;
+use App\Support\VendorNamePrivacy;
 use App\Support\SiteAuth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -35,7 +36,11 @@ class BookingFlowController extends Controller
 
         $this->shareShell('bookings');
 
-        $profile = $this->app->publicProfile($vendor, false);
+        $profile = VendorNamePrivacy::present(
+            $this->app->publicProfile($vendor, false),
+            $this->webUser(),
+            forceReveal: true,
+        );
         $vendorType = (string) ($vendor->vendorType?->slug ?? '');
         $remoteTypes = collect($profile['project_types'] ?? [])
             ->map(fn ($item): string => trim((string) (is_array($item) ? ($item['label'] ?? '') : $item)))

@@ -112,9 +112,10 @@ class SiteHomeTest extends TestCase
         $this->get('/search?vendor_type=photographer')
             ->assertOk()
             ->assertSee('Photographers');
+        $masked = \App\Support\VendorNamePrivacy::mask((string) $vendor->display_name);
         $this->get('/creatives/'.$vendor->id)
             ->assertOk()
-            ->assertSee($vendor->display_name);
+            ->assertSee($masked);
     }
 
     public function test_search_explore_and_bookings_match_mobile_features(): void

@@ -16,6 +16,7 @@ use App\Services\VendorSearch;
 use App\Support\SearchQuery;
 use App\Support\SiteAuth;
 use App\Support\SitePages;
+use App\Support\VendorNamePrivacy;
 use App\Support\VendorPhotos;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -102,6 +103,7 @@ class HomeController extends Controller
             $vendors = array_map(fn (array $row) => $this->app->publicCard($row['vendor']), $found['vendors']);
         }
 
+        $vendors = VendorNamePrivacy::presentMany($vendors, $this->webUser());
         $vendors = collect($vendors);
         if ($minRating) {
             $vendors = $vendors->filter(fn (array $vendor): bool => (float) ($vendor['rating_avg'] ?? 0) >= $minRating);
@@ -376,7 +378,16 @@ class HomeController extends Controller
     {
         abort_unless($vendor->isMarketplaceVisible(), 404);
 
-        $profile = $this->app->publicProfile($vendor, false);
+        $profile = $this->app->publicProfile($vendor, true);
+        $user = $this->webUser();
+        $nameUnlocked = VendorNamePrivacy::unlocked($user, (int) $vendor->id);
+        $profile = VendorNamePrivacy::present($profile, $user);
+        if (! $nameUnlocked) {
+            $profile['contact_unlocked'] = false;
+            $profile['contact_phone'] = null;
+            $profile['whatsapp'] = null;
+        }
+
         $slug = $vendor->vendorType?->slug;
         if (($profile['portfolio'] ?? []) === []) {
             $profile['portfolio'] = array_map(
@@ -420,7 +431,10 @@ class HomeController extends Controller
      */
     protected function bootstrap(): array
     {
-        return $this->app->bootstrap()->getData(true);
+        return VendorNamePrivacy::presentBootstrap(
+            $this->app->bootstrap()->getData(true),
+            $this->webUser(),
+        );
     }
 
     /**
