@@ -135,8 +135,8 @@
                         @endif
                     </span>
                     <span class="vp-follower-copy">
-                        <span class="vp-follower-net">{{ $row['label'] }}</span>
                         <strong>{{ $formatFollowers((int) $row['followers']) }}</strong>
+                        <span class="vp-follower-net">{{ $row['label'] }}</span>
                         <small>Followers</small>
                     </span>
                 </div>

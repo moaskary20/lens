@@ -13,11 +13,11 @@
         <a class="brand" href="{{ route('site.home') }}" aria-label="Lens home">
             <img class="brand-logo" src="{{ asset('branding/lenslogo_mark.png') }}" alt="Lens">
         </a>
-        <nav class="site-nav" aria-label="Primary">
-            <a class="{{ $active === 'home' ? 'is-active' : '' }}" href="{{ route('site.home') }}">Home</a>
-            <a class="{{ $active === 'bookings' ? 'is-active' : '' }}" href="{{ route('site.bookings') }}">Bookings</a>
-            <a class="{{ $active === 'search' ? 'is-active' : '' }}" href="{{ route('site.search') }}">Search</a>
-            <a class="{{ $active === 'explore' ? 'is-active' : '' }}" href="{{ route('site.explore') }}">Explore</a>
+        <nav class="site-nav site-nav--desktop" aria-label="Primary">
+            <a class="{{ $active === 'home' ? 'is-active' : '' }}" href="{{ route('site.home') }}"><span class="site-nav-label">Home</span></a>
+            <a class="{{ $active === 'bookings' ? 'is-active' : '' }}" href="{{ route('site.bookings') }}"><span class="site-nav-label">Bookings</span></a>
+            <a class="{{ $active === 'search' ? 'is-active' : '' }}" href="{{ route('site.search') }}"><span class="site-nav-label">Search</span></a>
+            <a class="{{ $active === 'explore' ? 'is-active' : '' }}" href="{{ route('site.explore') }}"><span class="site-nav-label">Explore</span></a>
         </nav>
         <form class="header-search" action="{{ route('site.search') }}" method="get" role="search">
             <label class="sr-only" for="home-q">Search</label>
@@ -47,3 +47,30 @@
         </div>
     </div>
 </header>
+
+<nav class="site-nav site-nav--mobile" aria-label="Primary">
+    <a class="{{ $active === 'home' ? 'is-active' : '' }}" href="{{ route('site.home') }}">
+        <span class="site-nav-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z"/></svg>
+        </span>
+        <span class="site-nav-label">Home</span>
+    </a>
+    <a class="{{ $active === 'bookings' ? 'is-active' : '' }}" href="{{ route('site.bookings') }}">
+        <span class="site-nav-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>
+        </span>
+        <span class="site-nav-label">Bookings</span>
+    </a>
+    <a class="{{ $active === 'search' ? 'is-active' : '' }}" href="{{ route('site.search') }}">
+        <span class="site-nav-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.2-3.2"/></svg>
+        </span>
+        <span class="site-nav-label">Search</span>
+    </a>
+    <a class="{{ $active === 'explore' ? 'is-active' : '' }}" href="{{ route('site.explore') }}">
+        <span class="site-nav-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="m9.2 14.8 1.4-4.2 4.2-1.4-1.4 4.2-4.2 1.4z"/></svg>
+        </span>
+        <span class="site-nav-label">Explore</span>
+    </a>
+</nav>

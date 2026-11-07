@@ -1152,10 +1152,11 @@ function bootHomeMotion() {
     if (cats) {
         const head = cats.querySelector('.block-head');
         const cards = [...cats.querySelectorAll('[data-cat-card]')];
-        if (reduced) {
-            gsap.set([head, ...cards], { clearProps: 'all' });
+        const coarse = window.matchMedia('(pointer: coarse)').matches;
+        if (reduced || coarse) {
+            gsap.set([head, ...cards].filter(Boolean), { clearProps: 'all' });
         } else {
-            gsap.set(cards, { autoAlpha: 0, y: 36, scale: 0.96 });
+            gsap.set(cards, { autoAlpha: 0, y: 28 });
             ScrollTrigger.batch(cards, {
                 start: 'top 92%',
                 once: true,
@@ -1163,10 +1164,10 @@ function bootHomeMotion() {
                     gsap.to(batch, {
                         autoAlpha: 1,
                         y: 0,
-                        scale: 1,
-                        duration: 0.7,
-                        stagger: 0.06,
+                        duration: 0.65,
+                        stagger: 0.05,
                         ease: 'power3.out',
+                        overwrite: 'auto',
                     });
                 },
             });
