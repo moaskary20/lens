@@ -7,6 +7,7 @@ use App\Http\Controllers\Site\BookingFlowController;
 use App\Http\Controllers\Site\ChatController;
 use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\InboxController;
+use App\Http\Controllers\Site\MapsController;
 use App\Http\Controllers\Site\VendorOnboardingController;
 use App\Http\Middleware\RedirectIfComingSoon;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,8 @@ Route::middleware(RedirectIfComingSoon::class)->group(function (): void {
     Route::get('/creatives/{vendor}', [HomeController::class, 'vendor'])->name('site.vendor');
     Route::get('/help', [HomeController::class, 'help'])->name('site.help');
     Route::post('/help/report', [HomeController::class, 'helpReport'])->name('site.help.report');
+    Route::get('/maps/search', [MapsController::class, 'search'])->name('site.maps.search');
+    Route::get('/maps/reverse', [MapsController::class, 'reverse'])->name('site.maps.reverse');
     Route::get('/p/{slug}', [HomeController::class, 'page'])->name('site.page')
         ->whereIn('slug', ['about', 'contact', 'help', 'terms', 'privacy', 'guidelines', 'pricing', 'resources', 'faqs']);
     Route::post('/newsletter', [HomeController::class, 'newsletter'])->name('site.newsletter');

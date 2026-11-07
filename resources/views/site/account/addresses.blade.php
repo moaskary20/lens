@@ -59,6 +59,8 @@
                 <form method="post" action="{{ route('site.account.addresses.store') }}" class="acc-sub-form"
                       x-data="addressMapPicker({
                           mapsKey: @js(config('services.google.maps_key')),
+                          searchUrl: @js(route('site.maps.search')),
+                          reverseUrl: @js(route('site.maps.reverse')),
                           address: @js(old('line', '')),
                           lat: @js((float) old('latitude', 30.0444)),
                           lng: @js((float) old('longitude', 31.2357)),

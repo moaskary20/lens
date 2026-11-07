@@ -43,7 +43,10 @@ function ensureLeaflet() {
 }
 
 function ensureGoogleMaps(mapsKey) {
-    if (window.google?.maps?.places) {
+    if (window.__lensGoogleMapsFailed) {
+        return Promise.reject(new Error('Google Maps unavailable'));
+    }
+    if (window.google?.maps?.Map && !window.__lensGoogleMapsFailed) {
         return Promise.resolve(window.google.maps);
     }
     if (!mapsKey) {
@@ -53,21 +56,54 @@ function ensureGoogleMaps(mapsKey) {
         return window.__lensGoogleMapsPromise;
     }
     window.__lensGoogleMapsPromise = new Promise((resolve, reject) => {
+        let settled = false;
+        const fail = (reason) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            window.__lensGoogleMapsFailed = true;
+            reject(reason instanceof Error ? reason : new Error(String(reason || 'Google Maps unavailable')));
+        };
+        const ok = (maps) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            resolve(maps);
+        };
+        const previousAuth = window.gm_authFailure;
+        window.gm_authFailure = () => {
+            try {
+                previousAuth?.();
+            } catch (_) {
+                // ignore
+            }
+            fail(new Error('Google Maps auth failed'));
+        };
         const previous = window.initLensGoogleMaps;
         window.initLensGoogleMaps = () => {
             window.initLensGoogleMaps = previous;
-            if (window.google?.maps) {
-                resolve(window.google.maps);
-                return;
-            }
-            reject(new Error('Google Maps failed to load'));
+            // Auth failures often fire right after callback; wait briefly before accepting.
+            window.setTimeout(() => {
+                if (window.__lensGoogleMapsFailed) {
+                    fail(new Error('Google Maps auth failed'));
+                    return;
+                }
+                if (window.google?.maps?.Map) {
+                    ok(window.google.maps);
+                    return;
+                }
+                fail(new Error('Google Maps failed to load'));
+            }, 120);
         };
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&libraries=places&callback=initLensGoogleMaps`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&libraries=places&v=weekly&callback=initLensGoogleMaps`;
         script.async = true;
         script.defer = true;
-        script.onerror = () => reject(new Error('Could not load Google Maps'));
+        script.onerror = () => fail(new Error('Could not load Google Maps'));
         document.head.appendChild(script);
+        window.setTimeout(() => fail(new Error('Google Maps load timeout')), 2500);
     });
     return window.__lensGoogleMapsPromise;
 }
@@ -513,12 +549,175 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    Alpine.data('vendorAvailability', () => ({
+        defaultStart: '10:00',
+        defaultEnd: '18:00',
+        weeksAhead: 4,
+        timeOptions: (() => {
+            const out = [];
+            for (let hour = 6; hour <= 23; hour += 1) {
+                for (const minute of [0, 30]) {
+                    if (hour === 23 && minute === 30) {
+                        continue;
+                    }
+                    const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                    out.push(value);
+                }
+            }
+            return out;
+        })(),
+        days: [
+            { key: 'Sun', full: 'Sunday', on: true, start: '10:00', end: '18:00' },
+            { key: 'Mon', full: 'Monday', on: true, start: '10:00', end: '18:00' },
+            { key: 'Tue', full: 'Tuesday', on: true, start: '10:00', end: '18:00' },
+            { key: 'Wed', full: 'Wednesday', on: true, start: '10:00', end: '18:00' },
+            { key: 'Thu', full: 'Thursday', on: true, start: '10:00', end: '18:00' },
+            { key: 'Fri', full: 'Friday', on: false, start: '10:00', end: '18:00' },
+            { key: 'Sat', full: 'Saturday', on: true, start: '10:00', end: '18:00' },
+        ],
+        get activeCount() {
+            return this.days.filter((day) => day.on).length;
+        },
+        get totalHours() {
+            return this.days.reduce((sum, day) => sum + (day.on ? this.dayHours(day) : 0), 0);
+        },
+        minutes(value) {
+            const [hh, mm] = String(value || '00:00').split(':').map(Number);
+            return (hh * 60) + (mm || 0);
+        },
+        dayHours(day) {
+            const diff = this.minutes(day.end) - this.minutes(day.start);
+            return diff > 0 ? diff / 60 : 0;
+        },
+        dayHoursLabel(day) {
+            const hours = this.dayHours(day);
+            if (!day.on) {
+                return 'Closed';
+            }
+            if (hours <= 0) {
+                return 'Invalid';
+            }
+            const whole = Number.isInteger(hours) ? hours : hours.toFixed(1);
+            return `${whole}h`;
+        },
+        barStyle(day) {
+            const startMin = 6 * 60;
+            const endMin = 23 * 60;
+            const span = endMin - startMin;
+            const from = Math.min(Math.max(this.minutes(day.start), startMin), endMin);
+            const to = Math.min(Math.max(this.minutes(day.end), startMin), endMin);
+            if (!day.on || to <= from) {
+                return 'display:none';
+            }
+            const left = ((from - startMin) / span) * 100;
+            const width = ((to - from) / span) * 100;
+            return `left:${left}%;width:${width}%`;
+        },
+        setWeekdays() {
+            this.days.forEach((day, index) => {
+                day.on = index >= 1 && index <= 5;
+                if (day.on) {
+                    day.start = this.defaultStart;
+                    day.end = this.defaultEnd;
+                }
+            });
+        },
+        setAll(on) {
+            this.days.forEach((day) => {
+                day.on = on;
+                if (on) {
+                    day.start = this.defaultStart;
+                    day.end = this.defaultEnd;
+                }
+            });
+        },
+        applyDefault() {
+            this.days.forEach((day) => {
+                if (!day.on) {
+                    return;
+                }
+                day.start = this.defaultStart;
+                day.end = this.defaultEnd;
+            });
+        },
+        applyPreset(preset) {
+            if (preset === 'standard') {
+                this.defaultStart = '10:00';
+                this.defaultEnd = '18:00';
+                this.setWeekdays();
+                return;
+            }
+            if (preset === 'early') {
+                this.defaultStart = '09:00';
+                this.defaultEnd = '17:00';
+                this.setWeekdays();
+                return;
+            }
+            if (preset === 'late') {
+                this.defaultStart = '12:00';
+                this.defaultEnd = '20:00';
+                this.setWeekdays();
+                return;
+            }
+            if (preset === 'weekend') {
+                this.days.forEach((day, index) => {
+                    day.on = index === 0 || index === 6;
+                    day.start = '11:00';
+                    day.end = '19:00';
+                });
+                this.defaultStart = '11:00';
+                this.defaultEnd = '19:00';
+            }
+        },
+        copyToOpen(sourceIndex) {
+            const source = this.days[sourceIndex];
+            if (!source) {
+                return;
+            }
+            this.days.forEach((day, index) => {
+                if (index === sourceIndex || !day.on) {
+                    return;
+                }
+                day.start = source.start;
+                day.end = source.end;
+            });
+        },
+        slotIso(weekday, time, weeksAhead = 0) {
+            const now = new Date();
+            const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+            const delta = (weekday - date.getDay() + 7) % 7;
+            date.setDate(date.getDate() + delta + (weeksAhead * 7));
+            const [hh, mm] = String(time || '10:00').split(':');
+            date.setHours(Number(hh) || 0, Number(mm) || 0, 0, 0);
+            return date.toISOString();
+        },
+        payloadSlots() {
+            const out = [];
+            for (let week = 0; week < this.weeksAhead; week += 1) {
+                this.days.forEach((day, weekday) => {
+                    if (!day.on || this.dayHours(day) <= 0) {
+                        return;
+                    }
+                    out.push({
+                        starts_at: this.slotIso(weekday, day.start, week),
+                        ends_at: this.slotIso(weekday, day.end, week),
+                        status: 'open',
+                    });
+                });
+            }
+            return out;
+        },
+    }));
+
     Alpine.data('addressMapPicker', (config = {}) => ({
         mapsKey: config.mapsKey || '',
+        searchUrl: config.searchUrl || '/maps/search',
+        reverseUrl: config.reverseUrl || '/maps/reverse',
         open: false,
         searching: false,
         locating: false,
         geocoding: false,
+        engine: 'auto',
         search: '',
         suggestions: [],
         places: Array.isArray(config.places) ? config.places : BOOK_MAP_PLACES,
@@ -533,11 +732,12 @@ document.addEventListener('alpine:init', () => {
         _map: null,
         _marker: null,
         _autocomplete: null,
+        _engine: null,
         get hasPin() {
             return Boolean(this.address && this.lat && this.lng);
         },
         get preview() {
-            return this.address || 'Pick your address on Google Maps';
+            return this.address || 'Pick your address on the map';
         },
         get coordsLabel() {
             if (!(this.lat && this.lng)) {
@@ -569,46 +769,77 @@ document.addEventListener('alpine:init', () => {
             this.lng = Number(Number(this.draft.lng).toFixed(6));
             this.closePicker();
         },
+        resetMapCanvas(el) {
+            if (this._map?.remove && this._engine === 'leaflet') {
+                try {
+                    this._map.remove();
+                } catch (_) {
+                    // ignore
+                }
+            }
+            this._map = null;
+            this._marker = null;
+            this._autocomplete = null;
+            this._engine = null;
+            if (el) {
+                el.innerHTML = '';
+            }
+        },
         async mountMap() {
             const el = this.$refs.mapCanvas;
             if (!el) {
                 return;
             }
-            try {
-                const maps = await ensureGoogleMaps(this.mapsKey);
-                const center = { lat: Number(this.draft.lat), lng: Number(this.draft.lng) };
-                if (!this._map) {
-                    this._map = new maps.Map(el, {
-                        center,
-                        zoom: 13,
-                        mapTypeControl: false,
-                        streetViewControl: false,
-                        fullscreenControl: false,
-                    });
-                    this._marker = new maps.Marker({
-                        map: this._map,
-                        position: center,
-                        draggable: true,
-                    });
-                    this._map.addListener('click', (event) => {
-                        if (!event.latLng) {
-                            return;
-                        }
-                        this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
-                    });
-                    this._marker.addListener('dragend', (event) => {
-                        if (!event.latLng) {
-                            return;
-                        }
-                        this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
-                    });
-                } else {
+            if (this._map && this._engine) {
+                if (this._engine === 'google') {
+                    const center = { lat: Number(this.draft.lat), lng: Number(this.draft.lng) };
                     this._map.setCenter(center);
-                    this._marker.setPosition(center);
+                    this._marker?.setPosition?.(center);
+                    window.google?.maps?.event?.trigger?.(this._map, 'resize');
+                    return;
                 }
+                this._map.setView([this.draft.lat, this.draft.lng], Math.max(this._map.getZoom?.() || 13, 13));
+                this._marker?.setLatLng?.([this.draft.lat, this.draft.lng]);
+                window.setTimeout(() => this._map?.invalidateSize?.(), 80);
+                return;
+            }
+            // Google Maps JS key matches mobile, but Maps JavaScript / Places / Geocoding
+            // are often restricted or not enabled for browser referrers — try Google briefly,
+            // then fall back to a working OpenStreetMap canvas.
+            try {
+                const maps = await Promise.race([
+                    ensureGoogleMaps(this.mapsKey),
+                    new Promise((_, reject) => window.setTimeout(() => reject(new Error('Google Maps slow')), 1800)),
+                ]);
+                const center = { lat: Number(this.draft.lat), lng: Number(this.draft.lng) };
+                this._engine = 'google';
+                this.engine = 'google';
+                this._map = new maps.Map(el, {
+                    center,
+                    zoom: 13,
+                    mapTypeControl: false,
+                    streetViewControl: false,
+                    fullscreenControl: false,
+                });
+                this._marker = new maps.Marker({
+                    map: this._map,
+                    position: center,
+                    draggable: true,
+                });
+                this._map.addListener('click', (event) => {
+                    if (!event.latLng) {
+                        return;
+                    }
+                    this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
+                });
+                this._marker.addListener('dragend', (event) => {
+                    if (!event.latLng) {
+                        return;
+                    }
+                    this.dropPin(event.latLng.lat(), event.latLng.lng(), true);
+                });
                 maps.event.trigger(this._map, 'resize');
-                this._map.setCenter(center);
-                if (this.$refs.searchInput && !this._autocomplete) {
+                if (this.$refs.searchInput && maps.places?.Autocomplete && !this._autocomplete) {
                     this._autocomplete = new maps.places.Autocomplete(this.$refs.searchInput, {
                         fields: ['formatted_address', 'geometry', 'name'],
                         componentRestrictions: { country: ['eg'] },
@@ -627,14 +858,14 @@ document.addEventListener('alpine:init', () => {
                     });
                 }
             } catch (_) {
+                this.resetMapCanvas(el);
                 await this.mountLeafletFallback(el);
             }
         },
         async mountLeafletFallback(el) {
             const L = await ensureLeaflet();
-            if (this._map?.setView) {
-                return;
-            }
+            this._engine = 'leaflet';
+            this.engine = 'leaflet';
             this._map = L.map(el, { zoomControl: true }).setView([this.draft.lat, this.draft.lng], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -647,6 +878,7 @@ document.addEventListener('alpine:init', () => {
                 this.dropPin(point.lat, point.lng, true);
             });
             window.setTimeout(() => this._map?.invalidateSize?.(), 120);
+            window.setTimeout(() => this._map?.invalidateSize?.(), 360);
         },
         setPlace(place) {
             this.draft = {
@@ -655,12 +887,12 @@ document.addEventListener('alpine:init', () => {
                 lng: Number(place.lng),
             };
             this.dropPin(place.lat, place.lng, false);
-            if (this._map?.setCenter) {
+            if (this._engine === 'google' && this._map?.setCenter) {
                 this._map.setCenter({ lat: this.draft.lat, lng: this.draft.lng });
                 this._map.setZoom(Math.max(this._map.getZoom?.() || 13, 14));
                 this._marker?.setPosition?.({ lat: this.draft.lat, lng: this.draft.lng });
             } else if (this._map?.setView) {
-                this._map.setView([this.draft.lat, this.draft.lng], Math.max(this._map.getZoom(), 14));
+                this._map.setView([this.draft.lat, this.draft.lng], Math.max(this._map.getZoom?.() || 13, 14));
                 this._marker?.setLatLng([this.draft.lat, this.draft.lng]);
             }
         },
@@ -668,19 +900,16 @@ document.addEventListener('alpine:init', () => {
             const nextLat = Number(Number(lat).toFixed(6));
             const nextLng = Number(Number(lng).toFixed(6));
             this.draft = {
-                label: reverse ? (this.geocoding ? 'Looking up address…' : this.draft.label) : this.draft.label,
+                label: reverse ? 'Looking up address…' : this.draft.label,
                 lat: nextLat,
                 lng: nextLng,
             };
-            if (this._marker?.setPosition) {
+            if (this._engine === 'google' && this._marker?.setPosition) {
                 this._marker.setPosition({ lat: nextLat, lng: nextLng });
+                this._map?.panTo?.({ lat: nextLat, lng: nextLng });
             } else if (this._marker?.setLatLng) {
                 this._marker.setLatLng([nextLat, nextLng]);
-            }
-            if (this._marker?.setPosition && this._map?.panTo) {
-                this._map.panTo({ lat: nextLat, lng: nextLng });
-            } else if (this._map?.panTo && this._marker?.setLatLng) {
-                this._map.panTo([nextLat, nextLng]);
+                this._map?.panTo?.([nextLat, nextLng]);
             }
             if (!reverse) {
                 return;
@@ -697,27 +926,19 @@ document.addEventListener('alpine:init', () => {
             }
         },
         async reverseGeocode(lat, lng) {
-            if (this.mapsKey) {
-                try {
-                    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${encodeURIComponent(this.mapsKey)}`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    const label = data?.results?.[0]?.formatted_address;
-                    if (label) {
-                        return label;
-                    }
-                } catch (_) {
-                    // fall through
-                }
-            }
             try {
-                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`;
+                const url = `${this.reverseUrl}?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
                 const res = await fetch(url, { headers: { Accept: 'application/json' } });
-                const data = await res.json();
-                return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.label) {
+                        return data.label;
+                    }
+                }
             } catch (_) {
-                return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+                // fall through
             }
+            return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
         },
         async searchPlaces() {
             const query = String(this.search || '').trim();
@@ -726,19 +947,16 @@ document.addEventListener('alpine:init', () => {
             }
             this.searching = true;
             try {
-                if (this.mapsKey) {
-                    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:eg&key=${encodeURIComponent(this.mapsKey)}`;
-                    // Browser calls to Places REST are often blocked by CORS; Autocomplete widget handles search.
-                    // Keep local chips as backup.
-                }
-                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=eg&q=${encodeURIComponent(query)}`;
+                const url = `${this.searchUrl}?q=${encodeURIComponent(query)}`;
                 const res = await fetch(url, { headers: { Accept: 'application/json' } });
-                const rows = res.ok ? await res.json() : [];
-                const remote = (Array.isArray(rows) ? rows : []).map((row) => ({
-                    label: row.display_name,
-                    lat: Number(row.lat),
-                    lng: Number(row.lon),
-                })).filter((row) => row.label && row.lat && row.lng);
+                const data = res.ok ? await res.json() : { results: [] };
+                const remote = (Array.isArray(data?.results) ? data.results : [])
+                    .map((row) => ({
+                        label: row.label,
+                        lat: Number(row.lat),
+                        lng: Number(row.lng),
+                    }))
+                    .filter((row) => row.label && row.lat && row.lng);
                 const local = this.places.filter((place) => place.label.toLowerCase().includes(query.toLowerCase()));
                 this.suggestions = remote.length ? remote : local;
                 if (this.suggestions.length) {

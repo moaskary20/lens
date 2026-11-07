@@ -145,6 +145,8 @@
                         class="acc-sub-span-2 vj-address"
                         x-data="addressMapPicker({
                             mapsKey: @js(config('services.google.maps_key')),
+                            searchUrl: @js(route('site.maps.search')),
+                            reverseUrl: @js(route('site.maps.reverse')),
                             address: @js(old('address', $vendor['address'] ?? '')),
                             lat: @js((float) old('latitude', $vendor['latitude'] ?? 30.0444)),
                             lng: @js((float) old('longitude', $vendor['longitude'] ?? 31.2357)),
