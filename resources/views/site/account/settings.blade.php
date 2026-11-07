@@ -1,40 +1,65 @@
-@extends('site.layout', ['title' => 'Settings', 'active' => 'account'])
+@extends('site.layout', ['title' => 'App settings', 'active' => 'account'])
 
 @section('content')
-@php $s = $settings['settings'] ?? $settings; @endphp
+@php
+    $s = $settings['settings'] ?? $settings;
+    $toggles = [
+        'push_enabled' => [
+            'label' => 'Push notifications',
+            'copy' => 'Booking status, payouts, and account alerts',
+            'ico' => 'bell',
+        ],
+        'chat_alerts' => [
+            'label' => 'Chat alerts',
+            'copy' => 'New messages from vendors and clients',
+            'ico' => 'chat',
+        ],
+        'booking_reminders' => [
+            'label' => 'Booking reminders',
+            'copy' => 'Upcoming sessions and check-in nudges',
+            'ico' => 'calendar',
+        ],
+        'review_prompts' => [
+            'label' => 'Review prompts',
+            'copy' => 'Ask for ratings after a completed booking',
+            'ico' => 'star',
+        ],
+        'offers' => [
+            'label' => 'Offers & promos',
+            'copy' => 'Occasional Lens deals and creator tips',
+            'ico' => 'tag',
+        ],
+    ];
+@endphp
 <section class="acc-sub wrap" data-reveal>
     @include('site.account.partials.sub-hero', [
         'title' => 'App settings',
         'lede' => 'Alerts, language, and preferences — same as the Lens app.',
         'image' => asset('branding/account/settings.svg'),
         'icon' => 'gear',
-        'tips' => ['Push & chat alerts', 'Booking reminders', 'Language preference'],
+        'tips' => ['Synced with the app', 'Change anytime', 'Privacy first'],
     ])
 
     <div class="acc-sub-body">
-        <div class="acc-sub-card">
-            <header class="acc-sub-card-head">
-                <span class="acc-sub-card-ico" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 6v2M12 16v2M6 12h2M16 12h2M7.8 7.8l1.4 1.4M14.8 14.8l1.4 1.4M16.2 7.8l-1.4 1.4M9.2 14.8l-1.4 1.4"/><circle cx="12" cy="12" r="3"/></svg>
-                </span>
-                <div>
-                    <h2>Notifications & language</h2>
-                    <p>Control what Lens sends you and how it reads.</p>
-                </div>
-            </header>
-            <form method="post" action="{{ route('site.account.settings.update') }}" class="acc-sub-form">
-                @csrf
-                <div class="acc-sub-toggles">
-                    @foreach([
-                        'push_enabled' => ['Push notifications', 'bell'],
-                        'chat_alerts' => ['Chat alerts', 'chat'],
-                        'booking_reminders' => ['Booking reminders', 'calendar'],
-                        'review_prompts' => ['Review prompts', 'star'],
-                        'offers' => ['Offers & promos', 'tag'],
-                    ] as $key => [$label, $ico])
-                        <label class="acc-sub-toggle">
-                            <span class="acc-sub-toggle-ico" aria-hidden="true">
-                                @switch($ico)
+        <form method="post" action="{{ route('site.account.settings.update') }}" class="acc-settings-form">
+            @csrf
+
+            <div class="acc-sub-card acc-settings-card">
+                <header class="acc-sub-card-head">
+                    <span class="acc-sub-card-ico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4a5 5 0 0 0-5 5v2.2c0 .8-.3 1.6-.8 2.2L5 15h14l-1.2-1.6a3.5 3.5 0 0 1-.8-2.2V9a5 5 0 0 0-5-5z"/><path d="M10 18a2 2 0 0 0 4 0"/></svg>
+                    </span>
+                    <div>
+                        <h2>Notifications</h2>
+                        <p>Choose what Lens can ping you about.</p>
+                    </div>
+                </header>
+
+                <div class="acc-settings-toggles">
+                    @foreach($toggles as $key => $item)
+                        <label class="acc-settings-toggle">
+                            <span class="acc-settings-toggle-ico" aria-hidden="true">
+                                @switch($item['ico'])
                                     @case('bell')
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4a5 5 0 0 0-5 5v2.2c0 .8-.3 1.6-.8 2.2L5 15h14l-1.2-1.6a3.5 3.5 0 0 1-.8-2.2V9a5 5 0 0 0-5-5z"/><path d="M10 18a2 2 0 0 0 4 0"/></svg>
                                         @break
@@ -52,26 +77,58 @@
                                         @break
                                 @endswitch
                             </span>
-                            <span class="acc-sub-toggle-text">{{ $label }}</span>
+                            <span class="acc-settings-toggle-copy">
+                                <strong>{{ $item['label'] }}</strong>
+                                <small>{{ $item['copy'] }}</small>
+                            </span>
                             <input type="hidden" name="{{ $key }}" value="0">
-                            <input class="acc-sub-switch" type="checkbox" name="{{ $key }}" value="1" @checked(old($key, data_get($s, $key, true)))>
+                            <input class="acc-settings-switch" type="checkbox" name="{{ $key }}" value="1" @checked(old($key, data_get($s, $key, true))) aria-label="{{ $item['label'] }}">
                         </label>
                     @endforeach
                 </div>
-                <label>
-                    <span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg> Language</span>
-                    <select name="locale">
-                        <option value="en" @selected(old('locale', data_get($s, 'locale', 'en')) === 'en')>English</option>
-                        <option value="ar" @selected(old('locale', data_get($s, 'locale')) === 'ar')>العربية</option>
-                    </select>
-                </label>
-                <button class="ai-btn" type="submit">Save settings</button>
-            </form>
-            <div class="acc-sub-links">
-                <a class="ghost-btn" href="{{ route('site.page', 'terms') }}">Terms</a>
-                <a class="ghost-btn" href="{{ route('site.page', 'privacy') }}">Privacy</a>
             </div>
-        </div>
+
+            <div class="acc-settings-lower">
+                <div class="acc-sub-card acc-settings-card">
+                    <header class="acc-sub-card-head">
+                        <span class="acc-sub-card-ico" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
+                        </span>
+                        <div>
+                            <h2>Language</h2>
+                            <p>How Lens labels menus and messages.</p>
+                        </div>
+                    </header>
+                    <label class="acc-settings-locale">
+                        <span class="acc-sub-label">Preferred language</span>
+                        <select name="locale">
+                            <option value="en" @selected(old('locale', data_get($s, 'locale', 'en')) === 'en')>English</option>
+                            <option value="ar" @selected(old('locale', data_get($s, 'locale')) === 'ar')>العربية</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="acc-sub-card acc-settings-card acc-settings-legal">
+                    <header class="acc-sub-card-head">
+                        <span class="acc-sub-card-ico" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 4h10v16H7z"/><path d="M10 8h4M10 12h4M10 16h3"/></svg>
+                        </span>
+                        <div>
+                            <h2>Policies</h2>
+                            <p>Legal pages for your Lens account.</p>
+                        </div>
+                    </header>
+                    <div class="acc-sub-links">
+                        <a class="ghost-btn" href="{{ route('site.page', 'terms') }}">Terms</a>
+                        <a class="ghost-btn" href="{{ route('site.page', 'privacy') }}">Privacy</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="acc-settings-actions">
+                <button class="ai-btn" type="submit">Save settings</button>
+            </div>
+        </form>
     </div>
 </section>
 @endsection

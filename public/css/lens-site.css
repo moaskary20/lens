@@ -814,6 +814,7 @@ main { padding-bottom: 8px; }
 .acc-sub-empty strong { display: block; margin-bottom: 6px; }
 .acc-sub-empty p { margin: 0; color: var(--muted); font-size: .9rem; }
 .acc-sub-toggles { display: grid; gap: 10px; }
+.acc-sub-form label.acc-sub-toggle,
 .acc-sub-toggle {
     display: flex;
     align-items: center;
@@ -830,19 +831,27 @@ main { padding-bottom: 8px; }
     font-weight: 700;
     font-size: .95rem;
 }
-.acc-sub-switch {
+.acc-sub-switch,
+.acc-settings-switch {
     width: 46px;
+    min-width: 46px;
+    max-width: 46px;
     height: 28px;
+    margin: 0;
+    padding: 0;
     appearance: none;
+    -webkit-appearance: none;
     border-radius: 999px;
     background: #2a2d34;
     border: 1px solid #3a3e46;
     position: relative;
     cursor: pointer;
-    flex-shrink: 0;
+    flex: 0 0 46px;
+    align-self: center;
     transition: background .2s ease, border-color .2s ease;
 }
-.acc-sub-switch::after {
+.acc-sub-switch::after,
+.acc-settings-switch::after {
     content: "";
     position: absolute;
     top: 3px;
@@ -853,11 +862,13 @@ main { padding-bottom: 8px; }
     background: #fff;
     transition: transform .2s ease;
 }
-.acc-sub-switch:checked {
+.acc-sub-switch:checked,
+.acc-settings-switch:checked {
     background: var(--orange);
     border-color: transparent;
 }
-.acc-sub-switch:checked::after { transform: translateX(18px); }
+.acc-sub-switch:checked::after,
+.acc-settings-switch:checked::after { transform: translateX(18px); }
 .acc-sub-links {
     display: flex;
     flex-wrap: wrap;
@@ -865,6 +876,93 @@ main { padding-bottom: 8px; }
     margin-top: 16px;
 }
 .acc-sub-links .ghost-btn { margin: 0; }
+
+.acc-settings-form {
+    display: grid;
+    gap: 14px;
+}
+.acc-settings-toggles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.acc-settings-form label.acc-settings-toggle,
+.acc-settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 72px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid #2a2d34;
+    background: #0f1116;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease;
+}
+.acc-settings-toggle:hover {
+    border-color: rgba(255, 90, 31, .45);
+    background: #14161c;
+}
+.acc-settings-toggle-ico {
+    display: grid;
+    place-items: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    background: rgba(255, 90, 31, .12);
+    color: var(--orange);
+    border: 1px solid rgba(255, 90, 31, .28);
+}
+.acc-settings-toggle-ico svg { width: 20px; height: 20px; }
+.acc-settings-toggle-copy {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+.acc-settings-toggle-copy strong {
+    font-size: .95rem;
+    letter-spacing: -.01em;
+    line-height: 1.2;
+}
+.acc-settings-toggle-copy small {
+    color: var(--muted);
+    font-size: .78rem;
+    line-height: 1.35;
+}
+.acc-settings-lower {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: stretch;
+}
+.acc-settings-locale {
+    display: grid;
+    gap: 7px;
+}
+.acc-settings-locale select {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 14px;
+    border: 1px solid #2a2d34;
+    background: #0f1116;
+    color: #fff;
+    padding: 0 14px;
+    font: inherit;
+}
+.acc-settings-locale select:focus {
+    outline: none;
+    border-color: rgba(255, 90, 31, .65);
+}
+.acc-settings-legal .acc-sub-links { margin-top: 4px; }
+.acc-settings-actions {
+    display: flex;
+    justify-content: flex-start;
+}
+.acc-settings-actions .ai-btn {
+    min-width: 180px;
+}
 
 @media (max-width: 960px) {
     .acc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -894,6 +992,10 @@ main { padding-bottom: 8px; }
         grid-column: auto;
     }
     .acc-sub-stack { grid-template-columns: 1fr; }
+    .acc-settings-toggles,
+    .acc-settings-lower {
+        grid-template-columns: 1fr;
+    }
 }
 @media (max-width: 640px) {
     .acc-identity { align-items: flex-start; }
@@ -988,6 +1090,28 @@ main { padding-bottom: 8px; }
     .acc-sub-links .ghost-btn {
         flex: 1 1 calc(50% - 8px);
         justify-content: center;
+    }
+    .acc-settings-toggles,
+    .acc-settings-lower {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    .acc-settings-toggle {
+        min-height: 64px;
+        padding: 11px 12px;
+        gap: 10px;
+    }
+    .acc-settings-toggle-ico {
+        width: 38px;
+        height: 38px;
+        flex-basis: 38px;
+        border-radius: 12px;
+    }
+    .acc-settings-toggle-copy strong { font-size: .9rem; }
+    .acc-settings-toggle-copy small { font-size: .72rem; }
+    .acc-settings-actions .ai-btn {
+        width: 100%;
+        min-width: 0;
     }
 }
 
