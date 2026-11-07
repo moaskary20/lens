@@ -985,6 +985,36 @@ main { padding-bottom: 8px; }
     max-width: 32em;
 }
 
+.help-page-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    margin: 4px auto 10px;
+    padding: 8px;
+    border-radius: 16px;
+    background: #111318;
+    border: 1px solid rgba(255, 255, 255, .08);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.help-page-nav::-webkit-scrollbar { display: none; }
+.help-page-nav a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 9px 12px;
+    border-radius: 999px;
+    background: #141518;
+    border: 1px solid #2a2d34;
+    color: #b8b3ab;
+    font-size: 12px;
+    font-weight: 700;
+}
+.help-page-nav a.is-on {
+    color: #ff8a50;
+    border-color: rgba(255, 109, 56, .55);
+    background: rgba(255, 87, 34, .14);
+}
 .help-guide-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .help-guide-card { background: #14161c; border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 16px; }
 .help-guide-card .kicker { margin: 0 0 8px; color: #ff6d38; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
@@ -1806,6 +1836,24 @@ main { padding-bottom: 8px; }
 
 @media (max-width: 980px) {
     .wrap { width: min(var(--wrap), calc(100% - 32px)); }
+    .cms-shell {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 24px 0 56px;
+    }
+    .cms-aside {
+        position: static;
+        display: grid;
+        grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+        gap: 12px;
+        align-items: stretch;
+    }
+    .cms-aside-photo {
+        max-height: none;
+        aspect-ratio: 4 / 5;
+    }
+    .cms-contact-grid { grid-template-columns: 1fr; }
+    .cms-acc-item:not(:has(.cms-acc-shot)) .cms-acc-panel { padding-left: 18px; }
     .bookings-auth { grid-template-columns: 1fr; }
     .booking-card { flex-direction: column; }
     .booking-card-side { justify-items: start; text-align: left; }
@@ -2151,15 +2199,122 @@ main { padding-bottom: 8px; }
     .block { padding: 28px 0 4px; }
     .block-head { margin-bottom: 14px; gap: 10px; }
     .block-head h2, .page-head h1 { font-size: 22px; }
-    .cms-aside { grid-template-columns: 1fr; }
-    .cms-aside-photo { max-height: 220px; aspect-ratio: 16 / 9; }
-    .cms-hero-copy { padding: 36px 0 28px; }
-    .cms-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: -10px; }
+    .page-head { padding: 22px 0 4px; }
+    .page-head .lede { font-size: 14px; line-height: 1.45; }
+    .cms-hero {
+        min-height: 220px;
+    }
+    .cms-hero-copy {
+        padding: 28px 0 22px;
+        max-width: none;
+    }
+    .cms-hero-copy h1 {
+        font-size: clamp(28px, 8vw, 36px);
+    }
+    .cms-lede {
+        margin-top: 10px;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    .cms-gallery {
+        width: min(1240px, calc(100% - 28px));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: -12px;
+    }
+    .cms-gallery figure { border-radius: 14px; }
     .cms-gallery figure:nth-child(n + 3) { display: none; }
+    .cms-shell {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 20px 0 48px;
+    }
+    .cms-aside {
+        position: static;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .cms-aside-photo {
+        display: none;
+    }
+    .cms-aside-nav {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 8px;
+        border-radius: 16px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .cms-aside-nav::-webkit-scrollbar { display: none; }
+    .cms-aside-nav a {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding: 9px 12px;
+        border-radius: 999px;
+        background: #141518;
+        border: 1px solid #2a2d34;
+        font-size: 12px;
+    }
+    .cms-aside-nav a.is-on {
+        border-color: rgba(255, 109, 56, .55);
+        background: rgba(255, 87, 34, .14);
+    }
+    .cms-intro {
+        padding: 16px;
+        border-radius: 16px;
+        margin-bottom: 16px;
+    }
+    .cms-intro-lede {
+        font-size: 14px;
+        margin-bottom: 16px;
+    }
+    .cms-contact-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+    .cms-contact-card { padding: 14px; border-radius: 16px; }
+    .cms-acc-head h2 { font-size: 18px; }
     .cms-acc-item summary { gap: 10px; padding: 14px; }
-    .cms-acc-panel { grid-template-columns: 1fr; }
-    .cms-acc-shot { max-height: 180px; aspect-ratio: 16 / 9; }
-    .cms-band-copy { padding: 36px 0; }
+    .cms-acc-title { font-size: 14px; }
+    .cms-acc-index { width: 30px; height: 30px; font-size: 11px; }
+    .cms-acc-panel {
+        grid-template-columns: 1fr;
+        padding: 0 14px 14px;
+        font-size: 14px;
+    }
+    .cms-acc-item:not(:has(.cms-acc-shot)) .cms-acc-panel {
+        padding-left: 14px;
+    }
+    .cms-acc-shot { max-height: 160px; aspect-ratio: 16 / 9; }
+    .cms-cta-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 18px;
+    }
+    .cms-cta {
+        width: 100%;
+        min-height: 46px;
+    }
+    .cms-band { min-height: 240px; }
+    .cms-band-copy { padding: 28px 0; }
+    .cms-band-copy h2 { font-size: 26px; }
+    .help-guides,
+    .help-report { padding-top: 18px; }
+    .help-guide-grid { gap: 10px; }
+    .help-guide-card { padding: 14px; border-radius: 16px; }
+    .help-links { gap: 8px; }
+    .help-links .ghost-btn {
+        flex: 1 1 calc(50% - 8px);
+        justify-content: center;
+        min-height: 42px;
+    }
+    .help-form { gap: 12px; }
+    .help-topic { padding: 9px 12px; font-size: 12px; }
     .hero {
         height: min(78vw, 360px);
         min-height: 300px;

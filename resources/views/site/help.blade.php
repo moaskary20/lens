@@ -8,8 +8,20 @@
 @endphp
 <section class="page-head wrap">
     <h1>Help &amp; Support</h1>
-    <p class="lede">Answers for clients and creators — the same topics from the Lens app.</p>
+    <p class="lede">Answers for clients and vendors — the same topics from the Lens app.</p>
 </section>
+
+<nav class="wrap cms-aside-nav help-page-nav" aria-label="More pages">
+    <a href="{{ route('site.page', 'about') }}">About Us</a>
+    <a href="{{ route('site.page', 'contact') }}">Contact Us</a>
+    <a href="{{ route('site.page', 'faqs') }}">FAQs</a>
+    <a href="{{ route('site.page', 'pricing') }}">Pricing &amp; Commission</a>
+    <a href="{{ route('site.page', 'privacy') }}">Privacy Policy</a>
+    <a href="{{ route('site.page', 'terms') }}">Terms &amp; Conditions</a>
+    <a href="{{ route('site.page', 'resources') }}">Creator Resources</a>
+    <a href="{{ route('site.page', 'guidelines') }}">Creator Guidelines</a>
+    <a class="is-on" href="{{ route('site.help') }}">Help &amp; Support</a>
+</nav>
 
 <section class="wrap block help-guides">
     <div class="block-head"><h2>Quick guides</h2></div>

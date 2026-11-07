@@ -51,7 +51,7 @@
             @foreach($related as $link)
                 <a href="{{ route('site.page', $link['slug']) }}" class="{{ ($slug ?? '') === $link['slug'] ? 'is-on' : '' }}">{{ $link['label'] }}</a>
             @endforeach
-            <a href="{{ route('site.help') }}">Help &amp; Support</a>
+            <a href="{{ route('site.help') }}" class="{{ ($slug ?? '') === 'help' ? 'is-on' : '' }}">Help &amp; Support</a>
         </nav>
     </aside>
 
