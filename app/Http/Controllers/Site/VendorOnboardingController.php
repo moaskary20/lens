@@ -9,7 +9,9 @@ use App\Http\Controllers\Site\Concerns\InteractsWithSite;
 use App\Models\City;
 use App\Models\User;
 use App\Models\VendorType;
+use App\Support\Egypt;
 use App\Support\SiteAuth;
+use App\Support\VendorRegisterCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,12 +24,7 @@ class VendorOnboardingController extends Controller
     {
         $this->shareShell('account');
 
-        return view('site.vendor.wizard', [
-            'editing' => false,
-            'cities' => City::query()->orderBy('name_en')->get(['id', 'name_en']),
-            'vendorTypes' => VendorType::query()->orderBy('sort_order')->get(['id', 'slug', 'name_en', 'name_ar']),
-            'profile' => null,
-        ]);
+        return view('site.vendor.wizard', $this->wizardPayload(false, null));
     }
 
     public function store(Request $request): RedirectResponse
@@ -53,12 +50,7 @@ class VendorOnboardingController extends Controller
         $profile = $this->jsonData(app(ApiAccountController::class)->profile());
         $this->shareShell('account');
 
-        return view('site.vendor.wizard', [
-            'editing' => true,
-            'cities' => City::query()->orderBy('name_en')->get(['id', 'name_en']),
-            'vendorTypes' => VendorType::query()->orderBy('sort_order')->get(['id', 'slug', 'name_en', 'name_ar']),
-            'profile' => $profile,
-        ]);
+        return view('site.vendor.wizard', $this->wizardPayload(true, $profile));
     }
 
     public function update(Request $request): RedirectResponse
@@ -71,5 +63,62 @@ class VendorOnboardingController extends Controller
         }
 
         return redirect()->route('site.account')->with('status', 'Vendor profile updated.');
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $profile
+     * @return array<string, mixed>
+     */
+    protected function wizardPayload(bool $editing, ?array $profile): array
+    {
+        $vendor = is_array($profile['vendor'] ?? null) ? $profile['vendor'] : [];
+        $extras = is_array($vendor['extras'] ?? null) ? $vendor['extras'] : [];
+        $texts = [];
+        $lists = [
+            'specialties' => array_values($vendor['specialties'] ?? []),
+            'delivery_formats' => array_values($vendor['delivery_formats'] ?? []),
+        ];
+        foreach ($vendor['filter_tags'] ?? [] as $slug) {
+            // Group unknown; chips resolve against field options client-side.
+            $lists['__filters'] = array_values(array_unique([
+                ...($lists['__filters'] ?? []),
+                (string) $slug,
+            ]));
+        }
+        foreach ($extras as $key => $value) {
+            if ($key === 'prices' && is_array($value)) {
+                foreach ($value as $priceKey => $priceValue) {
+                    $texts['extras.prices.'.$priceKey] = (string) $priceValue;
+                }
+                continue;
+            }
+            if (is_scalar($value) || $value === null) {
+                $texts['extras.'.$key] = (string) ($value ?? '');
+            }
+        }
+        foreach (['half_day_price', 'full_day_price', 'hourly_price', 'per_video_price', 'turnaround_hours'] as $column) {
+            if (isset($vendor[$column]) && $vendor[$column] !== null && $vendor[$column] !== '') {
+                $texts[$column] = (string) $vendor[$column];
+            }
+        }
+
+        return [
+            'editing' => $editing,
+            'cities' => City::query()->orderBy('name_en')->get(['id', 'name_en']),
+            'vendorTypes' => VendorType::query()->orderBy('sort_order')->get(['id', 'slug', 'name_en', 'name_ar']),
+            'profile' => $profile,
+            'registerCatalog' => VendorRegisterCatalog::types(),
+            'banks' => Egypt::banks(),
+            'telecomWallets' => Egypt::telecomWallets(),
+            'joinState' => [
+                'vendorType' => old('vendor_type', $vendor['vendor_type'] ?? ''),
+                'pricingModelId' => (string) old('pricing_model_id', $extras['pricing_model_id'] ?? ''),
+                'texts' => old('_texts', $texts) ?: $texts,
+                'lists' => old('_lists', $lists) ?: $lists,
+                'filterTags' => array_values($vendor['filter_tags'] ?? []),
+                'payoutMethod' => old('payout_method', $vendor['payout_method'] ?? 'bank'),
+                'walletNetwork' => old('wallet_network_type', $vendor['wallet_network_type'] ?? 'telecom'),
+            ],
+        ];
     }
 }

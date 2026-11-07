@@ -1066,6 +1066,42 @@ main { padding-bottom: 8px; }
 .vendor-join .vj-upload strong { display: block; margin-bottom: 4px; }
 .vendor-join .vj-upload p { margin: 0; color: var(--muted); font-size: .85rem; }
 .vendor-join .vj-upload-inline { margin-top: 12px; }
+.vendor-join .vj-type-block,
+.vendor-join .vj-catalog {
+    display: grid;
+    gap: 12px;
+    margin: 16px 0;
+}
+.vendor-join .vj-type-help,
+.vendor-join .vj-field-help {
+    margin: 0;
+    color: var(--muted);
+    font-size: .8rem;
+    line-height: 1.4;
+}
+.vendor-join .vj-type-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.vendor-join .vj-catalog-field {
+    display: grid;
+    gap: 8px;
+}
+.vendor-join .vj-catalog-field textarea,
+.vendor-join .vj-catalog-field input[type="text"],
+.vendor-join .vj-catalog-field input[type="url"],
+.vendor-join .vj-catalog-field input[type="number"] {
+    width: 100%;
+    min-height: 46px;
+    border-radius: 12px;
+    border: 1px solid #2a2d34;
+    background: #0a0b0e;
+    color: #fff;
+    padding: 10px 12px;
+    font: inherit;
+}
+.vendor-join .vj-catalog-field textarea { min-height: 96px; resize: vertical; }
 .vendor-join .vj-projects {
     display: grid;
     gap: 14px;

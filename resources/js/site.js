@@ -549,6 +549,111 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    Alpine.data('vendorJoin', (config = {}) => ({
+        catalog: Array.isArray(config.catalog) ? config.catalog : [],
+        vendorType: config.vendorType || '',
+        pricingModelId: config.pricingModelId ? String(config.pricingModelId) : '',
+        texts: config.texts && typeof config.texts === 'object' ? { ...config.texts } : {},
+        lists: config.lists && typeof config.lists === 'object' ? { ...config.lists } : {},
+        filterTags: Array.isArray(config.filterTags) ? [...config.filterTags] : [],
+        payoutMethod: config.payoutMethod || 'bank',
+        walletNetwork: config.walletNetwork || 'telecom',
+        init() {
+            if (!this.vendorType && this.catalog.length) {
+                this.vendorType = this.catalog[0].slug;
+            }
+            this.ensurePricingModel();
+            // Seed filter multi fields from flat filter_tags.
+            this.typeFields.forEach((field) => {
+                if (!String(field.key || '').startsWith('filter.')) {
+                    return;
+                }
+                const options = (field.options || []).map((option) => option.id);
+                this.lists[field.key] = this.filterTags.filter((slug) => options.includes(slug));
+            });
+        },
+        get spec() {
+            return this.catalog.find((item) => item.slug === this.vendorType) || null;
+        },
+        get typeFields() {
+            return Array.isArray(this.spec?.fields) ? this.spec.fields : [];
+        },
+        get pricingModels() {
+            const models = Array.isArray(this.spec?.pricing_models) ? this.spec.pricing_models : [];
+            if (models.length) {
+                return models;
+            }
+            if (Array.isArray(this.spec?.pricing) && this.spec.pricing.length) {
+                return [{
+                    id: String(this.spec.pricing_model_id || 'default'),
+                    name: this.spec.pricing_model || 'Pricing model',
+                    fields: this.spec.pricing,
+                }];
+            }
+            return [];
+        },
+        get selectedPricing() {
+            return this.pricingModels.find((model) => String(model.id) === String(this.pricingModelId))
+                || this.pricingModels[0]
+                || null;
+        },
+        get pricingFields() {
+            return Array.isArray(this.selectedPricing?.fields) ? this.selectedPricing.fields : [];
+        },
+        ensurePricingModel() {
+            if (!this.pricingModels.length) {
+                this.pricingModelId = '';
+                return;
+            }
+            if (!this.pricingModels.some((model) => String(model.id) === String(this.pricingModelId))) {
+                this.pricingModelId = String(this.pricingModels[0].id);
+            }
+        },
+        selectType(slug) {
+            this.vendorType = slug;
+            this.pricingModelId = '';
+            this.ensurePricingModel();
+        },
+        textValue(key) {
+            return this.texts[key] ?? '';
+        },
+        setText(key, value) {
+            this.texts[key] = value;
+        },
+        listValue(key) {
+            return Array.isArray(this.lists[key]) ? this.lists[key] : [];
+        },
+        toggleList(key, id) {
+            const current = this.listValue(key);
+            const next = current.includes(id)
+                ? current.filter((item) => item !== id)
+                : [...current, id];
+            this.lists[key] = next;
+        },
+        formName(key) {
+            if (key === 'specialties' || key === 'delivery_formats') {
+                return `${key}[]`;
+            }
+            if (String(key).startsWith('filter.')) {
+                return 'filter_tags[]';
+            }
+            if (String(key).startsWith('extras.')) {
+                return `extras${String(key).slice(7).split('.').map((part) => `[${part}]`).join('')}`;
+            }
+            return key;
+        },
+        collectedFilterTags() {
+            const tags = [];
+            this.typeFields.forEach((field) => {
+                if (!String(field.key || '').startsWith('filter.')) {
+                    return;
+                }
+                tags.push(...this.listValue(field.key));
+            });
+            return [...new Set(tags)];
+        },
+    }));
+
     Alpine.data('vendorProjects', (config = {}) => ({
         projects: (() => {
             const incoming = Array.isArray(config.projects) ? config.projects : [];

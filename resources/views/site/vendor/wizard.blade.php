@@ -4,13 +4,17 @@
 @php
     $p = $profile ?? [];
     $vendor = $p['vendor'] ?? $p;
+    $joinState = $joinState ?? [];
+    $registerCatalog = $registerCatalog ?? [];
+    $banks = $banks ?? [];
+    $telecomWallets = $telecomWallets ?? [];
     $steps = [
-        ['label' => 'Identity', 'hint' => 'Who you are'],
-        ['label' => 'Type & bio', 'hint' => 'Your craft'],
+        ['label' => 'Identity', 'hint' => 'Account & type'],
+        ['label' => 'Type profile', 'hint' => 'Gear & tags'],
         ['label' => 'Previous projects', 'hint' => 'Your work'],
         ['label' => 'Pricing', 'hint' => 'Your rates'],
-        ['label' => 'Availability', 'hint' => 'Working hours'],
-        ['label' => 'Payouts', 'hint' => 'Get paid'],
+        ['label' => 'Calendar', 'hint' => 'Working hours'],
+        ['label' => 'Bank & payouts', 'hint' => 'Get paid'],
     ];
 @endphp
 <section class="acc-sub wrap vendor-join" data-reveal x-data="vendorWizard({ step: 1, total: 6 })">
@@ -72,6 +76,16 @@
               action="{{ $editing ? route('site.vendors.profile.update') : route('site.vendors.join.submit') }}"
               enctype="multipart/form-data"
               class="acc-sub-card vj-card acc-sub-form"
+              x-data="vendorJoin({
+                  catalog: @js($registerCatalog),
+                  vendorType: @js($joinState['vendorType'] ?? ''),
+                  pricingModelId: @js($joinState['pricingModelId'] ?? ''),
+                  texts: @js($joinState['texts'] ?? []),
+                  lists: @js($joinState['lists'] ?? []),
+                  filterTags: @js($joinState['filterTags'] ?? []),
+                  payoutMethod: @js($joinState['payoutMethod'] ?? 'bank'),
+                  walletNetwork: @js($joinState['walletNetwork'] ?? 'telecom'),
+              })"
               @submit="document.querySelectorAll('[data-vj-project]').forEach((card) => {
                   const title = (card.querySelector('[data-vj-title]')?.value || '').trim();
                   if (!title) {
@@ -82,6 +96,8 @@
             @unless($editing)
                 <input type="hidden" name="role" value="vendor">
             @endunless
+            <input type="hidden" name="vendor_type" :value="vendorType">
+            <input type="hidden" name="pricing_model_id" :value="pricingModelId">
 
             <div x-show="step === 1" x-cloak class="vj-pane">
                 <header class="acc-sub-card-head">
@@ -90,7 +106,7 @@
                     </span>
                     <div>
                         <h2>Identity</h2>
-                        <p>Legal name, contact, and verification photos.</p>
+                        <p>Account, vendor type, and identity fields — same as the mobile app.</p>
                     </div>
                 </header>
                 <div class="acc-sub-grid">
@@ -99,7 +115,7 @@
                     @unless($editing)
                         <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V8a4 4 0 0 1 8 0v2"/></svg> Password</span><input type="password" name="password" required></label>
                     @endunless
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6.5 4.5h3l1.5 4-2 1.2a12 12 0 0 0 5.3 5.3l1.2-2 4 1.5v3A2 2 0 0 1 17.5 19.5 13 13 0 0 1 4.5 6.5a2 2 0 0 1 2-2z"/></svg> Phone</span><input name="phone" value="{{ old('phone', $p['phone'] ?? '') }}" required placeholder="01xxxxxxxxx" inputmode="numeric"></label>
+                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6.5 4.5h3l1.5 4-2 1.2a12 12 0 0 0 5.3 5.3l1.2-2 4 1.5v3A2 2 0 0 1 17.5 19.5 13 13 0 0 1 4.5 6.5a2 2 0 0 1 2-2z"/></svg> Phone</span><input name="phone" value="{{ old('phone', $p['phone'] ?? '') }}" required placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11"></label>
                     <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg> Date of birth</span><input type="date" name="date_of_birth" value="{{ old('date_of_birth', $vendor['date_of_birth'] ?? '') }}" required></label>
                     <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z"/><circle cx="12" cy="11" r="2.2"/></svg> Governorate</span>
                         <select name="city_id" required>
@@ -109,44 +125,34 @@
                             @endforeach
                         </select>
                     </label>
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg> Profile photo</span><input type="file" name="profile_photo" accept="image/*"></label>
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h10M9 9h.01M15 9h.01"/></svg> National ID image</span><input type="file" name="national_id_image" accept="image/*"></label>
                 </div>
-                <div class="vj-actions">
-                    <button class="ai-btn" type="button" @click="next()">Continue</button>
-                </div>
-            </div>
 
-            <div x-show="step === 2" x-cloak class="vj-pane">
-                <header class="acc-sub-card-head">
-                    <span class="acc-sub-card-ico" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h10M4 17h14"/></svg>
-                    </span>
-                    <div>
-                        <h2>Type &amp; bio</h2>
-                        <p>How clients discover you on Lens.</p>
+                <div class="vj-type-block">
+                    <span class="acc-sub-label">Vendor type *</span>
+                    <p class="vj-type-help">Choosing a type loads the matching Type profile — same filter fields clients use in the app.</p>
+                    <div class="vj-type-chips" role="group" aria-label="Vendor type">
+                        <template x-for="type in catalog" :key="type.slug">
+                            <button type="button" class="book-chip" :class="vendorType === type.slug && 'is-active'" @click="selectType(type.slug)" x-text="type.label"></button>
+                        </template>
                     </div>
-                </header>
+                </div>
+
                 <div class="acc-sub-grid">
-                    <label><span class="acc-sub-label">Vendor type</span>
-                        <select name="vendor_type" required>
-                            @foreach($vendorTypes as $type)
-                                <option value="{{ $type->slug }}" @selected(old('vendor_type', $vendor['vendor_type'] ?? $vendor['type'] ?? '') === $type->slug)>{{ $type->name_en }}</option>
-                            @endforeach
-                        </select>
-                    </label>
                     <label><span class="acc-sub-label">Display name</span><input name="display_name" value="{{ old('display_name', $vendor['display_name'] ?? '') }}" required></label>
                     <label><span class="acc-sub-label">Profession</span><input name="profession" value="{{ old('profession', $vendor['profession'] ?? '') }}" required></label>
                     <label><span class="acc-sub-label">Years experience</span><input type="number" min="0" name="years_experience" value="{{ old('years_experience', $vendor['years_experience'] ?? 1) }}" required></label>
-                    <label class="acc-sub-span-2"><span class="acc-sub-label">Bio</span><textarea name="bio" required>{{ old('bio', $vendor['bio'] ?? '') }}</textarea></label>
-                    <label><span class="acc-sub-label">WhatsApp</span><input name="whatsapp" value="{{ old('whatsapp', $vendor['whatsapp'] ?? '') }}" required placeholder="01xxxxxxxxx"></label>
+                    <label class="acc-sub-span-2"><span class="acc-sub-label">About</span><textarea name="bio" required>{{ old('bio', $vendor['bio'] ?? '') }}</textarea></label>
+                    <label><span class="acc-sub-label">WhatsApp</span><input name="whatsapp" value="{{ old('whatsapp', $vendor['whatsapp'] ?? '') }}" required placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11"></label>
                     <label><span class="acc-sub-label">Contact email</span><input type="email" name="contact_email" value="{{ old('contact_email', $vendor['contact_email'] ?? $p['email'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label">Instagram</span><input name="instagram" value="{{ old('instagram', $vendor['instagram'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Instagram link</span><input name="instagram" value="{{ old('instagram', $vendor['instagram'] ?? '') }}" required></label>
                     <label><span class="acc-sub-label">Instagram followers</span><input type="number" min="0" name="instagram_followers" value="{{ old('instagram_followers', $vendor['instagram_followers'] ?? 0) }}" required></label>
-                    <label><span class="acc-sub-label">TikTok URL</span><input name="tiktok_url" value="{{ old('tiktok_url', $vendor['tiktok_url'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">TikTok link</span><input name="tiktok_url" value="{{ old('tiktok_url', $vendor['tiktok_url'] ?? '') }}" required></label>
                     <label><span class="acc-sub-label">TikTok followers</span><input type="number" min="0" name="tiktok_followers" value="{{ old('tiktok_followers', $vendor['tiktok_followers'] ?? 0) }}" required></label>
-                    <label><span class="acc-sub-label">Facebook URL</span><input name="facebook_url" value="{{ old('facebook_url', $vendor['facebook_url'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Facebook link</span><input name="facebook_url" value="{{ old('facebook_url', $vendor['facebook_url'] ?? '') }}" required></label>
                     <label><span class="acc-sub-label">Facebook followers</span><input type="number" min="0" name="facebook_followers" value="{{ old('facebook_followers', $vendor['facebook_followers'] ?? 0) }}" required></label>
+                    <label><span class="acc-sub-label">Profile photo</span><input type="file" name="profile_photo" accept="image/*" @required(!$editing)></label>
+                    <label><span class="acc-sub-label">National ID image</span><input type="file" name="national_id_image" accept="image/*" @required(!$editing)></label>
+                    <label class="acc-sub-span-2"><span class="acc-sub-label">Cover image</span><input type="file" name="cover_image" accept="image/*" @required(!$editing)></label>
                     <div
                         class="acc-sub-span-2 vj-address"
                         x-data="addressMapPicker({
@@ -218,6 +224,77 @@
                     </div>
                 </div>
                 <div class="vj-actions">
+                    <button class="ai-btn" type="button" @click="next()">Continue</button>
+                </div>
+            </div>
+
+            <div x-show="step === 2" x-cloak class="vj-pane">
+                <header class="acc-sub-card-head">
+                    <span class="acc-sub-card-ico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h10M4 17h14"/></svg>
+                    </span>
+                    <div>
+                        <h2 x-text="spec?.profile_title || 'Type profile'"></h2>
+                        <p x-text="spec?.profile_description || 'Choose a vendor type on Identity to load matching fields.'"></p>
+                    </div>
+                </header>
+
+                <div class="vj-catalog" x-show="!vendorType" x-cloak>
+                    <p class="vj-type-help">Choose a vendor type on Identity. Matching portfolio, gear, and specialty fields will appear here.</p>
+                </div>
+
+                <div class="vj-catalog" x-show="vendorType" x-cloak>
+                    <template x-for="field in typeFields" :key="field.key">
+                        <div class="vj-catalog-field">
+                            <span class="acc-sub-label" x-text="field.label + ' *'"></span>
+                            <template x-if="field.type === 'multi'">
+                                <div class="vj-type-chips">
+                                    <template x-for="opt in (field.options || [])" :key="field.key + '-' + opt.id">
+                                        <button
+                                            type="button"
+                                            class="book-chip"
+                                            :class="listValue(field.key).includes(opt.id) && 'is-active'"
+                                            @click="toggleList(field.key, opt.id)"
+                                            x-text="opt.label"
+                                        ></button>
+                                    </template>
+                                    <template x-for="id in listValue(field.key)" :key="'sel-' + field.key + '-' + id">
+                                        <input type="hidden" :name="formName(field.key)" :value="id">
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="field.type === 'textarea'">
+                                <textarea
+                                    :name="formName(field.key)"
+                                    rows="3"
+                                    x-model="texts[field.key]"
+                                    :placeholder="field.placeholder || ''"
+                                ></textarea>
+                            </template>
+                            <template x-if="field.type === 'text' || field.type === 'url'">
+                                <input
+                                    :type="field.type === 'url' ? 'url' : 'text'"
+                                    :name="formName(field.key)"
+                                    x-model="texts[field.key]"
+                                    :placeholder="field.placeholder || ''"
+                                >
+                            </template>
+                            <template x-if="field.type === 'number'">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    :name="formName(field.key)"
+                                    x-model="texts[field.key]"
+                                    :placeholder="field.prefix || ''"
+                                >
+                            </template>
+                            <small class="vj-field-help" x-show="field.helper" x-text="field.helper"></small>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="vj-actions">
                     <button class="ghost-btn" type="button" @click="prev()">Back</button>
                     <button class="ai-btn" type="button" @click="next()">Continue</button>
                 </div>
@@ -238,17 +315,6 @@
                         <p>Upload photos, a gallery, videos, or social links — same as the app and admin.</p>
                     </div>
                 </header>
-
-                <div class="vj-upload">
-                    <span class="vj-upload-ico" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V6m0 0 4 4m-4-4-4 4"/><path d="M4 18h16"/></svg>
-                    </span>
-                    <div>
-                        <strong>Cover image</strong>
-                        <p>Landscape works best. JPG or PNG.</p>
-                    </div>
-                    <input type="file" name="cover_image" accept="image/*">
-                </div>
 
                 <div class="vj-projects">
                     <template x-for="(project, index) in projects" :key="'project-' + index">
@@ -345,16 +411,49 @@
                     </span>
                     <div>
                         <h2>Pricing</h2>
-                        <p>Set the rates clients see when they book you.</p>
+                        <p>Admin-defined price fields for the selected vendor type — same as the app.</p>
                     </div>
                 </header>
-                <div class="acc-sub-grid">
-                    <label><span class="acc-sub-label">Half day price</span><input type="number" min="0" name="half_day_price" value="{{ old('half_day_price', $vendor['half_day_price'] ?? '') }}" placeholder="EGP"></label>
-                    <label><span class="acc-sub-label">Full day price</span><input type="number" min="0" name="full_day_price" value="{{ old('full_day_price', $vendor['full_day_price'] ?? '') }}" placeholder="EGP"></label>
-                    <label><span class="acc-sub-label">Hourly price</span><input type="number" min="0" name="hourly_price" value="{{ old('hourly_price', $vendor['hourly_price'] ?? '') }}" placeholder="EGP"></label>
-                    <label><span class="acc-sub-label">Per video price</span><input type="number" min="0" name="per_video_price" value="{{ old('per_video_price', $vendor['per_video_price'] ?? '') }}" placeholder="EGP"></label>
-                    <label><span class="acc-sub-label">Turnaround hours</span><input type="number" min="1" name="turnaround_hours" value="{{ old('turnaround_hours', $vendor['turnaround_hours'] ?? 48) }}"></label>
+
+                <div class="vj-catalog" x-show="!pricingModels.length" x-cloak>
+                    <p class="vj-type-help">No pricing model is assigned to this vendor type yet. Ask Lens admin to add one, or continue with calendar.</p>
                 </div>
+
+                <div class="vj-catalog" x-show="pricingModels.length" x-cloak>
+                    <div class="vj-catalog-field" x-show="pricingModels.length > 1">
+                        <span class="acc-sub-label">Pricing model *</span>
+                        <div class="vj-type-chips">
+                            <template x-for="model in pricingModels" :key="'pm-' + model.id">
+                                <button
+                                    type="button"
+                                    class="book-chip"
+                                    :class="String(pricingModelId) === String(model.id) && 'is-active'"
+                                    @click="pricingModelId = String(model.id)"
+                                    x-text="model.name"
+                                ></button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="acc-sub-grid">
+                        <template x-for="field in pricingFields" :key="'price-' + field.key">
+                            <label>
+                                <span class="acc-sub-label" x-text="field.label + (field.prefix ? ' (' + field.prefix + ')' : '')"></span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    :name="formName(field.key)"
+                                    x-model="texts[field.key]"
+                                    :placeholder="field.prefix || '0'"
+                                    required
+                                >
+                                <small class="vj-field-help" x-show="field.helper" x-text="field.helper"></small>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+
                 <div class="vj-actions">
                     <button class="ghost-btn" type="button" @click="prev()">Back</button>
                     <button class="ai-btn" type="button" @click="next()">Continue</button>
@@ -372,7 +471,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
                     </span>
                     <div>
-                        <h2>Availability</h2>
+                        <h2>Calendar</h2>
                         <p>Set your weekly working hours — clients book inside these windows.</p>
                     </div>
                 </header>
@@ -515,24 +614,85 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M3 11h18M7 15h3"/></svg>
                     </span>
                     <div>
-                        <h2>Payouts</h2>
-                        <p>Where Lens sends your earnings after escrow release.</p>
+                        <h2>Bank &amp; payouts</h2>
+                        <p>The same payout options as Create Vendor in admin and the mobile app.</p>
                     </div>
                 </header>
-                <div class="acc-sub-grid">
-                    <label><span class="acc-sub-label">Payout method</span>
-                        <select name="payout_method" required>
-                            <option value="bank" @selected(old('payout_method', $vendor['payout_method'] ?? '') === 'bank')>Bank</option>
-                            <option value="wallet" @selected(old('payout_method', $vendor['payout_method'] ?? '') === 'wallet')>Wallet</option>
-                            <option value="paypal" @selected(old('payout_method', $vendor['payout_method'] ?? '') === 'paypal')>PayPal</option>
+
+                <div class="vj-catalog-field">
+                    <span class="acc-sub-label">Payout method *</span>
+                    <div class="vj-type-chips">
+                        <template x-for="opt in [
+                            { id: 'bank', label: 'Bank' },
+                            { id: 'wallet', label: 'Wallet' },
+                            { id: 'paypal', label: 'PayPal' },
+                        ]" :key="opt.id">
+                            <button type="button" class="book-chip" :class="payoutMethod === opt.id && 'is-active'" @click="payoutMethod = opt.id" x-text="opt.label"></button>
+                        </template>
+                    </div>
+                    <input type="hidden" name="payout_method" :value="payoutMethod">
+                </div>
+
+                <div class="acc-sub-grid" x-show="payoutMethod === 'bank'" x-cloak>
+                    <label><span class="acc-sub-label">Bank</span>
+                        <select name="bank_name" :required="payoutMethod === 'bank'">
+                            <option value="">Choose bank…</option>
+                            @foreach($banks as $value => $label)
+                                <option value="{{ $value }}" @selected(old('bank_name', $vendor['bank_name'] ?? '') === $value)>{{ $label }}</option>
+                            @endforeach
                         </select>
                     </label>
-                    <label><span class="acc-sub-label">Bank name</span><input name="bank_name" value="{{ old('bank_name', $vendor['bank_name'] ?? '') }}"></label>
-                    <label><span class="acc-sub-label">Account holder</span><input name="bank_account_holder" value="{{ old('bank_account_holder', $vendor['bank_account_holder'] ?? '') }}"></label>
-                    <label><span class="acc-sub-label">Account number</span><input name="bank_account_number" value="{{ old('bank_account_number', $vendor['bank_account_number'] ?? '') }}"></label>
-                    <label><span class="acc-sub-label">Wallet phone</span><input name="wallet_phone" value="{{ old('wallet_phone', $vendor['wallet_phone'] ?? '') }}" placeholder="01xxxxxxxxx"></label>
-                    <label><span class="acc-sub-label">PayPal email</span><input type="email" name="paypal_email" value="{{ old('paypal_email', $vendor['paypal_email'] ?? '') }}"></label>
+                    <label><span class="acc-sub-label">Account type</span>
+                        <select name="bank_account_type" :required="payoutMethod === 'bank'">
+                            <option value="current" @selected(old('bank_account_type', $vendor['bank_account_type'] ?? 'current') === 'current')>Current</option>
+                            <option value="savings" @selected(old('bank_account_type', $vendor['bank_account_type'] ?? '') === 'savings')>Savings</option>
+                        </select>
+                    </label>
+                    <label><span class="acc-sub-label">Account holder</span><input name="bank_account_holder" value="{{ old('bank_account_holder', $vendor['bank_account_holder'] ?? '') }}" :required="payoutMethod === 'bank'"></label>
+                    <label><span class="acc-sub-label">Account number</span><input name="bank_account_number" value="{{ old('bank_account_number', $vendor['bank_account_number'] ?? '') }}" :required="payoutMethod === 'bank'"></label>
+                    <label><span class="acc-sub-label">IBAN</span><input name="bank_iban" value="{{ old('bank_iban', $vendor['bank_iban'] ?? '') }}" :required="payoutMethod === 'bank'"></label>
+                    <label><span class="acc-sub-label">SWIFT</span><input name="bank_swift" value="{{ old('bank_swift', $vendor['bank_swift'] ?? '') }}" :required="payoutMethod === 'bank'"></label>
+                    <label><span class="acc-sub-label">Branch</span><input name="bank_branch" value="{{ old('bank_branch', $vendor['bank_branch'] ?? '') }}" :required="payoutMethod === 'bank'"></label>
+                    <label><span class="acc-sub-label">Branch code</span><input name="bank_branch_code" value="{{ old('bank_branch_code', $vendor['bank_branch_code'] ?? '') }}" :required="payoutMethod === 'bank'"></label>
                 </div>
+
+                <div class="acc-sub-grid" x-show="payoutMethod === 'wallet'" x-cloak>
+                    <div class="acc-sub-span-2 vj-catalog-field">
+                        <span class="acc-sub-label">Wallet issuer *</span>
+                        <div class="vj-type-chips">
+                            <button type="button" class="book-chip" :class="walletNetwork === 'telecom' && 'is-active'" @click="walletNetwork = 'telecom'">Telecom</button>
+                            <button type="button" class="book-chip" :class="walletNetwork === 'bank' && 'is-active'" @click="walletNetwork = 'bank'">Bank wallet</button>
+                        </div>
+                        <input type="hidden" name="wallet_network_type" :value="walletNetwork">
+                    </div>
+                    <label x-show="walletNetwork === 'telecom'" x-cloak><span class="acc-sub-label">Telecom</span>
+                        <select name="wallet_telecom" :required="payoutMethod === 'wallet' && walletNetwork === 'telecom'">
+                            <option value="">Choose…</option>
+                            @foreach($telecomWallets as $value => $label)
+                                <option value="{{ $value }}" @selected(old('wallet_telecom', $vendor['wallet_telecom'] ?? '') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label x-show="walletNetwork === 'bank'" x-cloak><span class="acc-sub-label">Wallet bank</span>
+                        <select name="wallet_bank_name" :required="payoutMethod === 'wallet' && walletNetwork === 'bank'">
+                            <option value="">Choose bank…</option>
+                            @foreach($banks as $value => $label)
+                                <option value="{{ $value }}" @selected(old('wallet_bank_name', $vendor['wallet_bank_name'] ?? '') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label><span class="acc-sub-label">Wallet phone</span><input name="wallet_phone" value="{{ old('wallet_phone', $vendor['wallet_phone'] ?? '') }}" placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11" :required="payoutMethod === 'wallet'"></label>
+                </div>
+
+                <div class="acc-sub-grid" x-show="payoutMethod === 'paypal'" x-cloak>
+                    <label><span class="acc-sub-label">PayPal email</span><input type="email" name="paypal_email" value="{{ old('paypal_email', $vendor['paypal_email'] ?? '') }}" :required="payoutMethod === 'paypal'"></label>
+                    <label><span class="acc-sub-label">PayPal name</span><input name="paypal_name" value="{{ old('paypal_name', $vendor['paypal_name'] ?? '') }}" :required="payoutMethod === 'paypal'"></label>
+                </div>
+
+                <div class="acc-sub-grid">
+                    <label class="acc-sub-span-2"><span class="acc-sub-label">Transfer notes</span><textarea name="transfer_notes" rows="2" placeholder="Optional notes for payouts">{{ old('transfer_notes', $vendor['transfer_notes'] ?? '') }}</textarea></label>
+                </div>
+
                 @foreach($errors->all() as $error)<em class="bookings-error">{{ $error }}</em>@endforeach
                 <div class="vj-actions">
                     <button class="ghost-btn" type="button" @click="prev()">Back</button>

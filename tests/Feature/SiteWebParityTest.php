@@ -27,8 +27,11 @@ class SiteWebParityTest extends TestCase
         $this->get('/vendors/join')
             ->assertOk()
             ->assertSee('Become a Lens vendor')
+            ->assertSee('Type profile')
             ->assertSee('Previous projects')
-            ->assertSee('Add previous project');
+            ->assertSee('Add previous project')
+            ->assertSee('Bank & payouts')
+            ->assertSee('Vendor type');
 
         $this->post('/login', [
             'email' => 'client@lens.app',
