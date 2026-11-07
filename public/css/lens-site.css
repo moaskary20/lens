@@ -980,18 +980,34 @@ main { padding-bottom: 8px; }
     overflow-x: clip;
 }
 @media (min-width: 961px) {
+    .vendor-join.acc-sub {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 18px;
+    }
+    .vendor-join .acc-sub-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+        gap: 18px;
+        align-items: stretch;
+    }
+    .vendor-join .acc-sub-hero-copy,
+    .vendor-join .acc-sub-body {
+        grid-column: auto;
+    }
     .vendor-join .acc-sub-hero-art {
-        grid-row: 1;
-        align-self: start;
+        grid-column: auto;
+        grid-row: auto;
+        position: relative;
+        top: auto;
         height: auto;
         min-height: 0;
         max-height: none;
+        align-self: stretch;
     }
     .vendor-join .acc-sub-hero-art img {
-        min-height: 0;
-        height: auto;
+        min-height: 240px;
+        height: 100%;
         width: 100%;
-        aspect-ratio: 800 / 520;
         object-fit: cover;
         object-position: center;
     }
