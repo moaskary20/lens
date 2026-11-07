@@ -979,6 +979,23 @@ main { padding-bottom: 8px; }
     max-width: 100%;
     overflow-x: clip;
 }
+@media (min-width: 961px) {
+    .vendor-join .acc-sub-hero-art {
+        grid-row: 1;
+        align-self: start;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+    }
+    .vendor-join .acc-sub-hero-art img {
+        min-height: 0;
+        height: auto;
+        width: 100%;
+        aspect-ratio: 800 / 520;
+        object-fit: cover;
+        object-position: center;
+    }
+}
 .vendor-join .vj-steps {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
