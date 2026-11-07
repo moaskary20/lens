@@ -17,7 +17,7 @@
         ['label' => 'Bank & payouts', 'hint' => 'Get paid'],
     ];
 @endphp
-<section class="acc-sub wrap vendor-join" data-reveal x-data="vendorWizard({ step: 1, total: 6 })">
+<section class="acc-sub wrap vendor-join" data-reveal x-data="vendorWizard({ step: 1, total: 6, editing: @js((bool) $editing) })">
     <header class="acc-sub-hero">
         <div class="acc-sub-hero-copy">
             @if($editing)
@@ -58,7 +58,7 @@
                     type="button"
                     class="vj-step"
                     :class="{ 'is-active': step === {{ $i + 1 }}, 'is-done': step > {{ $i + 1 }} }"
-                    @click="step = {{ $i + 1 }}"
+                    @click="goTo({{ $i + 1 }})"
                 >
                     <span class="vj-step-num" aria-hidden="true">
                         <span x-show="step <= {{ $i + 1 }}">{{ $i + 1 }}</span>
@@ -72,10 +72,12 @@
             @endforeach
         </nav>
 
+        <div class="vj-step-error" x-show="stepError" x-cloak x-text="stepError" role="alert"></div>
+
         <form method="post"
               action="{{ $editing ? route('site.vendors.profile.update') : route('site.vendors.join.submit') }}"
               enctype="multipart/form-data"
-              class="acc-sub-card vj-card acc-sub-form"
+              class="acc-sub-card vj-card acc-sub-form vendor-join-form"
               x-data="vendorJoin({
                   catalog: @js($registerCatalog),
                   vendorType: @js($joinState['vendorType'] ?? ''),
@@ -86,12 +88,17 @@
                   payoutMethod: @js($joinState['payoutMethod'] ?? 'bank'),
                   walletNetwork: @js($joinState['walletNetwork'] ?? 'telecom'),
               })"
-              @submit="document.querySelectorAll('[data-vj-project]').forEach((card) => {
-                  const title = (card.querySelector('[data-vj-title]')?.value || '').trim();
-                  if (!title) {
-                      card.querySelectorAll('input, select, textarea').forEach((el) => { el.disabled = true; });
-                  }
-              })">
+              @submit.prevent="
+                  document.querySelectorAll('[data-vj-project]').forEach((card) => {
+                      const title = (card.querySelector('[data-vj-title]')?.value || '').trim();
+                      if (!title) {
+                          card.querySelectorAll('input, select, textarea').forEach((el) => { el.disabled = true; });
+                      }
+                  });
+                  const wizard = window.Alpine.$data($el.closest('section.vendor-join'));
+                  if (wizard?.beforeSubmit?.({ preventDefault() {} }) === false) { return; }
+                  $el.submit();
+              ">
             @csrf
             @unless($editing)
                 <input type="hidden" name="role" value="vendor">
@@ -110,14 +117,14 @@
                     </div>
                 </header>
                 <div class="acc-sub-grid">
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19c1.8-3.4 4-5 6.5-5s4.7 1.6 6.5 5"/></svg> Full name</span><input name="name" value="{{ old('name', $p['name'] ?? '') }}" @required(!$editing)></label>
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg> Email</span><input type="email" name="email" value="{{ old('email', $p['email'] ?? '') }}" @required(!$editing) @disabled($editing)></label>
+                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19c1.8-3.4 4-5 6.5-5s4.7 1.6 6.5 5"/></svg> Full name *</span><input name="name" value="{{ old('name', $p['name'] ?? '') }}" @required(!$editing)></label>
+                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg> Email *</span><input type="email" name="email" value="{{ old('email', $p['email'] ?? '') }}" @required(!$editing) @disabled($editing)></label>
                     @unless($editing)
-                        <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V8a4 4 0 0 1 8 0v2"/></svg> Password</span><input type="password" name="password" required></label>
+                        <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V8a4 4 0 0 1 8 0v2"/></svg> Password *</span><input type="password" name="password" required minlength="8"></label>
                     @endunless
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6.5 4.5h3l1.5 4-2 1.2a12 12 0 0 0 5.3 5.3l1.2-2 4 1.5v3A2 2 0 0 1 17.5 19.5 13 13 0 0 1 4.5 6.5a2 2 0 0 1 2-2z"/></svg> Phone</span><input name="phone" value="{{ old('phone', $p['phone'] ?? '') }}" required placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11"></label>
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg> Date of birth</span><input type="date" name="date_of_birth" value="{{ old('date_of_birth', $vendor['date_of_birth'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z"/><circle cx="12" cy="11" r="2.2"/></svg> Governorate</span>
+                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6.5 4.5h3l1.5 4-2 1.2a12 12 0 0 0 5.3 5.3l1.2-2 4 1.5v3A2 2 0 0 1 17.5 19.5 13 13 0 0 1 4.5 6.5a2 2 0 0 1 2-2z"/></svg> Phone *</span><input name="phone" value="{{ old('phone', $p['phone'] ?? '') }}" required placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11" pattern="01[0125][0-9]{8}"></label>
+                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg> Date of birth *</span><input type="date" name="date_of_birth" value="{{ old('date_of_birth', $vendor['date_of_birth'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z"/><circle cx="12" cy="11" r="2.2"/></svg> Governorate *</span>
                         <select name="city_id" required>
                             <option value="">Choose…</option>
                             @foreach($cities as $city)
@@ -138,21 +145,21 @@
                 </div>
 
                 <div class="acc-sub-grid">
-                    <label><span class="acc-sub-label">Display name</span><input name="display_name" value="{{ old('display_name', $vendor['display_name'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label">Profession</span><input name="profession" value="{{ old('profession', $vendor['profession'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label">Years experience</span><input type="number" min="0" name="years_experience" value="{{ old('years_experience', $vendor['years_experience'] ?? 1) }}" required></label>
-                    <label class="acc-sub-span-2"><span class="acc-sub-label">About</span><textarea name="bio" required>{{ old('bio', $vendor['bio'] ?? '') }}</textarea></label>
-                    <label><span class="acc-sub-label">WhatsApp</span><input name="whatsapp" value="{{ old('whatsapp', $vendor['whatsapp'] ?? '') }}" required placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11"></label>
-                    <label><span class="acc-sub-label">Contact email</span><input type="email" name="contact_email" value="{{ old('contact_email', $vendor['contact_email'] ?? $p['email'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label">Instagram link</span><input name="instagram" value="{{ old('instagram', $vendor['instagram'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label">Instagram followers</span><input type="number" min="0" name="instagram_followers" value="{{ old('instagram_followers', $vendor['instagram_followers'] ?? 0) }}" required></label>
-                    <label><span class="acc-sub-label">TikTok link</span><input name="tiktok_url" value="{{ old('tiktok_url', $vendor['tiktok_url'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label">TikTok followers</span><input type="number" min="0" name="tiktok_followers" value="{{ old('tiktok_followers', $vendor['tiktok_followers'] ?? 0) }}" required></label>
-                    <label><span class="acc-sub-label">Facebook link</span><input name="facebook_url" value="{{ old('facebook_url', $vendor['facebook_url'] ?? '') }}" required></label>
-                    <label><span class="acc-sub-label">Facebook followers</span><input type="number" min="0" name="facebook_followers" value="{{ old('facebook_followers', $vendor['facebook_followers'] ?? 0) }}" required></label>
-                    <label><span class="acc-sub-label">Profile photo</span><input type="file" name="profile_photo" accept="image/*" @required(!$editing)></label>
-                    <label><span class="acc-sub-label">National ID image</span><input type="file" name="national_id_image" accept="image/*" @required(!$editing)></label>
-                    <label class="acc-sub-span-2"><span class="acc-sub-label">Cover image</span><input type="file" name="cover_image" accept="image/*" @required(!$editing)></label>
+                    <label><span class="acc-sub-label">Display name *</span><input name="display_name" value="{{ old('display_name', $vendor['display_name'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Profession *</span><input name="profession" value="{{ old('profession', $vendor['profession'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Years experience *</span><input type="number" min="0" name="years_experience" value="{{ old('years_experience', $vendor['years_experience'] ?? '') }}" required></label>
+                    <label class="acc-sub-span-2"><span class="acc-sub-label">About *</span><textarea name="bio" required>{{ old('bio', $vendor['bio'] ?? '') }}</textarea></label>
+                    <label><span class="acc-sub-label">WhatsApp *</span><input name="whatsapp" value="{{ old('whatsapp', $vendor['whatsapp'] ?? '') }}" required placeholder="01xxxxxxxxx" inputmode="numeric" maxlength="11"></label>
+                    <label><span class="acc-sub-label">Contact email *</span><input type="email" name="contact_email" value="{{ old('contact_email', $vendor['contact_email'] ?? $p['email'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Instagram link *</span><input name="instagram" value="{{ old('instagram', $vendor['instagram'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Instagram followers *</span><input type="number" min="0" name="instagram_followers" value="{{ old('instagram_followers', $vendor['instagram_followers'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">TikTok link *</span><input name="tiktok_url" value="{{ old('tiktok_url', $vendor['tiktok_url'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">TikTok followers *</span><input type="number" min="0" name="tiktok_followers" value="{{ old('tiktok_followers', $vendor['tiktok_followers'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Facebook link *</span><input name="facebook_url" value="{{ old('facebook_url', $vendor['facebook_url'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Facebook followers *</span><input type="number" min="0" name="facebook_followers" value="{{ old('facebook_followers', $vendor['facebook_followers'] ?? '') }}" required></label>
+                    <label><span class="acc-sub-label">Profile photo *</span><input type="file" name="profile_photo" accept="image/*" @required(!$editing)></label>
+                    <label><span class="acc-sub-label">National ID image *</span><input type="file" name="national_id_image" accept="image/*" @required(!$editing)></label>
+                    <label class="acc-sub-span-2"><span class="acc-sub-label">Cover image *</span><input type="file" name="cover_image" accept="image/*" @required(!$editing)></label>
                     <div
                         class="acc-sub-span-2 vj-address"
                         x-data="addressMapPicker({
@@ -170,7 +177,7 @@
 
                         <span class="acc-sub-label">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
-                            Address
+                            Address *
                         </span>
 
                         <button type="button" class="book-map-trigger vj-address-trigger" @click="openPicker()">
@@ -304,6 +311,7 @@
                 x-show="step === 3"
                 x-cloak
                 class="vj-pane"
+                data-vj-projects
                 x-data="vendorProjects({ projects: @js(old('projects', $vendor['projects'] ?? [])) })"
             >
                 <header class="acc-sub-card-head">
@@ -312,7 +320,7 @@
                     </span>
                     <div>
                         <h2>Previous projects</h2>
-                        <p>Upload photos, a gallery, videos, or social links — same as the app and admin.</p>
+                        <p>At least one project with media or a link is required — same as the app.</p>
                     </div>
                 </header>
 
@@ -343,7 +351,7 @@
 
                             <div class="acc-sub-grid vj-project-grid">
                                 <label>
-                                    <span class="acc-sub-label">Project title</span>
+                                    <span class="acc-sub-label">Project title *</span>
                                     <input type="text" data-vj-title :name="'projects[' + index + '][title]'" x-model="project.title" placeholder="Wedding film · Brand shoot">
                                 </label>
                                 <label>

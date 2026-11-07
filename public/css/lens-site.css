@@ -1066,6 +1066,16 @@ main { padding-bottom: 8px; }
 .vendor-join .vj-upload strong { display: block; margin-bottom: 4px; }
 .vendor-join .vj-upload p { margin: 0; color: var(--muted); font-size: .85rem; }
 .vendor-join .vj-upload-inline { margin-top: 12px; }
+.vendor-join .vj-step-error {
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(220, 80, 80, .45);
+    background: rgba(220, 80, 80, .12);
+    color: #ffb4b4;
+    font-size: .9rem;
+    font-weight: 600;
+}
 .vendor-join .vj-type-block,
 .vendor-join .vj-catalog {
     display: grid;

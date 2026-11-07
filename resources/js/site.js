@@ -539,13 +539,79 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('vendorWizard', (config = {}) => ({
         step: config.step || 1,
         total: config.total || 6,
+        editing: Boolean(config.editing),
+        stepError: '',
+        joinForm() {
+            return this.$el.querySelector('form.vendor-join-form, form.acc-sub-form');
+        },
+        joinData() {
+            const form = this.joinForm();
+            return form ? window.Alpine.$data(form) : null;
+        },
+        fail(message) {
+            this.stepError = message;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return false;
+        },
+        clearError() {
+            this.stepError = '';
+            return true;
+        },
+        validateBeforeLeave(fromStep) {
+            const join = this.joinData();
+            if (!join?.validateStep) {
+                return this.clearError();
+            }
+            const error = join.validateStep(fromStep, this.editing);
+            if (error) {
+                return this.fail(error);
+            }
+            return this.clearError();
+        },
         next() {
+            if (!this.validateBeforeLeave(this.step)) {
+                return;
+            }
             this.step = Math.min(this.total, this.step + 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         prev() {
+            this.clearError();
             this.step = Math.max(1, this.step - 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+        goTo(target) {
+            const next = Math.min(this.total, Math.max(1, Number(target) || 1));
+            if (next <= this.step) {
+                this.clearError();
+                this.step = next;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+            for (let current = this.step; current < next; current += 1) {
+                if (!this.validateBeforeLeave(current)) {
+                    this.step = current;
+                    return;
+                }
+                this.step = current + 1;
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+        beforeSubmit(event) {
+            const join = this.joinData();
+            if (!join?.validateStep) {
+                return true;
+            }
+            for (let current = 1; current <= this.total; current += 1) {
+                const error = join.validateStep(current, this.editing);
+                if (error) {
+                    event.preventDefault();
+                    this.step = current;
+                    this.fail(error);
+                    return false;
+                }
+            }
+            return this.clearError();
         },
     }));
 
@@ -558,12 +624,32 @@ document.addEventListener('alpine:init', () => {
         filterTags: Array.isArray(config.filterTags) ? [...config.filterTags] : [],
         payoutMethod: config.payoutMethod || 'bank',
         walletNetwork: config.walletNetwork || 'telecom',
+        optionalGear: [
+            'extras.camera_type',
+            'extras.lenses_available',
+            'extras.lighting_gear',
+            'extras.photo_extras',
+            'extras.video_quality',
+            'extras.video_gear',
+            'extras.delivery_formats_notes',
+            'extras.reels_setup',
+            'extras.studio_features',
+            'extras.studio_sets',
+            'extras.studio_amenities',
+            'extras.studio_equipment',
+            'extras.model_sizes_notes',
+            'extras.model_experience_notes',
+            'extras.ugc_content_notes',
+            'extras.ugc_gear_notes',
+            'extras.food_expertise_notes',
+            'extras.food_content_notes',
+            'extras.addon_notes',
+        ],
         init() {
             if (!this.vendorType && this.catalog.length) {
                 this.vendorType = this.catalog[0].slug;
             }
             this.ensurePricingModel();
-            // Seed filter multi fields from flat filter_tags.
             this.typeFields.forEach((field) => {
                 if (!String(field.key || '').startsWith('filter.')) {
                     return;
@@ -651,6 +737,209 @@ document.addEventListener('alpine:init', () => {
                 tags.push(...this.listValue(field.key));
             });
             return [...new Set(tags)];
+        },
+        fieldValue(name) {
+            const el = this.$el.querySelector(`[name="${name}"]`);
+            if (!el) {
+                return '';
+            }
+            if (el.type === 'file') {
+                return el.files?.length ? '1' : '';
+            }
+            return String(el.value || '').trim();
+        },
+        egyptPhone(value) {
+            return /^01[0125][0-9]{8}$/.test(String(value || '').replace(/\D+/g, ''));
+        },
+        projectsData() {
+            const el = this.$el.querySelector('[data-vj-projects]');
+            return el ? window.Alpine.$data(el) : null;
+        },
+        validateStep(step, editing = false) {
+            if (step === 1) {
+                return this.validateIdentity(editing);
+            }
+            if (step === 2) {
+                return this.validateTypeProfile();
+            }
+            if (step === 3) {
+                return this.validateProjects();
+            }
+            if (step === 4) {
+                return this.validatePricing();
+            }
+            if (step === 5) {
+                return null;
+            }
+            if (step === 6) {
+                return this.validatePayout();
+            }
+            return null;
+        },
+        validateIdentity(editing) {
+            if (!editing) {
+                if (!this.fieldValue('name')) {
+                    return 'Enter your full name.';
+                }
+                if (!this.fieldValue('email')) {
+                    return 'Enter your email.';
+                }
+                if (!this.fieldValue('password') || this.fieldValue('password').length < 8) {
+                    return 'Enter a password with at least 8 characters.';
+                }
+            }
+            if (!this.egyptPhone(this.fieldValue('phone'))) {
+                return 'Enter a valid Egyptian phone (010 / 011 / 012 / 015).';
+            }
+            if (!this.vendorType) {
+                return 'Choose a vendor type to load the matching Type profile.';
+            }
+            if (!this.fieldValue('display_name')) {
+                return 'Enter your display name.';
+            }
+            if (!this.fieldValue('date_of_birth')) {
+                return 'Enter your date of birth.';
+            }
+            if (!this.fieldValue('city_id')) {
+                return 'Choose your home governorate.';
+            }
+            if (!this.fieldValue('profession')) {
+                return 'Enter your profession / job title.';
+            }
+            const years = Number(this.fieldValue('years_experience'));
+            if (Number.isNaN(years) || years < 0) {
+                return 'Enter your years of experience.';
+            }
+            if (!this.fieldValue('bio')) {
+                return 'Write a short About section.';
+            }
+            if (!this.fieldValue('contact_email')) {
+                return 'Enter your contact email.';
+            }
+            if (!this.egyptPhone(this.fieldValue('whatsapp'))) {
+                return 'Enter a valid WhatsApp number.';
+            }
+            if (!this.fieldValue('instagram') || this.fieldValue('instagram_followers') === '') {
+                return 'Enter your Instagram link and followers count.';
+            }
+            if (!this.fieldValue('tiktok_url') || this.fieldValue('tiktok_followers') === '') {
+                return 'Enter your TikTok link and followers count.';
+            }
+            if (!this.fieldValue('facebook_url') || this.fieldValue('facebook_followers') === '') {
+                return 'Enter your Facebook link and followers count.';
+            }
+            if (!editing) {
+                if (!this.fieldValue('profile_photo')) {
+                    return 'Add your personal photo.';
+                }
+                if (!this.fieldValue('national_id_image')) {
+                    return 'Upload your national ID card.';
+                }
+                if (!this.fieldValue('cover_image')) {
+                    return 'Add a cover image.';
+                }
+            }
+            if (!this.fieldValue('address') || !this.fieldValue('latitude') || !this.fieldValue('longitude')) {
+                return 'Pin your map address.';
+            }
+            return null;
+        },
+        validateTypeProfile() {
+            if (!this.vendorType) {
+                return 'Choose a vendor type on Identity first.';
+            }
+            for (const field of this.typeFields) {
+                if (this.optionalGear.includes(field.key)) {
+                    continue;
+                }
+                if (field.type === 'multi' || field.type === 'tags') {
+                    if (!this.listValue(field.key).length) {
+                        return `Complete every Type profile field (${field.label}).`;
+                    }
+                } else if (!String(this.texts[field.key] || '').trim()) {
+                    return `Complete every Type profile field (${field.label}).`;
+                }
+            }
+            return null;
+        },
+        validateProjects() {
+            const projects = this.projectsData()?.projects || [];
+            const filled = projects.filter((project) => String(project.title || '').trim());
+            if (!filled.length) {
+                return 'Add at least one previous project.';
+            }
+            for (const project of filled) {
+                const title = String(project.title || '').trim();
+                if (project.type === 'link' && !String(project.external_url || '').trim()) {
+                    return `Add a link for project “${title}”.`;
+                }
+                if (project.type !== 'link') {
+                    const hasExisting = Array.isArray(project.existing) && project.existing.length > 0;
+                    const hasIds = Array.isArray(project.ids) && project.ids.length > 0;
+                    // New uploads are only in the file input; check matching card input.
+                    const index = projects.indexOf(project);
+                    const input = this.$el.querySelector(`[name="projects[${index}][files][]"]`);
+                    const hasFiles = Boolean(input?.files?.length);
+                    if (!hasExisting && !hasIds && !hasFiles) {
+                        return `Upload media for project “${title}”.`;
+                    }
+                }
+            }
+            return null;
+        },
+        validatePricing() {
+            if (!this.pricingModels.length) {
+                return null;
+            }
+            if (!this.selectedPricing) {
+                return 'Choose the pricing model assigned to this vendor type.';
+            }
+            for (const field of this.pricingFields) {
+                if (!String(this.texts[field.key] || '').trim()) {
+                    return `Fill every price field from ${this.selectedPricing.name}.`;
+                }
+            }
+            return null;
+        },
+        validatePayout() {
+            if (!this.payoutMethod) {
+                return 'Choose a payout method.';
+            }
+            if (this.payoutMethod === 'bank') {
+                if (!this.fieldValue('bank_name') || !this.fieldValue('bank_account_type')) {
+                    return 'Choose bank and account type.';
+                }
+                for (const name of [
+                    'bank_account_holder',
+                    'bank_account_number',
+                    'bank_iban',
+                    'bank_swift',
+                    'bank_branch',
+                    'bank_branch_code',
+                ]) {
+                    if (!this.fieldValue(name)) {
+                        return 'Fill every bank payout field.';
+                    }
+                }
+            } else if (this.payoutMethod === 'wallet') {
+                if (!this.egyptPhone(this.fieldValue('wallet_phone'))) {
+                    return 'Enter a valid wallet phone number.';
+                }
+                if (!this.walletNetwork) {
+                    return 'Choose whether the wallet is telecom or bank issued.';
+                }
+                if (this.walletNetwork === 'telecom' && !this.fieldValue('wallet_telecom')) {
+                    return 'Choose the telecom company.';
+                }
+                if (this.walletNetwork === 'bank' && !this.fieldValue('wallet_bank_name')) {
+                    return 'Choose the wallet bank.';
+                }
+            } else if (this.payoutMethod === 'paypal') {
+                if (!this.fieldValue('paypal_email') || !this.fieldValue('paypal_name')) {
+                    return 'Enter PayPal email and account name.';
+                }
+            }
+            return null;
         },
     }));
 
@@ -921,10 +1210,10 @@ document.addEventListener('alpine:init', () => {
         _autocomplete: null,
         _engine: null,
         get hasPin() {
-            return Boolean(this.address && this.lat && this.lng);
+            return Boolean(String(this.address || '').trim() && this.lat && this.lng);
         },
         get preview() {
-            return this.address || 'Pick your address on the map';
+            return String(this.address || '').trim() || 'Pick your address on the map';
         },
         get coordsLabel() {
             if (!(this.lat && this.lng)) {
