@@ -3274,9 +3274,28 @@ main { padding-bottom: 8px; }
         justify-content: flex-end;
         padding-block: 28px 60px;
     }
-    .site-header-row { flex-wrap: wrap; min-height: 0; padding: 10px 0 0; gap: 10px 14px; max-width: 100%; }
-    .site-tools { margin-left: auto; flex-shrink: 0; }
-    .header-search { order: 3; max-width: none; width: 100%; min-width: 0; margin-bottom: 10px; }
+    .site-header-row {
+        flex-wrap: wrap;
+        align-items: center;
+        min-height: 0;
+        padding: 10px 0 0;
+        gap: 10px 14px;
+        max-width: 100%;
+    }
+    .site-header-row .brand { order: 1; }
+    .site-tools {
+        order: 2;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+    .header-search {
+        order: 3;
+        flex: 0 0 100%;
+        max-width: none;
+        width: 100%;
+        min-width: 0;
+        margin-bottom: 10px;
+    }
     .site-nav--desktop { display: none; }
     .site-nav--mobile {
         position: fixed;
