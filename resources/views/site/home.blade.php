@@ -41,11 +41,17 @@
         </a>
     </section>
 
-    <section class="wrap block" data-home-cats>
+    <section class="wrap block" data-home-cats data-card-slider>
         <div class="block-head">
             <h2>Categories</h2>
+            <div class="block-head-actions home-cats-nav">
+                <div class="card-nav">
+                    <button type="button" class="card-nav-btn" data-card-prev aria-label="Previous categories">‹</button>
+                    <button type="button" class="card-nav-btn" data-card-next aria-label="Next categories">›</button>
+                </div>
+            </div>
         </div>
-        <div class="cats cats--home">
+        <div class="cats cats--home" data-card-rail>
             @foreach($types as $type)
                 @include('site.partials.category-card', [
                     'type' => $type,

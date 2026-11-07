@@ -17,6 +17,7 @@ Route::middleware(RedirectIfComingSoon::class)->group(function (): void {
     Route::get('/search', [HomeController::class, 'search'])->name('site.search');
     Route::get('/explore', [HomeController::class, 'explore'])->name('site.explore');
     Route::get('/ai', [AiController::class, 'show'])->name('site.ai');
+    Route::post('/ai/chat', [AiController::class, 'chat'])->name('site.ai.chat');
     Route::get('/creatives/{vendor}', [HomeController::class, 'vendor'])->name('site.vendor');
     Route::get('/help', [HomeController::class, 'help'])->name('site.help');
     Route::post('/help/report', [HomeController::class, 'helpReport'])->name('site.help.report');

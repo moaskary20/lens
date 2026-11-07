@@ -13,6 +13,21 @@
     @stack('head')
 </head>
 <body>
+    <div class="app-open-banner" data-app-open-banner hidden>
+        <div class="app-open-banner-inner wrap">
+            <div class="app-open-banner-copy">
+                <img src="{{ asset('branding/lenslogo_mark.png') }}" alt="" width="36" height="36">
+                <div>
+                    <strong>Lens app</strong>
+                    <small>Open the full mobile experience</small>
+                </div>
+            </div>
+            <div class="app-open-banner-actions">
+                <button type="button" class="ai-btn" data-app-open-btn>Open app</button>
+                <button type="button" class="ghost-btn" data-app-open-dismiss aria-label="Dismiss">Stay</button>
+            </div>
+        </div>
+    </div>
     @include('site.partials.header')
     <main>
         @if (session('status'))

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" role="img" aria-label="Wallet">
+  <defs>
+    <linearGradient id="walletBg" x1="40" y1="20" x2="780" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1a1710"/>
+      <stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="walletGlow" cx="420" cy="240" r="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e8c87a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#e8c87a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#walletBg)"/>
+  <rect width="800" height="520" fill="url(#walletGlow)"/>
+  <!-- wallet shell -->
+  <rect x="190" y="140" width="360" height="230" rx="32" fill="#c45a32"/>
+  <rect x="210" y="160" width="320" height="190" rx="22" fill="#1c1f27"/>
+  <!-- payment card -->
+  <rect x="245" y="190" width="210" height="128" rx="16" fill="#2f3540" stroke="#e8c87a" stroke-width="3"/>
+  <rect x="265" y="214" width="78" height="20" rx="5" fill="#e8c87a"/>
+  <rect x="265" y="260" width="130" height="12" rx="6" fill="#d8d3ca" opacity="0.45"/>
+  <rect x="265" y="282" width="90" height="12" rx="6" fill="#d8d3ca" opacity="0.28"/>
+  <!-- clasp -->
+  <rect x="500" y="220" width="56" height="70" rx="14" fill="#e8c87a"/>
+  <circle cx="528" cy="255" r="12" fill="#1c1f27"/>
+  <!-- coin -->
+  <circle cx="575" cy="355" r="48" fill="#e8c87a"/>
+  <circle cx="575" cy="355" r="32" fill="none" stroke="#1c1f27" stroke-width="5"/>
+  <path d="M568 335 h14 v12 h-6 v28 h-8 v-28 h-6 z" fill="#1c1f27"/>
+  <path d="M560 347 h30 v8 h-30 z" fill="#1c1f27"/>
+</svg>

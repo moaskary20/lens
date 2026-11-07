@@ -455,7 +455,7 @@ class HomeController extends Controller
             '/branding/hero-pyramids.jpg',
             '/branding/hero-egypt-studio.jpg',
             '/branding/hero-egypt-creators.jpg',
-            'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=80',
+            '/branding/categories/videographer.jpg',
         ];
 
         return collect($copy)->values()->map(function (array $slide, int $index) use ($images): array {

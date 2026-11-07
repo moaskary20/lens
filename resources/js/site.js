@@ -483,6 +483,142 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    Alpine.data('aiSearch', (config = {}) => ({
+        chatUrl: config.chatUrl || '',
+        csrf: config.csrf || '',
+        enabled: Boolean(config.enabled),
+        prompt: config.prompt || 'What will you create today?',
+        helper: config.helper || 'Describe your idea and let AI find the right creatives for you.',
+        voiceInput: Boolean(config.voiceInput),
+        moodboardOn: Boolean(config.moodboardOn),
+        moodboardLocked: Boolean(config.moodboardLocked),
+        cities: Array.isArray(config.cities) ? config.cities : [],
+        vendorUrl: config.vendorUrl || '/creatives',
+        steps: ['location', 'date', 'budget'],
+        lines: [{
+            role: 'assistant',
+            body: 'I ask location, then date, then budget — the same Lens assistant from the app. Then I compare real creators and help you pick.',
+        }],
+        draft: '',
+        conversationId: null,
+        ask: null,
+        status: 'gathering',
+        provider: 'lexicon',
+        slots: {},
+        vendors: [],
+        comparison: [],
+        pick: null,
+        addOns: [],
+        busy: false,
+        init() {
+            const seed = String(config.seed || '').trim();
+            if (seed && this.enabled) {
+                this.$nextTick(() => this.send(seed));
+            }
+        },
+        get quickReplies() {
+            if (this.ask === 'location') {
+                return this.cities.slice(0, 6);
+            }
+            if (this.ask === 'date') {
+                return ['This weekend', 'Next week', 'Next month'];
+            }
+            if (this.ask === 'budget') {
+                return ['Low', 'Mid', 'High'];
+            }
+            return [];
+        },
+        slotFilled(step) {
+            const slots = this.slots || {};
+            if (step === 'location') {
+                return Boolean(slots.governorate || slots.city_id);
+            }
+            if (step === 'date') {
+                return Boolean(slots.available_on || slots.relative_date);
+            }
+            return Boolean(slots.budget_band || slots.min_price || slots.max_price);
+        },
+        initials(name) {
+            return String(name || 'L')
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0]?.toUpperCase() || '')
+                .join('') || 'L';
+        },
+        reset() {
+            this.conversationId = null;
+            this.ask = null;
+            this.status = 'gathering';
+            this.slots = {};
+            this.vendors = [];
+            this.comparison = [];
+            this.pick = null;
+            this.addOns = [];
+            this.busy = false;
+            this.draft = '';
+            this.lines = [{
+                role: 'assistant',
+                body: 'New brief. Tell me what you want to create.',
+            }];
+        },
+        jump() {
+            this.$nextTick(() => {
+                const el = this.$refs.thread;
+                if (el) {
+                    el.scrollTop = el.scrollHeight + 80;
+                }
+            });
+        },
+        async send(preset) {
+            const text = String(preset ?? this.draft ?? '').trim();
+            if (!text || this.busy || !this.enabled) {
+                return;
+            }
+            this.draft = '';
+            this.lines.push({ role: 'user', body: text });
+            this.busy = true;
+            this.jump();
+            try {
+                const res = await fetch(this.chatUrl, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': this.csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({
+                        message: text,
+                        conversation_id: this.conversationId,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Assistant unavailable.');
+                }
+                this.conversationId = data.conversation_id || this.conversationId;
+                this.ask = data.ask || null;
+                this.status = data.status || 'gathering';
+                this.provider = data.provider || this.provider;
+                this.slots = data.slots || {};
+                this.vendors = Array.isArray(data.vendors) ? data.vendors : [];
+                this.comparison = Array.isArray(data.comparison) ? data.comparison : [];
+                this.pick = data.pick || null;
+                this.addOns = Array.isArray(data.add_ons) ? data.add_ons : (Array.isArray(data.addOns) ? data.addOns : []);
+                this.lines.push({ role: 'assistant', body: data.reply || 'Got it.' });
+            } catch (error) {
+                this.lines.push({
+                    role: 'assistant',
+                    body: error?.message || 'Something went wrong. Try again.',
+                });
+            } finally {
+                this.busy = false;
+                this.jump();
+            }
+        },
+    }));
+
     Alpine.data('chatThread', (config = {}) => ({
         messages: config.messages || [],
         body: '',
@@ -652,10 +788,15 @@ function animateHeroSlide(slide, { immediate = false } = {}) {
 
     lines.forEach((line) => {
         if (line.dataset.split === '1' && line._split) {
-            line._split.revert();
+            try {
+                line._split.revert();
+            } catch {
+                // ignore broken split state
+            }
             delete line._split;
             delete line.dataset.split;
         }
+        gsap.set(line, { clearProps: 'opacity,visibility,transform' });
     });
 
     if (reduced) {
@@ -663,14 +804,35 @@ function animateHeroSlide(slide, { immediate = false } = {}) {
         return;
     }
 
-    const splits = lines.map((line) => {
-        const split = new SplitType(line, { types: 'lines,words', lineClass: 'hero-line' });
-        line.dataset.split = '1';
-        line._split = split;
-        return split;
-    });
+    let words = [];
+    try {
+        const splits = lines.map((line) => {
+            const split = new SplitType(line, { types: 'lines,words', lineClass: 'hero-line' });
+            line.dataset.split = '1';
+            line._split = split;
+            return split;
+        });
+        words = splits.flatMap((split) => split.words || []);
+    } catch {
+        gsap.fromTo(
+            lines,
+            { autoAlpha: 0, y: 18 },
+            {
+                autoAlpha: 1,
+                y: 0,
+                duration: immediate ? 0.4 : 0.65,
+                stagger: 0.06,
+                ease: 'power3.out',
+            },
+        );
+        return;
+    }
 
-    const words = splits.flatMap((split) => split.words || []);
+    if (words.length === 0) {
+        gsap.set(lines, { autoAlpha: 1, y: 0 });
+        return;
+    }
+
     gsap.set(words, { autoAlpha: 0, yPercent: 120 });
     gsap.to(words, {
         autoAlpha: 1,
@@ -687,9 +849,18 @@ function bootHeroSwiper() {
     if (!root) {
         return;
     }
+    if (root.dataset.swiperReady === '1') {
+        return;
+    }
+    root.dataset.swiperReady = '1';
+
     const reduced = prefersReducedMotion();
     const delay = 5600;
     const progress = root.querySelector('[data-hero-progress]');
+    const prevBtn = root.querySelector('.swiper-button-prev');
+    const nextBtn = root.querySelector('.swiper-button-next');
+    const pager = root.querySelector('.swiper-pagination');
+    const slideCount = root.querySelectorAll('.swiper-wrapper > .swiper-slide').length;
 
     const restartProgress = () => {
         if (!progress || reduced) {
@@ -697,7 +868,6 @@ function bootHeroSwiper() {
         }
         progress.style.transition = 'none';
         progress.style.width = '0%';
-        // Force reflow so the width reset applies before the fill animation.
         void progress.offsetWidth;
         progress.style.transition = `width ${delay}ms linear`;
         progress.style.width = '100%';
@@ -712,25 +882,53 @@ function bootHeroSwiper() {
         progress.style.width = computed;
     };
 
+    const activeSlide = (instance) =>
+        instance?.slides?.[instance.activeIndex]
+        || root.querySelector('.swiper-slide-active')
+        || null;
+
     const swiper = new Swiper(root, {
-        modules: [Navigation, Pagination, Autoplay, EffectFade],
-        loop: true,
-        effect: reduced ? 'slide' : 'fade',
-        fadeEffect: { crossFade: true },
-        speed: reduced ? 350 : 900,
-        autoplay: reduced ? false : { delay, disableOnInteraction: false },
-        pagination: { el: root.querySelector('.swiper-pagination'), clickable: true },
+        modules: [Navigation, Pagination, Autoplay],
+        loop: false,
+        rewind: slideCount > 1,
+        slidesPerView: 1,
+        spaceBetween: 0,
+        speed: reduced ? 320 : 650,
+        grabCursor: true,
+        allowTouchMove: true,
+        autoplay: reduced
+            ? false
+            : {
+                delay,
+                disableOnInteraction: false,
+                pauseOnMouseEnter: true,
+            },
+        pagination: pager
+            ? {
+                el: pager,
+                clickable: true,
+                dynamicBullets: false,
+            }
+            : undefined,
         navigation: {
-            nextEl: root.querySelector('.swiper-button-next'),
-            prevEl: root.querySelector('.swiper-button-prev'),
+            nextEl: nextBtn,
+            prevEl: prevBtn,
         },
         on: {
             init(instance) {
-                animateHeroSlide(instance.slides[instance.activeIndex], { immediate: true });
+                try {
+                    animateHeroSlide(activeSlide(instance), { immediate: true });
+                } catch (error) {
+                    console.warn('hero slide animation failed', error);
+                }
                 restartProgress();
             },
-            slideChangeTransitionStart(instance) {
-                animateHeroSlide(instance.slides[instance.activeIndex]);
+            slideChange(instance) {
+                try {
+                    animateHeroSlide(activeSlide(instance));
+                } catch (error) {
+                    console.warn('hero slide animation failed', error);
+                }
                 restartProgress();
             },
             autoplayStop() {
@@ -741,6 +939,7 @@ function bootHeroSwiper() {
             },
         },
     });
+
     window.__lensHeroSwiper = swiper;
 }
 
@@ -765,6 +964,181 @@ function bootCategoryParallax(root) {
             gsap.to(card, { y: 0, duration: 0.45, ease: 'power2.out' });
         });
     });
+}
+
+function bootSearchAiLink() {
+    const link = document.querySelector('[data-srch-ai]');
+    const input = document.querySelector('.srch-bar input[name="q"]');
+    if (!link) {
+        return;
+    }
+    link.addEventListener('click', (event) => {
+        const q = (input?.value || '').trim();
+        try {
+            const url = new URL(link.getAttribute('href') || '/ai', window.location.origin);
+            if (q !== '') {
+                url.searchParams.set('q', q);
+            } else {
+                url.searchParams.delete('q');
+            }
+            link.href = `${url.pathname}${url.search}`;
+        } catch {
+            event.preventDefault();
+            window.location.href = q !== '' ? `/ai?q=${encodeURIComponent(q)}` : '/ai';
+        }
+    });
+}
+
+function bootSearchMotion() {
+    const hero = document.querySelector('[data-search-motion]');
+    if (!hero) {
+        return;
+    }
+    const reduced = prefersReducedMotion();
+    const media = hero.querySelector('[data-srch-media]');
+    const copy = hero.querySelector('[data-srch-copy]');
+    const types = document.querySelector('[data-srch-types]');
+    const cards = [...document.querySelectorAll('[data-srch-grid] .vendor-card')];
+
+    if (reduced) {
+        gsap.set([media, copy, types, ...cards].filter(Boolean), { clearProps: 'all' });
+        return;
+    }
+
+    if (media) {
+        gsap.fromTo(
+            media,
+            { scale: 1.12, yPercent: 3 },
+            { scale: 1.04, yPercent: 0, duration: 1.2, ease: 'power2.out' },
+        );
+    }
+    if (copy) {
+        gsap.fromTo(
+            copy,
+            { autoAlpha: 0, y: 24 },
+            { autoAlpha: 1, y: 0, duration: 0.7, delay: 0.1, ease: 'power3.out' },
+        );
+    }
+    if (types) {
+        gsap.fromTo(
+            types.querySelectorAll('.srch-type'),
+            { autoAlpha: 0, y: 18 },
+            {
+                autoAlpha: 1,
+                y: 0,
+                duration: 0.5,
+                stagger: 0.04,
+                ease: 'power2.out',
+                scrollTrigger: { trigger: types, start: 'top 92%', once: true },
+            },
+        );
+    }
+    if (cards.length) {
+        gsap.set(cards, { autoAlpha: 0, y: 28 });
+        ScrollTrigger.batch(cards, {
+            start: 'top 93%',
+            once: true,
+            onEnter: (batch) => {
+                gsap.to(batch, {
+                    autoAlpha: 1,
+                    y: 0,
+                    duration: 0.6,
+                    stagger: 0.06,
+                    ease: 'power3.out',
+                });
+            },
+        });
+    }
+}
+
+function bootAccountMotion() {
+    const root = document.querySelector('[data-account-motion]');
+    if (!root) {
+        return;
+    }
+    const reduced = prefersReducedMotion();
+    const media = root.querySelector('[data-acc-media]');
+    const copy = root.querySelector('[data-acc-copy]');
+    const head = document.querySelector('[data-acc-head]');
+    const tiles = [...document.querySelectorAll('[data-acc-tile]')];
+    const secondary = document.querySelector('[data-acc-secondary]');
+
+    if (reduced) {
+        gsap.set([media, copy, head, ...tiles, secondary].filter(Boolean), { clearProps: 'all' });
+        return;
+    }
+
+    if (media) {
+        gsap.fromTo(
+            media,
+            { scale: 1.12, yPercent: 4 },
+            { scale: 1.05, yPercent: 0, duration: 1.35, ease: 'power2.out' },
+        );
+        gsap.to(media, {
+            yPercent: -4,
+            ease: 'none',
+            scrollTrigger: {
+                trigger: root,
+                start: 'top top',
+                end: 'bottom top',
+                scrub: true,
+            },
+        });
+    }
+
+    if (copy) {
+        gsap.fromTo(
+            copy,
+            { autoAlpha: 0, y: 28 },
+            { autoAlpha: 1, y: 0, duration: 0.75, delay: 0.12, ease: 'power3.out' },
+        );
+    }
+
+    if (head) {
+        gsap.fromTo(
+            head,
+            { autoAlpha: 0, y: 16 },
+            {
+                autoAlpha: 1,
+                y: 0,
+                duration: 0.55,
+                ease: 'power2.out',
+                scrollTrigger: { trigger: head, start: 'top 90%', once: true },
+            },
+        );
+    }
+
+    if (tiles.length) {
+        gsap.set(tiles, { autoAlpha: 0, y: 32, scale: 0.97 });
+        ScrollTrigger.batch(tiles, {
+            start: 'top 92%',
+            once: true,
+            onEnter: (batch) => {
+                gsap.to(batch, {
+                    autoAlpha: 1,
+                    y: 0,
+                    scale: 1,
+                    duration: 0.65,
+                    stagger: 0.07,
+                    ease: 'power3.out',
+                });
+            },
+        });
+    }
+
+    if (secondary) {
+        gsap.fromTo(
+            secondary,
+            { autoAlpha: 0, y: 20 },
+            {
+                autoAlpha: 1,
+                y: 0,
+                duration: 0.55,
+                ease: 'power2.out',
+                scrollTrigger: { trigger: secondary, start: 'top 92%', once: true },
+            },
+        );
+    }
 }
 
 function bootHomeMotion() {
@@ -1148,10 +1522,101 @@ function bootCmsAccordion() {
     });
 }
 
+function bootOpenInApp() {
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    if (!isAndroid && !isIOS) {
+        return;
+    }
+
+    const packageName = 'app.lens.lens';
+    const playStore = `https://play.google.com/store/apps/details?id=${packageName}`;
+    const dismissedKey = 'lens_app_banner_dismissed';
+    const triedKey = 'lens_app_open_tried';
+
+    const pathToDeepLink = () => {
+        const path = window.location.pathname.replace(/\/+$/, '') || '/';
+        const creatives = path.match(/^\/creatives\/(\d+)/);
+        if (creatives) {
+            return `vendor/${creatives[1]}`;
+        }
+        const book = path.match(/^\/book\/(\d+)/);
+        if (book) {
+            return `book/${book[1]}`;
+        }
+        if (path === '/ai') {
+            return 'ai';
+        }
+        if (path === '/search' || path === '/explore') {
+            return 'search';
+        }
+        if (path === '/bookings') {
+            return 'bookings';
+        }
+        return 'home';
+    };
+
+    const openApp = ({ withStoreFallback = false } = {}) => {
+        const deep = pathToDeepLink();
+        const fallback = withStoreFallback ? playStore : window.location.href;
+        if (isAndroid) {
+            const intent = `intent://${deep}#Intent;scheme=lens;package=${packageName};S.browser_fallback_url=${encodeURIComponent(fallback)};end`;
+            window.location.href = intent;
+            return;
+        }
+        // iOS custom scheme — if the app is missing the page simply stays put.
+        const started = Date.now();
+        window.location.href = `lens://${deep}`;
+        window.setTimeout(() => {
+            if (document.hidden || Date.now() - started > 1800) {
+                return;
+            }
+            if (withStoreFallback) {
+                window.location.href = playStore;
+            }
+        }, 1200);
+    };
+
+    const banner = document.querySelector('[data-app-open-banner]');
+    const openBtn = document.querySelector('[data-app-open-btn]');
+    const dismissBtn = document.querySelector('[data-app-open-dismiss]');
+
+    const showBanner = () => {
+        if (!banner || localStorage.getItem(dismissedKey) === '1') {
+            return;
+        }
+        banner.hidden = false;
+        document.body.classList.add('has-app-banner');
+    };
+
+    openBtn?.addEventListener('click', () => openApp({ withStoreFallback: true }));
+    dismissBtn?.addEventListener('click', () => {
+        localStorage.setItem(dismissedKey, '1');
+        if (banner) {
+            banner.hidden = true;
+        }
+        document.body.classList.remove('has-app-banner');
+    });
+
+    showBanner();
+
+    // One automatic open attempt per browser session when the app may be installed.
+    if (sessionStorage.getItem(triedKey) === '1' || localStorage.getItem(dismissedKey) === '1') {
+        return;
+    }
+    sessionStorage.setItem(triedKey, '1');
+    // Delay slightly so the first paint is not interrupted.
+    window.setTimeout(() => openApp({ withStoreFallback: false }), 400);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     bootLenis();
     bootHeroSwiper();
     bootHomeMotion();
+    bootAccountMotion();
+    bootSearchMotion();
+    bootSearchAiLink();
     bootLegacySliderFallback();
     bootVendorLightbox();
     bootVendorProfile();
@@ -1159,4 +1624,5 @@ document.addEventListener('DOMContentLoaded', () => {
     bootCardSliders();
     bootReveals();
     bootCmsAccordion();
+    bootOpenInApp();
 });

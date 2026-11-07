@@ -53,11 +53,25 @@
 	<string>Lens needs the camera to add photos or videos to previous projects.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Lens needs the microphone when you record a project video.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>app.lens.lens</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lens</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>
 		<string>https</string>
 		<string>whatsapp</string>
+		<string>lens</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>

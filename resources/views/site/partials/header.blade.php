@@ -2,7 +2,11 @@
     $active = $active ?? 'home';
     $placeholder = $data['search_placeholder'] ?? 'Search photographers, studios, models...';
     $user = $authUser ?? null;
-    $initial = $user ? mb_strtoupper(mb_substr($user->name ?: 'L', 0, 1)) : 'L';
+    $displayName = $user
+        ? (trim((string) ($user->name ?? '')) !== ''
+            ? explode(' ', trim((string) $user->name))[0]
+            : 'Account')
+        : null;
 @endphp
 <header class="site-header">
     <div class="wrap site-header-row">
@@ -33,12 +37,12 @@
                         <span class="badge-count">{{ ($data['unread_notifications'] ?? 0) > 9 ? '9+' : $data['unread_notifications'] }}</span>
                     @endif
                 </a>
-                <a class="avatar" href="{{ route('site.account') }}" aria-label="Account">{{ $initial }}</a>
+                <a class="header-user" href="{{ route('site.account') }}" aria-label="Account" title="{{ $user->name }}">{{ $displayName }}</a>
             @else
                 <a class="icon-btn" href="{{ route('site.login') }}" aria-label="Notifications">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5"/><path d="M9.5 17a2.5 2.5 0 0 0 5 0"/></svg>
                 </a>
-                <a class="avatar" href="{{ route('site.login') }}" aria-label="Sign in">{{ $initial }}</a>
+                <a class="header-login" href="{{ route('site.login') }}">Login</a>
             @endif
         </div>
     </div>

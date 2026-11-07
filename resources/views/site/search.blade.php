@@ -14,51 +14,95 @@
     $count = count($vendors);
     $cities = collect($data['cities'] ?? []);
     $types = collect($data['vendor_types'] ?? []);
+    $heroFile = ($slug !== '' && is_file(public_path('branding/categories/'.$slug.'.jpg')))
+        ? asset('branding/categories/'.$slug.'.jpg')
+        : asset('branding/hero-egypt-creators.jpg');
+    $lede = $slug !== ''
+        ? 'Browse verified '.$title.' on Lens — filter by city, price, and rating.'
+        : 'Search photographers, studios, models, and more across Egypt.';
+    $activeFilters = [];
+    if ($cityId) {
+        $cityName = $cities->firstWhere('id', (int) $cityId)['name_en']
+            ?? $cities->firstWhere('id', (int) $cityId)['name']
+            ?? 'City';
+        $activeFilters[] = ['label' => $cityName, 'clear' => array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null])];
+    }
+    if ($verified) {
+        $activeFilters[] = ['label' => 'Verified', 'clear' => array_filter(array_merge($params, ['verified' => null]))];
+    }
+    if ($minRating) {
+        $activeFilters[] = ['label' => $minRating.'+', 'clear' => array_filter(array_merge($params, ['min_rating' => null]))];
+    }
+    if ($minPrice || $maxPrice) {
+        $priceLabel = ($minPrice ? number_format($minPrice) : '0').'–'.($maxPrice ? number_format($maxPrice) : '∞');
+        $activeFilters[] = ['label' => 'EGP '.$priceLabel, 'clear' => array_filter(array_merge($params, ['min_price' => null, 'max_price' => null]))];
+    }
 @endphp
 
 @section('content')
-<section class="cat-page wrap search-page" data-category-page>
-    <div class="cat-head">
-        <a class="vp-round" href="{{ route('site.home') }}" aria-label="Back">‹</a>
+<section class="srch-hero" data-search-motion>
+    <img class="srch-hero-bg" src="{{ $heroFile }}" alt="" loading="eager" decoding="async" data-srch-media>
+    <div class="srch-hero-veil" aria-hidden="true"></div>
+    <div class="wrap srch-hero-copy" data-srch-copy>
+        <p class="srch-kicker">Lens · Search</p>
         <h1>{{ $title }}</h1>
+        <p class="srch-lede">{{ $lede }}</p>
+
+        <form class="srch-bar" action="{{ route('site.search') }}" method="get" role="search">
+            @if($slug !== '')
+                <input type="hidden" name="vendor_type" value="{{ $slug }}">
+            @endif
+            @if($cityId)
+                <input type="hidden" name="city_id" value="{{ $cityId }}">
+            @endif
+            <span class="srch-bar-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            </span>
+            <input type="search" name="q" value="{{ $q }}" placeholder="{{ $data['search_placeholder'] ?? 'Search creators, studios, models...' }}">
+            <button class="ai-btn" type="submit">Search</button>
+            @if(($data['features']['ai_assistant'] ?? true))
+                <a
+                    class="ghost-btn srch-ai"
+                    href="{{ route('site.ai', array_filter(['q' => $q ?: null])) }}"
+                    data-srch-ai
+                >AI</a>
+            @endif
+        </form>
     </div>
+</section>
 
-    <form class="search-bar search-page-bar" action="{{ route('site.search') }}" method="get" role="search">
-        @if($slug !== '')
-            <input type="hidden" name="vendor_type" value="{{ $slug }}">
-        @endif
-        @if($cityId)
-            <input type="hidden" name="city_id" value="{{ $cityId }}">
-        @endif
-        <span class="search-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        </span>
-        <input type="search" name="q" value="{{ $q }}" placeholder="{{ $data['search_placeholder'] ?? 'Search creators, studios, models...' }}">
-        <button class="ai-btn" type="submit">Search</button>
-        @if(($data['features']['ai_assistant'] ?? true))
-            <a class="ghost-btn" href="{{ route('site.search', array_filter(['q' => $q ?: null, 'ai' => 1, 'vendor_type' => $slug ?: null])) }}">AI</a>
-        @endif
-    </form>
-
-    <div class="search-type-chips">
-        <a class="search-type-chip {{ $slug === '' ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['q' => $q ?: null, 'city_id' => $cityId ?: null])) }}">All</a>
+<section class="wrap srch-shell cat-page search-page" data-category-page data-search-shell>
+    <div class="srch-types" data-srch-types>
+        <a class="srch-type {{ $slug === '' ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['q' => $q ?: null, 'city_id' => $cityId ?: null])) }}">
+            <span class="srch-type-media" style="background-image:url('{{ asset('branding/hero-egypt-creators.jpg') }}')"></span>
+            <span class="srch-type-label">All</span>
+        </a>
         @foreach($types as $type)
+            @php
+                $typeSlug = $type['slug'] ?? '';
+                $typeBg = ($typeSlug !== '' && is_file(public_path('branding/categories/'.$typeSlug.'.jpg')))
+                    ? asset('branding/categories/'.$typeSlug.'.jpg')
+                    : asset('branding/categories/photographer.jpg');
+            @endphp
             <a
-                class="search-type-chip {{ $slug === ($type['slug'] ?? '') ? 'is-active' : '' }}"
-                href="{{ route('site.search', array_filter(['vendor_type' => $type['slug'] ?? null, 'q' => $q ?: null, 'city_id' => $cityId ?: null])) }}"
+                class="srch-type {{ $slug === $typeSlug ? 'is-active' : '' }}"
+                href="{{ route('site.search', array_filter(['vendor_type' => $typeSlug ?: null, 'q' => $q ?: null, 'city_id' => $cityId ?: null])) }}"
             >
-                @include('site.partials.category-icon', ['slug' => $type['slug'] ?? ''])
-                {{ $type['label'] ?? $type['name'] ?? '' }}
+                <span class="srch-type-media" style="background-image:url('{{ $typeBg }}')"></span>
+                <span class="srch-type-label">
+                    @include('site.partials.category-icon', ['slug' => $typeSlug])
+                    {{ $type['label'] ?? $type['name'] ?? '' }}
+                </span>
             </a>
         @endforeach
     </div>
 
     @if($cities->isNotEmpty())
-        <div class="search-city-chips">
-            <a class="search-city-chip {{ ! $cityId ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null])) }}">All cities</a>
+        <div class="srch-cities">
+            <a class="srch-city {{ ! $cityId ? 'is-active' : '' }}" href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null])) }}">All cities</a>
             @foreach($cities as $city)
                 <a
-                    class="search-city-chip {{ (int) $cityId === (int) $city['id'] ? 'is-active' : '' }}"
+                    class="srch-city {{ (int) $cityId === (int) $city['id'] ? 'is-active' : '' }}"
                     href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null, 'city_id' => $city['id']])) }}"
                 >
                     {{ $city['name_en'] ?? $city['name'] }}
@@ -68,32 +112,62 @@
     @endif
 
     @if($summary)
-        <p class="summary">{{ $summary }}</p>
+        <p class="srch-summary">{{ $summary }}</p>
     @endif
 
-    <div class="cat-actions">
-        <button class="cat-pill" type="button" data-open="sort">⇅ Sort</button>
-        <button class="cat-pill {{ $filterOpen ? 'is-on' : '' }}" type="button" data-open="filter">⚙ Filter</button>
-        <a class="cat-pill {{ $view === 'map' ? 'is-on' : '' }}" href="{{ route('site.search', array_merge($params, ['sort' => $sort, 'view' => $view === 'map' ? 'list' : 'map'])) }}">📍 Map</a>
-    </div>
+    @if($activeFilters !== [])
+        <div class="srch-active">
+            @foreach($activeFilters as $filter)
+                <a class="srch-active-chip" href="{{ route('site.search', $filter['clear']) }}">
+                    {{ $filter['label'] }}
+                    <span aria-hidden="true">×</span>
+                </a>
+            @endforeach
+            <a class="srch-active-clear" href="{{ route('site.search', array_filter(['vendor_type' => $slug ?: null, 'q' => $q ?: null])) }}">Clear filters</a>
+        </div>
+    @endif
 
-    <div class="cat-count">
-        <span>{{ $count }} {{ Str::plural('result', $count) }}</span>
-        <button type="button" data-open="sort">{{ $sortLabels[$sort] ?? 'Recommended' }} ▾</button>
+    <div class="srch-toolbar">
+        <div class="srch-actions">
+            <button class="srch-pill" type="button" data-open="sort">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h12M8 12h8M8 18h4"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>
+                Sort
+            </button>
+            <button class="srch-pill {{ $filterOpen ? 'is-on' : '' }}" type="button" data-open="filter">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+                Filter
+            </button>
+            <a class="srch-pill {{ $view === 'map' ? 'is-on' : '' }}" href="{{ route('site.search', array_merge($params, ['sort' => $sort, 'view' => $view === 'map' ? 'list' : 'map'])) }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
+                {{ $view === 'map' ? 'List' : 'Map' }}
+            </a>
+        </div>
+        <div class="srch-meta">
+            <span>{{ $count }} {{ Str::plural('result', $count) }}</span>
+            <button type="button" data-open="sort">{{ $sortLabels[$sort] ?? 'Recommended' }} ▾</button>
+        </div>
     </div>
 
     @if($view === 'map')
-        <div id="cat-map" class="cat-map" data-vendors='@json($mapVendors)'></div>
+        <div id="cat-map" class="cat-map srch-map" data-vendors='@json($mapVendors)'></div>
     @elseif($vendors === [])
-        <div class="cat-empty">
+        <div class="srch-empty">
+            <div class="srch-empty-visual" aria-hidden="true">
+                <img src="{{ asset('branding/categories/photographer.jpg') }}" alt="">
+            </div>
             <strong>No exact matches yet</strong>
-            <p>Try adjusting your choices and we’ll find more creatives for you.</p>
-            <button class="ai-btn" type="button" data-open="filter">Adjust filters</button>
+            <p>Try another city, category, or price range — or ask AI Search.</p>
+            <div class="srch-empty-cta">
+                <button class="ai-btn" type="button" data-open="filter">Adjust filters</button>
+                @if(($data['features']['ai_assistant'] ?? true))
+                    <a class="ghost-btn" href="{{ route('site.ai') }}">AI Search</a>
+                @endif
+            </div>
         </div>
     @else
-        <div class="listing">
+        <div class="srch-grid" data-srch-grid>
             @foreach($vendors as $vendor)
-                @include('site.partials.vendor-row', ['vendor' => $vendor])
+                @include('site.partials.vendor-card', ['vendor' => $vendor, 'reveal' => false])
             @endforeach
         </div>
     @endif

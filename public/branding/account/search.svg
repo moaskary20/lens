@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="60" y1="40" x2="760" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12161c"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(340 220) rotate(90) scale(300 280)">
+      <stop stop-color="#ff8a50" stop-opacity=".28"/><stop offset="1" stop-color="#ff8a50" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#bg)"/>
+  <rect width="800" height="520" fill="url(#glow)"/>
+  <!-- people -->
+  <circle cx="250" cy="210" r="36" fill="#3a2a22"/>
+  <path d="M198 320c10-44 34-64 52-64s42 20 52 64" fill="#3a2a22"/>
+  <circle cx="360" cy="190" r="42" fill="#c45a32"/>
+  <path d="M298 320c12-52 40-76 62-76s50 24 62 76" fill="#c45a32"/>
+  <circle cx="470" cy="210" r="36" fill="#3a2a22"/>
+  <path d="M418 320c10-44 34-64 52-64s42 20 52 64" fill="#3a2a22"/>
+  <!-- magnifier -->
+  <circle cx="560" cy="300" r="78" fill="none" stroke="#ff8a50" stroke-width="18"/>
+  <line x1="616" y1="356" x2="700" y2="440" stroke="#ff8a50" stroke-width="20" stroke-linecap="round"/>
+</svg>

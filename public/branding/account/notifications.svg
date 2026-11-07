@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16131a"/><stop offset="1" stop-color="#0a0b0e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(400 200) rotate(90) scale(260 300)">
+      <stop stop-color="#ff8a50" stop-opacity=".32"/><stop offset="1" stop-color="#ff8a50" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#bg)"/>
+  <rect width="800" height="520" fill="url(#glow)"/>
+  <!-- bell -->
+  <path d="M400 120c-70 0-120 48-120 118v70c0 18-10 40-28 54 46 8 100 12 148 12s102-4 148-12c-18-14-28-36-28-54v-70c0-70-50-118-120-118z" fill="#c45a32"/>
+  <path d="M340 360c12 36 36 56 60 56s48-20 60-56" fill="#ff8a50"/>
+  <rect x="372" y="96" width="56" height="36" rx="18" fill="#ff8a50"/>
+  <!-- badge -->
+  <circle cx="500" cy="150" r="36" fill="#ff3b30"/>
+  <text x="500" y="162" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="800" fill="#fff">3</text>
+</svg>
