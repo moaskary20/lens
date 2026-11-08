@@ -54,7 +54,13 @@ class _RequestEditPageState extends State<RequestEditPage> {
   bool _sending = false;
 
   bool get _live => LensConfig.useNetwork && SessionStore.instance.isClient;
-  bool get _canSend => _change.text.trim().isNotEmpty || _selected.isNotEmpty || _comment.text.trim().isNotEmpty;
+  bool get _canSend =>
+      !_sending &&
+      widget.bookingId > 0 &&
+      (_change.text.trim().isNotEmpty ||
+          _selected.isNotEmpty ||
+          _comment.text.trim().isNotEmpty ||
+          _refs.isNotEmpty);
 
   @override
   void dispose() {
@@ -75,9 +81,20 @@ class _RequestEditPageState extends State<RequestEditPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 children: [
-                  const Text('Request an Edit', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800, height: 1.15)),
+                  const Text(
+                    'Request an Edit',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                    ),
+                  ),
                   const SizedBox(height: 6),
-                  const Text('Tell your creator exactly what needs to change.', style: TextStyle(color: _muted, fontSize: 14)),
+                  const Text(
+                    'Tell your creator exactly what needs to change.',
+                    style: TextStyle(color: _muted, fontSize: 14),
+                  ),
                   const SizedBox(height: 18),
                   _fileCard(),
                   const SizedBox(height: 22),
@@ -93,7 +110,14 @@ class _RequestEditPageState extends State<RequestEditPage> {
                     controller: _comment,
                   ),
                   const SizedBox(height: 22),
-                  const Text('Quick requests', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                  const Text(
+                    'Quick requests',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 16,
@@ -103,7 +127,14 @@ class _RequestEditPageState extends State<RequestEditPage> {
                     ],
                   ),
                   const SizedBox(height: 22),
-                  const Text('Add reference images (optional)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                  const Text(
+                    'Add reference images (optional)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   _references(),
                 ],
@@ -123,14 +154,26 @@ class _RequestEditPageState extends State<RequestEditPage> {
         children: [
           IconButton(
             tooltip: 'Back',
-            onPressed: () => Navigator.of(context).pop(false),
-            icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
+            onPressed: _sending ? null : () => Navigator.of(context).pop(false),
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
           ),
           const Expanded(
             child: Column(
               children: [
                 Icon(Icons.auto_awesome, color: _orange, size: 18),
-                Text('lens', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20, height: 1)),
+                Text(
+                  'lens',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                    height: 1,
+                  ),
+                ),
               ],
             ),
           ),
@@ -141,7 +184,8 @@ class _RequestEditPageState extends State<RequestEditPage> {
   }
 
   Widget _fileCard() {
-    final session = widget.projectName.isNotEmpty ? widget.projectName : widget.vendorRole;
+    final session =
+        widget.projectName.isNotEmpty ? widget.projectName : widget.vendorRole;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -153,18 +197,40 @@ class _RequestEditPageState extends State<RequestEditPage> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: SizedBox(width: 54, height: 54, child: _thumb(widget.fileUrl)),
+            child: SizedBox(
+              width: 54,
+              height: 54,
+              child: _thumb(widget.fileUrl),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                Text(
+                  widget.fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 if (widget.vendorName.isNotEmpty)
-                  Text(widget.vendorName, style: const TextStyle(color: _muted, fontSize: 13)),
+                  Text(
+                    widget.vendorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _muted, fontSize: 13),
+                  ),
                 if (session.isNotEmpty)
-                  Text(session, style: const TextStyle(color: _muted, fontSize: 12)),
+                  Text(
+                    session,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _muted, fontSize: 12),
+                  ),
               ],
             ),
           ),
@@ -173,11 +239,22 @@ class _RequestEditPageState extends State<RequestEditPage> {
     );
   }
 
-  Widget _box({required String label, required String hint, required TextEditingController controller}) {
+  Widget _box({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
@@ -191,6 +268,7 @@ class _RequestEditPageState extends State<RequestEditPage> {
                 controller: controller,
                 maxLength: 500,
                 maxLines: 3,
+                enabled: !_sending,
                 cursorColor: _orange,
                 onChanged: (_) => setState(() {}),
                 style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -206,7 +284,10 @@ class _RequestEditPageState extends State<RequestEditPage> {
                 alignment: Alignment.centerRight,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(0, 0, 12, 10),
-                  child: Text('${controller.text.length}/500', style: const TextStyle(color: _hint, fontSize: 12)),
+                  child: Text(
+                    '${controller.text.length}/500',
+                    style: const TextStyle(color: _hint, fontSize: 12),
+                  ),
                 ),
               ),
             ],
@@ -219,7 +300,11 @@ class _RequestEditPageState extends State<RequestEditPage> {
   Widget _chip(IconData icon, String label) {
     final on = _selected.contains(label);
     return GestureDetector(
-      onTap: () => setState(() => on ? _selected.remove(label) : _selected.add(label)),
+      onTap: _sending
+          ? null
+          : () => setState(
+              () => on ? _selected.remove(label) : _selected.add(label),
+            ),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -233,7 +318,14 @@ class _RequestEditPageState extends State<RequestEditPage> {
           children: [
             Icon(icon, color: _orange, size: 16),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: on ? _orange : Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(
+              label,
+              style: TextStyle(
+                color: on ? _orange : Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
       ),
@@ -254,15 +346,14 @@ class _RequestEditPageState extends State<RequestEditPage> {
           scrollDirection: Axis.horizontal,
           children: [
             _uploadTile(),
-            for (final file in _refs) ...[
+            for (var i = 0; i < _refs.length; i++) ...[
               const SizedBox(width: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(width: 72, height: 72, child: _fileThumb(file)),
-              ),
+              _refThumb(i),
             ],
-            const SizedBox(width: 8),
-            _plusTile(),
+            if (_refs.isNotEmpty && _refs.length < 10) ...[
+              const SizedBox(width: 8),
+              _plusTile(),
+            ],
           ],
         ),
       ),
@@ -271,7 +362,7 @@ class _RequestEditPageState extends State<RequestEditPage> {
 
   Widget _uploadTile() {
     return GestureDetector(
-      onTap: _pickRefs,
+      onTap: _sending ? null : _pickRefs,
       child: Container(
         width: 168,
         decoration: BoxDecoration(
@@ -285,8 +376,18 @@ class _RequestEditPageState extends State<RequestEditPage> {
           children: [
             Icon(Icons.add_photo_alternate_outlined, color: _muted),
             SizedBox(height: 6),
-            Text('Upload reference images', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11)),
-            Text('JPG, PNG, HEIC (Max 10 files)', style: TextStyle(color: _muted, fontSize: 10)),
+            Text(
+              'Upload reference images',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+              ),
+            ),
+            Text(
+              'JPG, PNG, HEIC (Max 10 files)',
+              style: TextStyle(color: _muted, fontSize: 10),
+            ),
           ],
         ),
       ),
@@ -295,7 +396,7 @@ class _RequestEditPageState extends State<RequestEditPage> {
 
   Widget _plusTile() {
     return GestureDetector(
-      onTap: _pickRefs,
+      onTap: _sending ? null : _pickRefs,
       child: Container(
         width: 72,
         height: 72,
@@ -309,36 +410,127 @@ class _RequestEditPageState extends State<RequestEditPage> {
     );
   }
 
-  Widget _thumb(String? url) {
-    if (!LensConfig.useNetwork || url == null || url.isEmpty) {
-      return const ColoredBox(color: Color(0xFF1C1D22), child: Icon(Icons.image_outlined, color: _muted));
+  Widget _refThumb(int index) {
+    final file = _refs[index];
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(width: 72, height: 72, child: _fileThumb(file)),
+        ),
+        Positioned(
+          top: 2,
+          right: 2,
+          child: Material(
+            color: const Color(0xCC000000),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _sending
+                  ? null
+                  : () => setState(() => _refs.removeAt(index)),
+              child: const Padding(
+                padding: EdgeInsets.all(3),
+                child: Icon(Icons.close, color: Colors.white, size: 14),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String? _resolveUrl(String? url) {
+    final raw = url?.trim();
+    if (raw == null || raw.isEmpty || raw.toLowerCase() == 'null') {
+      return null;
     }
-    return Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF1C1D22)));
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+    final base = LensConfig.apiBaseUrl.replaceAll(RegExp(r'/api/?$'), '');
+    if (raw.startsWith('/')) {
+      return '$base$raw';
+    }
+    if (raw.startsWith('storage/')) {
+      return '$base/$raw';
+    }
+    return '$base/storage/$raw';
+  }
+
+  Widget _thumb(String? url) {
+    final resolved = _resolveUrl(url);
+    if (!LensConfig.useNetwork || resolved == null) {
+      return const ColoredBox(
+        color: Color(0xFF1C1D22),
+        child: Icon(Icons.image_outlined, color: _muted),
+      );
+    }
+    return Image.network(
+      resolved,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          const ColoredBox(color: Color(0xFF1C1D22)),
+    );
   }
 
   Widget _fileThumb(XFile file) {
-    if (kIsWeb) {
-      return const ColoredBox(color: Color(0xFF1C1D22));
+    if (!kIsWeb && file.path.isNotEmpty) {
+      return Image.file(
+        File(file.path),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            const ColoredBox(color: Color(0xFF1C1D22)),
+      );
     }
-    return Image.file(File(file.path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF1C1D22)));
+    return FutureBuilder<Uint8List>(
+      future: file.readAsBytes(),
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        if (bytes == null) {
+          return const ColoredBox(
+            color: Color(0xFF1C1D22),
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: _muted),
+              ),
+            ),
+          );
+        }
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              const ColoredBox(color: Color(0xFF1C1D22)),
+        );
+      },
+    );
   }
 
   Future<void> _pickRefs() async {
     if (_refs.length >= 10) {
+      _toast('You can attach up to 10 reference images.');
       return;
     }
     try {
       final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
-      if (picked.isEmpty) {
+      if (!mounted || picked.isEmpty) {
         return;
       }
       setState(() {
         _refs.addAll(picked.take(10 - _refs.length));
       });
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        _toast('Could not open your photo library.');
+      }
+    }
   }
 
   Widget _footer() {
+    final narrow = MediaQuery.sizeOf(context).width < 360;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
       child: Column(
@@ -347,24 +539,45 @@ class _RequestEditPageState extends State<RequestEditPage> {
             width: double.infinity,
             height: 54,
             child: FilledButton(
-              onPressed: _canSend && !_sending ? _send : null,
+              onPressed: _canSend ? _send : null,
               style: FilledButton.styleFrom(
                 backgroundColor: _orange,
                 disabledBackgroundColor: const Color(0xFF4A2414),
                 disabledForegroundColor: const Color(0x99FFFFFF),
                 foregroundColor: Colors.white,
                 shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(horizontal: 22),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
               child: _sending
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Stack(
-                      alignment: Alignment.center,
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
                       children: [
-                        Text('Send Revision Request', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white)),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Icon(Icons.chevron_right_rounded, size: 22, color: Colors.white),
+                        Expanded(
+                          child: Text(
+                            narrow
+                                ? 'Send request'
+                                : 'Send Revision Request',
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 22,
+                          color: Colors.white,
                         ),
                       ],
                     ),
@@ -375,14 +588,23 @@ class _RequestEditPageState extends State<RequestEditPage> {
             width: double.infinity,
             height: 54,
             child: OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: _sending
+                  ? null
+                  : () => Navigator.of(context).pop(false),
               style: OutlinedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 foregroundColor: _orange,
                 side: const BorderSide(color: _orange, width: 1.6),
                 shape: const StadiumBorder(),
               ),
-              child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: _orange)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: _orange,
+                ),
+              ),
             ),
           ),
         ],
@@ -390,14 +612,46 @@ class _RequestEditPageState extends State<RequestEditPage> {
     );
   }
 
+  Future<List<http.MultipartFile>> _buildReferenceFiles() async {
+    final files = <http.MultipartFile>[];
+    for (var i = 0; i < _refs.length; i++) {
+      final ref = _refs[i];
+      final field = 'references[$i]';
+      final name = ref.name.isNotEmpty ? ref.name : 'reference_$i.jpg';
+      if (kIsWeb || ref.path.isEmpty) {
+        final bytes = await ref.readAsBytes();
+        files.add(http.MultipartFile.fromBytes(field, bytes, filename: name));
+      } else {
+        files.add(
+          await http.MultipartFile.fromPath(field, ref.path, filename: name),
+        );
+      }
+    }
+    return files;
+  }
+
   Future<void> _send() async {
+    if (!_canSend) {
+      return;
+    }
+    if (widget.bookingId <= 0) {
+      _toast('This booking is not ready for a revision request.');
+      return;
+    }
+
     final parts = <String>[
       if (_selected.isNotEmpty) 'Quick requests: ${_selected.join(', ')}',
       if (_change.text.trim().isNotEmpty) _change.text.trim(),
-      if (_comment.text.trim().isNotEmpty) 'Photo ${widget.fileName}: ${_comment.text.trim()}',
+      if (_comment.text.trim().isNotEmpty)
+        'Photo ${widget.fileName}: ${_comment.text.trim()}',
       if (_refs.isNotEmpty) '${_refs.length} reference image(s) attached.',
     ];
-    final note = parts.join('\n');
+    final note = parts.join('\n').trim();
+    if (note.isEmpty) {
+      _toast('Describe the edit you need.');
+      return;
+    }
+
     setState(() => _sending = true);
     var message = 'Edit requested. The creator will upload a new version.';
     if (_live) {
@@ -409,20 +663,26 @@ class _RequestEditPageState extends State<RequestEditPage> {
           'file_name': widget.fileName,
           'quick_requests': _selected.toList(),
         };
-        final files = <http.MultipartFile>[];
-        if (!kIsWeb) {
-          for (var i = 0; i < _refs.length; i++) {
-            files.add(await http.MultipartFile.fromPath('references[]', _refs[i].path, filename: _refs[i].name));
-          }
-        }
+        final files = await _buildReferenceFiles();
         final payload = files.isEmpty
-            ? await ApiClient().postJson('/app/bookings/${widget.bookingId}/request-edit', body)
-            : await ApiClient().postForm('/app/bookings/${widget.bookingId}/request-edit', body, files: files);
+            ? await ApiClient().postJson(
+                '/app/bookings/${widget.bookingId}/request-edit',
+                body,
+              )
+            : await ApiClient().postForm(
+                '/app/bookings/${widget.bookingId}/request-edit',
+                body,
+                files: files,
+              );
         message = payload['message']?.toString() ?? message;
       } catch (error) {
         if (mounted) {
           setState(() => _sending = false);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error is ApiException ? error.message : 'Could not send the request.')));
+          _toast(
+            error is ApiException
+                ? error.message
+                : 'Could not send the request.',
+          );
         }
         return;
       }
@@ -430,7 +690,17 @@ class _RequestEditPageState extends State<RequestEditPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    _toast(message);
     Navigator.of(context).pop(true);
+  }
+
+  void _toast(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }

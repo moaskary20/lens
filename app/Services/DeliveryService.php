@@ -60,6 +60,10 @@ class DeliveryService
             throw new LogicException('Revision cycles are disabled.');
         }
 
+        if (! in_array($booking->status, ['delivered', 'in_revision'], true)) {
+            throw new LogicException('You can request edits after the creator delivers files.');
+        }
+
         $updated = $this->escrow->requestRevision($booking);
         if (filled($note)) {
             $updated->update(['notes' => $note]);

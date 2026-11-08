@@ -96,8 +96,18 @@ class ApiClient {
       var message = 'Request failed (${response.statusCode}) for $path';
       try {
         final decoded = jsonDecode(response.body);
-        if (decoded is Map && decoded['message'] != null) {
-          message = decoded['message'].toString();
+        if (decoded is Map) {
+          final errors = decoded['errors'];
+          if (errors is Map && errors.isNotEmpty) {
+            final first = errors.values.first;
+            if (first is List && first.isNotEmpty) {
+              message = first.first.toString();
+            } else if (first != null) {
+              message = first.toString();
+            }
+          } else if (decoded['message'] != null) {
+            message = decoded['message'].toString();
+          }
         }
       } catch (_) {}
       throw ApiException(message);

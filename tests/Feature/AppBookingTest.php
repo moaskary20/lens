@@ -371,4 +371,19 @@ class AppBookingTest extends TestCase
                 ->contains(fn ($notification) => ($notification->data['title'] ?? null) === 'Revision requested'),
         );
     }
+
+    public function test_request_edit_requires_delivered_files(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1003')->firstOrFail();
+        $this->assertNotSame('delivered', $booking->status);
+        $this->assertNotSame('in_revision', $booking->status);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/request-edit', [
+                'change' => 'Please brighten the room.',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'You can request edits after the creator delivers files.');
+    }
 }

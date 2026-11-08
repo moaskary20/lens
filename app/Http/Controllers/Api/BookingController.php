@@ -352,7 +352,11 @@ class BookingController extends Controller
         abort_if($note === '', 422, 'Describe the edit you need.');
 
         $paths = [];
-        foreach ($request->file('references', []) as $file) {
+        $uploaded = $request->file('references', []);
+        if (! is_array($uploaded)) {
+            $uploaded = $uploaded ? [$uploaded] : [];
+        }
+        foreach ($uploaded as $file) {
             if ($file) {
                 $paths[] = $file->store('revision-refs/'.$booking->id, 'public');
             }
