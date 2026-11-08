@@ -740,7 +740,11 @@ class _VendorChatPageState extends State<VendorChatPage> {
 
   Widget _sessionCard() {
     final cover =
-        vendor.coverUrl ?? VendorPhotos.cover(vendor.vendorType, vendor.id);
+        _resolveMediaUrl(vendor.coverUrl) ??
+        _resolveMediaUrl(vendor.profilePhotoUrl) ??
+        (widget.clientId != null
+            ? null
+            : VendorPhotos.cover(vendor.vendorType, vendor.id));
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
       child: Material(
@@ -753,7 +757,7 @@ class _VendorChatPageState extends State<VendorChatPage> {
             padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
             child: Row(
               children: [
-                _photo(cover, 46, radius: 12),
+                _photo(cover ?? '', 46, radius: 12),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -1238,24 +1242,50 @@ class _VendorChatPageState extends State<VendorChatPage> {
     );
   }
 
+  String? _resolveMediaUrl(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty || value.toLowerCase() == 'null') {
+      return null;
+    }
+    if (value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('file:') ||
+        value.startsWith('/')) {
+      if (value.startsWith('/') && !value.startsWith('file:')) {
+        final base = LensConfig.apiBaseUrl.replaceAll(RegExp(r'/api/?$'), '');
+        return '$base$value';
+      }
+      return value;
+    }
+    final base = LensConfig.apiBaseUrl.replaceAll(RegExp(r'/api/?$'), '');
+    if (value.startsWith('storage/')) {
+      return '$base/$value';
+    }
+    return '$base/storage/$value';
+  }
+
   Widget _avatar(double size) {
-    final photo =
-        vendor.profilePhotoUrl ??
-        VendorPhotos.portrait(vendor.vendorType, vendor.id);
+    // Prefer the real counterpart photo. Do not invent a stock portrait for
+    // clients without an avatar — show initials instead.
+    final photo = _resolveMediaUrl(vendor.profilePhotoUrl);
+    if (photo == null) {
+      return _photo('', size, radius: size / 2);
+    }
     return _photo(photo, size, radius: size / 2);
   }
 
   Widget _photo(String url, double size, {double radius = 10}) {
+    final resolved = _resolveMediaUrl(url) ?? url;
     Widget child = _fallback();
-    if (!kIsWeb && (url.startsWith('/') || url.startsWith('file:'))) {
+    if (!kIsWeb && (resolved.startsWith('/') || resolved.startsWith('file:'))) {
       child = Image.file(
-        File(url.replaceFirst('file://', '')),
+        File(resolved.replaceFirst('file://', '')),
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _fallback(),
       );
-    } else if (url.startsWith('http') && LensConfig.useNetwork) {
+    } else if (resolved.startsWith('http') && LensConfig.useNetwork) {
       child = Image.network(
-        url,
+        resolved,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _fallback(),
       );

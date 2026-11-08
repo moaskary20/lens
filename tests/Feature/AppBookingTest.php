@@ -295,6 +295,10 @@ class AppBookingTest extends TestCase
             'project_details' => ['style' => 'Natural light', 'shots' => '50 edited'],
         ]);
 
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $client->forceFill(['avatar' => 'avatars/client-booking-photo.jpg'])->save();
+        Storage::disk('public')->put('avatars/client-booking-photo.jpg', 'fake-image');
+
         $list = $this->withHeaders($headers)
             ->getJson('/api/app/bookings')
             ->assertOk();
@@ -305,6 +309,18 @@ class AppBookingTest extends TestCase
         $this->assertSame('Wedding recap at Yasmin Hall with soft light portraits.', $row['client_brief'] ?? null);
         $this->assertSame('Weddings & Parties', $row['project_type'] ?? null);
         $this->assertSame('Natural light', data_get($row, 'project_details.style'));
+        $this->assertNotEmpty($row['photo'] ?? null);
+        $this->assertTrue(str_starts_with((string) $row['photo'], 'http'));
+
+        $clientList = $this->withHeaders(['X-Lens-Client' => 'client@lens.app'])
+            ->getJson('/api/app/bookings')
+            ->assertOk();
+        $clientRow = collect($clientList->json('bookings'))->firstWhere('id', $booking->id);
+        $this->assertNotNull($clientRow);
+        $this->assertNotEmpty($clientRow['photo'] ?? null);
+        $this->assertTrue(str_starts_with((string) $clientRow['photo'], 'http'));
+        $this->assertNotEmpty(data_get($clientRow, 'vendor.profile_photo_url'));
+        $this->assertTrue(str_starts_with((string) data_get($clientRow, 'vendor.profile_photo_url'), 'http'));
 
         $chat = $this->withHeaders($headers)
             ->postJson('/api/app/conversations', [

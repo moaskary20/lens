@@ -434,6 +434,7 @@ class _ClientCard extends StatelessWidget {
                 child: _VendorPhoto(
                   url: item.photo ?? vendor.profilePhotoUrl ?? vendor.coverUrl,
                   size: photoSize,
+                  initials: vendor.initials,
                 ),
               ),
               SizedBox(width: narrow ? 10 : 12),
@@ -975,10 +976,17 @@ class _ClientCard extends StatelessWidget {
 }
 
 class _VendorPhoto extends StatelessWidget {
-  const _VendorPhoto({this.url, this.size = 76});
+  const _VendorPhoto({
+    this.url,
+    this.size = 76,
+    this.initials,
+    this.radius = 14,
+  });
 
   final String? url;
   final double size;
+  final String? initials;
+  final double radius;
 
   String? get _resolved {
     final raw = url?.trim();
@@ -998,28 +1006,41 @@ class _VendorPhoto extends StatelessWidget {
     return '$base/storage/$raw';
   }
 
+  Widget _placeholder() {
+    final label = (initials ?? '').trim();
+    return ColoredBox(
+      color: LensColors.graphite,
+      child: Center(
+        child: label.isEmpty
+            ? const Icon(Icons.person, color: LensColors.cream)
+            : Text(
+                label,
+                style: TextStyle(
+                  color: LensColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: size * 0.32,
+                ),
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final resolved = _resolved;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(radius),
       child: SizedBox(
         width: size,
         height: size,
         child: resolved == null
-            ? const ColoredBox(
-                color: LensColors.graphite,
-                child: Icon(Icons.person, color: LensColors.cream),
-              )
+            ? _placeholder()
             : Image.network(
                 resolved,
                 fit: BoxFit.cover,
                 alignment: Alignment.center,
                 filterQuality: FilterQuality.high,
-                errorBuilder: (_, __, ___) => const ColoredBox(
-                  color: LensColors.graphite,
-                  child: Icon(Icons.person, color: LensColors.cream),
-                ),
+                errorBuilder: (_, __, ___) => _placeholder(),
               ),
       ),
     );
@@ -2025,54 +2046,146 @@ class _VendorCard extends StatelessWidget {
     );
   }
 
+  Future<void> _call(BuildContext context) async {
+    if (!ContactLaunch.hasNumber(item.phone)) {
+      _toast(context, 'No phone number is available for this client.');
+      return;
+    }
+    final opened = await ContactLaunch.open(ContactLaunch.tel(item.phone!));
+    if (!opened && context.mounted) {
+      _toast(context, 'Could not open the phone app.');
+    }
+  }
+
+  Future<void> _whatsapp(BuildContext context) async {
+    final number = item.whatsapp ?? item.phone;
+    if (!ContactLaunch.hasNumber(number)) {
+      _toast(context, 'No WhatsApp number is available for this client.');
+      return;
+    }
+    final opened = await ContactLaunch.open(ContactLaunch.whatsapp(number!));
+    if (!opened && context.mounted) {
+      _toast(context, 'Could not open WhatsApp.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 380;
+    final decisionActions = <Widget>[
+      if (item.hasRequestDetails)
+        _BookingAction(
+          icon: Icons.description_outlined,
+          label: 'View request',
+          highlighted: true,
+          onTap: () => _openRequestDetails(context),
+        ),
+      if (item.canAccept)
+        _BookingAction(
+          icon: Icons.thumb_up_alt_outlined,
+          label: 'Accept',
+          highlighted: !item.hasRequestDetails,
+          onTap: () => _accept(context),
+        ),
+      if (item.canReject)
+        _BookingAction(
+          icon: Icons.thumb_down_alt_outlined,
+          label: 'Decline',
+          onTap: () => _reject(context),
+        ),
+      if (_canDeliver)
+        _BookingAction(
+          icon: Icons.cloud_upload_outlined,
+          label: 'Delivery',
+          highlighted: item.status != 'pending' && !item.hasRequestDetails,
+          onTap: () => _openDelivery(context),
+        ),
+    ];
+    final moreActions = <Widget>[
+      if (_canCancel)
+        _BookingAction(
+          icon: Icons.event_busy_outlined,
+          label: 'Cancel',
+          onTap: () => _cancel(context),
+        ),
+      if (_canComplain)
+        _BookingAction(
+          icon: Icons.support_agent_rounded,
+          label: 'Complaint',
+          onTap: () => _complain(context),
+        ),
+    ];
+
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(narrow ? 12 : 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF141518),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2D34)),
+        color: const Color(0xFF121212),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF26282F)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFF25262C),
-                backgroundImage: item.photo == null || item.photo!.isEmpty
-                    ? null
-                    : NetworkImage(item.photo!),
-                child: item.photo == null || item.photo!.isEmpty
-                    ? Text(
-                        _clientCard.initials,
-                        style: const TextStyle(
-                          color: LensColors.primary,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      )
-                    : null,
+              _VendorPhoto(
+                url: item.photo,
+                size: narrow ? 48 : 52,
+                initials: _clientCard.initials,
+                radius: 14,
               ),
-              const SizedBox(width: 11),
+              SizedBox(width: narrow ? 10 : 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.counterpart.isEmpty ? 'Client' : item.counterpart,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.counterpart.isEmpty
+                                ? 'Client'
+                                : item.counterpart,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: narrow ? 15 : 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: LensColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(
+                              color: LensColors.primary.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Text(
+                            item.statusLabel,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              color: LensColors.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(
                       item.reference,
                       style: const TextStyle(
-                        color: LensColors.slate,
+                        color: Color(0xFF8E8B84),
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
                       ),
@@ -2080,37 +2193,26 @@ class _VendorCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: LensColors.primary.withValues(alpha: 0.13),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  item.statusLabel,
-                  style: const TextStyle(
-                    color: LensColors.primary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 12),
           Text(
             item.displayProject,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: LensColors.cream,
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w800,
+              height: 1.25,
             ),
           ),
-          const SizedBox(height: 9),
-          _BookingDetailRow(
-            icon: Icons.calendar_month_outlined,
-            text: item.when,
-          ),
+          const SizedBox(height: 10),
+          if (item.when.isNotEmpty)
+            _BookingDetailRow(
+              icon: Icons.calendar_month_outlined,
+              text: item.when,
+            ),
           if (item.location.isNotEmpty) ...[
             const SizedBox(height: 6),
             _BookingDetailRow(
@@ -2127,96 +2229,56 @@ class _VendorCard extends StatelessWidget {
           ],
           if (item.status == 'pending')
             const Padding(
-              padding: EdgeInsets.only(top: 9),
+              padding: EdgeInsets.only(top: 10),
               child: Text(
-                'New request — accept to confirm, or chat with the client first.',
-                style: TextStyle(color: LensColors.slate, fontSize: 12),
+                'Review the brief, then accept or chat with the client.',
+                style: TextStyle(color: Color(0xFF8E8B84), fontSize: 12),
               ),
             ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Row(
             children: [
-              if (item.hasRequestDetails)
-                _BookingAction(
-                  icon: Icons.description_outlined,
-                  label: 'View request',
-                  highlighted: true,
-                  onTap: () => _openRequestDetails(context),
+              Expanded(
+                child: _VendorContactChip(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: 'Chat',
+                  onTap: () => _openChat(context),
                 ),
-              if (item.canAccept)
-                _BookingAction(
-                  icon: Icons.thumb_up_alt_outlined,
-                  label: 'Accept',
-                  highlighted: !item.hasRequestDetails,
-                  onTap: () => _accept(context),
-                ),
-              if (item.canReject)
-                _BookingAction(
-                  icon: Icons.thumb_down_alt_outlined,
-                  label: 'Decline',
-                  onTap: () => _reject(context),
-                ),
-              _BookingAction(
-                icon: Icons.chat_bubble_outline_rounded,
-                label: 'In-app chat',
-                onTap: () => _openChat(context),
               ),
-              _BookingAction(
-                icon: Icons.call_outlined,
-                label: 'Call',
-                onTap: () async {
-                  if (!ContactLaunch.hasNumber(item.phone)) {
-                    _toast(context, 'No phone number is available for this client.');
-                    return;
-                  }
-                  final opened = await ContactLaunch.open(
-                    ContactLaunch.tel(item.phone!),
-                  );
-                  if (!opened && context.mounted) {
-                    _toast(context, 'Could not open the phone app.');
-                  }
-                },
+              const SizedBox(width: 8),
+              Expanded(
+                child: _VendorContactChip(
+                  icon: Icons.call_outlined,
+                  label: 'Call',
+                  onTap: () => _call(context),
+                ),
               ),
-              _BookingAction(
-                icon: Icons.message_outlined,
-                label: 'WhatsApp',
-                onTap: () async {
-                  final number = item.whatsapp ?? item.phone;
-                  if (!ContactLaunch.hasNumber(number)) {
-                    _toast(context, 'No WhatsApp number is available for this client.');
-                    return;
-                  }
-                  final opened = await ContactLaunch.open(
-                    ContactLaunch.whatsapp(number!),
-                  );
-                  if (!opened && context.mounted) {
-                    _toast(context, 'Could not open WhatsApp.');
-                  }
-                },
+              const SizedBox(width: 8),
+              Expanded(
+                child: _VendorContactChip(
+                  icon: Icons.message_outlined,
+                  label: 'WhatsApp',
+                  onTap: () => _whatsapp(context),
+                ),
               ),
-              if (_canDeliver)
-                _BookingAction(
-                  icon: Icons.cloud_upload_outlined,
-                  label: 'Project delivery',
-                  highlighted: item.status != 'pending',
-                  onTap: () => _openDelivery(context),
-                ),
-              if (_canCancel)
-                _BookingAction(
-                  icon: Icons.event_busy_outlined,
-                  label: 'Cancel',
-                  onTap: () => _cancel(context),
-                ),
-              if (_canComplain)
-                _BookingAction(
-                  icon: Icons.support_agent_rounded,
-                  label: 'Open complaint',
-                  onTap: () => _complain(context),
-                ),
             ],
           ),
+          if (decisionActions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: decisionActions,
+            ),
+          ],
+          if (moreActions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: moreActions,
+            ),
+          ],
         ],
       ),
     );
@@ -2278,6 +2340,57 @@ class _BookingDetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _VendorContactChip extends StatelessWidget {
+  const _VendorContactChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF1A1B20),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF303238)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 15, color: LensColors.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: LensColors.cream,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

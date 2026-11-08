@@ -197,15 +197,7 @@ class User extends Authenticatable implements FilamentUser
             $path = $this->vendor?->profile_photo;
         }
 
-        if (! filled($path)) {
-            return null;
-        }
-
-        if (str_starts_with((string) $path, 'http://') || str_starts_with((string) $path, 'https://')) {
-            return $path;
-        }
-
-        return asset('storage/'.$path);
+        return \App\Support\VendorAppProfile::publicUrl(is_string($path) ? $path : null);
     }
 
     protected static function booted(): void
