@@ -117,6 +117,14 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     _equipment = _equipmentFor(type);
     _equipmentDetails = const [];
     _specialties = vendor.tags.isEmpty ? _filters.skip(1).take(3).toList() : vendor.tags;
+    _social = [
+      if (vendor.instagramFollowers != null)
+        _SocialStat(label: 'Instagram', followers: vendor.instagramFollowers),
+      if (vendor.tiktokFollowers != null)
+        _SocialStat(label: 'TikTok', followers: vendor.tiktokFollowers),
+      if (vendor.facebookFollowers != null)
+        _SocialStat(label: 'Facebook', followers: vendor.facebookFollowers),
+    ];
     _packages = [
       if ((vendor.hourlyPrice ?? 0) > 0)
         _Package(label: 'Price per hour per location', price: vendor.hourlyPrice!),
@@ -505,7 +513,61 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         if (_social.isNotEmpty) ...[
           SizedBox(height: booked ? 10 : 14),
           _socialFollowers(),
+        ] else if (_loadingProfile) ...[
+          SizedBox(height: booked ? 10 : 14),
+          _socialFollowersSkeleton(),
         ],
+      ],
+    );
+  }
+
+  Widget _socialFollowersSkeleton() {
+    Widget chip() {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: Color(0xFF2A2D34),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            children: [
+              Container(
+                width: 36,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2D34),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 48,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22252B),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        chip(),
+        const SizedBox(width: 18),
+        chip(),
+        const SizedBox(width: 18),
+        chip(),
       ],
     );
   }

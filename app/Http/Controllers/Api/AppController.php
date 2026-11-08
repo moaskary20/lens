@@ -487,6 +487,23 @@ class AppController extends Controller
             'assisted_sessions' => (int) ($vendor->assisted_sessions ?? 0),
             'years_experience' => (int) ($vendor->years_experience ?? 0),
             'client_satisfaction' => (int) ($vendor->client_satisfaction ?? 0),
+            'instagram_followers' => $vendor->instagram_followers !== null ? (int) $vendor->instagram_followers : null,
+            'tiktok_followers' => $vendor->tiktok_followers !== null ? (int) $vendor->tiktok_followers : null,
+            'facebook_followers' => $vendor->facebook_followers !== null ? (int) $vendor->facebook_followers : null,
+            'social' => [
+                [
+                    'label' => 'Instagram',
+                    'followers' => $vendor->instagram_followers !== null ? (int) $vendor->instagram_followers : null,
+                ],
+                [
+                    'label' => 'TikTok',
+                    'followers' => $vendor->tiktok_followers !== null ? (int) $vendor->tiktok_followers : null,
+                ],
+                [
+                    'label' => 'Facebook',
+                    'followers' => $vendor->facebook_followers !== null ? (int) $vendor->facebook_followers : null,
+                ],
+            ],
             'latitude' => $this->coord($vendor->latitude ?? $vendor->city?->latitude, (int) $vendor->id, 30.0444, 0.04),
             'longitude' => $this->coord($vendor->longitude ?? $vendor->city?->longitude, (int) $vendor->id + 5, 31.2357, 0.05),
         ]);

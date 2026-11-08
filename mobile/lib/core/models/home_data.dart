@@ -229,9 +229,30 @@ class VendorCard {
     this.fullDayPrice,
     this.hourlyPrice,
     this.perVideoPrice,
+    this.instagramFollowers,
+    this.tiktokFollowers,
+    this.facebookFollowers,
   });
 
   factory VendorCard.fromJson(Map<String, dynamic> json) {
+    final social = (json['social'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    int? socialFollowers(String key) {
+      for (final item in social) {
+        final label = item['label']?.toString().toLowerCase() ?? '';
+        if (label.contains(key)) {
+          final raw = item['followers'];
+          if (raw is num) {
+            return raw.toInt();
+          }
+          return int.tryParse('$raw');
+        }
+      }
+      return null;
+    }
+
     return VendorCard(
       id: _asInt(json['id']),
       displayName: json['display_name']?.toString() ?? '',
@@ -259,6 +280,15 @@ class VendorCard {
       fullDayPrice: json['full_day_price'] == null ? null : _asDouble(json['full_day_price']),
       hourlyPrice: json['hourly_price'] == null ? null : _asDouble(json['hourly_price']),
       perVideoPrice: json['per_video_price'] == null ? null : _asDouble(json['per_video_price']),
+      instagramFollowers: json['instagram_followers'] == null
+          ? socialFollowers('instagram')
+          : _asInt(json['instagram_followers']),
+      tiktokFollowers: json['tiktok_followers'] == null
+          ? socialFollowers('tiktok')
+          : _asInt(json['tiktok_followers']),
+      facebookFollowers: json['facebook_followers'] == null
+          ? socialFollowers('facebook')
+          : _asInt(json['facebook_followers']),
     );
   }
 
@@ -288,6 +318,9 @@ class VendorCard {
   final double? fullDayPrice;
   final double? hourlyPrice;
   final double? perVideoPrice;
+  final int? instagramFollowers;
+  final int? tiktokFollowers;
+  final int? facebookFollowers;
 
   double get mapLatitude => latitude ?? LensCities.latitude(city);
 
