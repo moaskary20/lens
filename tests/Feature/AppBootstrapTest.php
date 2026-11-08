@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Setting;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AppBootstrapTest extends TestCase
@@ -13,6 +14,8 @@ class AppBootstrapTest extends TestCase
 
     public function test_mobile_bootstrap_exposes_the_current_platform_logo(): void
     {
+        Storage::fake('public');
+        Storage::disk('public')->put('branding/lens-logo.png', 'logo');
         Setting::setValue('platform.logo', 'branding/lens-logo.png');
 
         $this->getJson('/api/app/bootstrap')

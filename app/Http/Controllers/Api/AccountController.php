@@ -254,14 +254,14 @@ class AccountController extends Controller
 
     public function settings(): JsonResponse
     {
-        $user = $this->client();
+        $user = $this->member();
 
         return response()->json(['settings' => $this->mergedSettings($user)]);
     }
 
     public function updateSettings(Request $request): JsonResponse
     {
-        $user = $this->client();
+        $user = $this->member();
         $data = $request->validate([
             'settings' => ['required', 'array'],
             'settings.push_notifications' => ['nullable', 'boolean'],
@@ -490,9 +490,15 @@ class AccountController extends Controller
         $vendor = $booking->vendor;
         $vendor?->loadMissing('user');
         $booking->loadMissing(['conversation', 'client']);
-        $phone = preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: $vendor?->user?->phone ?: '')) ?: null;
+        $client = $booking->client;
+        $vendorPhone = preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: $vendor?->user?->phone ?: '')) ?: null;
+        $clientPhone = Egypt::normalizeMobile($client?->phone);
+        $phone = $view === 'vendor' ? $clientPhone : $vendorPhone;
+        $whatsapp = $view === 'vendor'
+            ? $clientPhone
+            : (preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendorPhone)) ?: $vendorPhone);
         $counterpart = $view === 'vendor'
-            ? ($booking->client?->name ?: 'Client')
+            ? ($client?->name ?: 'Client')
             : ($vendor?->display_name ?: 'Creator');
         $conversationId = $booking->conversation?->id
             ?? Conversation::query()
@@ -500,30 +506,26 @@ class AccountController extends Controller
                 ->where('vendor_id', $booking->vendor_id)
                 ->value('id');
 
-        return [
-            'id' => $booking->id,
-            'booking_id' => $booking->id,
-            'title' => $booking->project_name ?: (($vendor?->vendorType?->name_en ?: 'Creative').' Session'),
-            'project_name' => $booking->project_name,
-            'reference' => $booking->reference,
-            'status' => $booking->status,
-            'status_label' => match ($booking->status) {
-                'pending' => 'Pending',
-                'accepted', 'checked_in', 'in_progress' => 'Confirmed',
-                'delivered' => 'Delivered',
-                'completed', 'approved' => 'Completed',
-                default => ucfirst(str_replace('_', ' ', (string) $booking->status)),
-            },
-            'when' => $booking->scheduled_at?->format('l, j F Y • g:i A'),
-            'location' => $booking->location_text ?: ($vendor?->city?->name_en ?: 'Egypt'),
-            'phone' => $phone,
-            'whatsapp' => preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $phone)) ?: $phone,
-            'vendor_id' => $vendor?->id,
-            'client_id' => $booking->client_id,
-            'vendor_name' => $vendor?->display_name,
-            'counterpart' => $counterpart,
-            'conversation_id' => $conversationId ? (int) $conversationId : null,
-            'vendor' => [
+        $card = $view === 'vendor'
+            ? [
+                'id' => $client?->id,
+                'display_name' => $client?->name ?: 'Client',
+                'vendor_type_name' => 'Client',
+                'vendor_type' => 'client',
+                'city' => $booking->location_text,
+                'location' => $booking->location_text,
+                'rating_avg' => 0,
+                'rating_count' => 0,
+                'badges' => [],
+                'cover_url' => $client?->avatarUrl(),
+                'profile_photo_url' => $client?->avatarUrl(),
+                'initials' => mb_strtoupper(mb_substr((string) ($client?->name ?: 'C'), 0, 1)),
+                'tags' => [],
+                'verified' => false,
+                'latitude' => $booking->location_lat,
+                'longitude' => $booking->location_lng,
+            ]
+            : [
                 'id' => $vendor?->id,
                 'display_name' => $vendor?->display_name,
                 'vendor_type_name' => $vendor?->vendorType?->name_en,
@@ -542,7 +544,32 @@ class AccountController extends Controller
                 'verified' => $vendor?->verification_status === 'verified',
                 'latitude' => $vendor?->latitude,
                 'longitude' => $vendor?->longitude,
-            ],
+            ];
+
+        return [
+            'id' => $booking->id,
+            'booking_id' => $booking->id,
+            'title' => $booking->project_name ?: (($vendor?->vendorType?->name_en ?: 'Creative').' Session'),
+            'project_name' => $booking->project_name,
+            'reference' => $booking->reference,
+            'status' => $booking->status,
+            'status_label' => match ($booking->status) {
+                'pending' => 'Pending',
+                'accepted', 'checked_in', 'in_progress' => 'Confirmed',
+                'delivered' => 'Delivered',
+                'completed', 'approved' => 'Completed',
+                default => ucfirst(str_replace('_', ' ', (string) $booking->status)),
+            },
+            'when' => $booking->scheduled_at?->format('l, j F Y • g:i A'),
+            'location' => $booking->location_text ?: ($vendor?->city?->name_en ?: 'Egypt'),
+            'phone' => $phone,
+            'whatsapp' => $whatsapp,
+            'vendor_id' => $vendor?->id,
+            'client_id' => $booking->client_id,
+            'vendor_name' => $vendor?->display_name,
+            'counterpart' => $counterpart,
+            'conversation_id' => $conversationId ? (int) $conversationId : null,
+            'vendor' => $card,
         ];
     }
 

@@ -19,9 +19,15 @@ import 'package:lens/features/profile/payment_methods_page.dart';
 import 'package:lens/features/profile/profile_scaffold.dart';
 
 class EditProfilePage extends StatefulWidget {
-  const EditProfilePage({super.key, required this.home});
+  const EditProfilePage({
+    super.key,
+    required this.home,
+    this.vendorInitialStep = 0,
+  });
 
   final HomeData home;
+  /// When the signed-in user is a vendor, open this wizard step (2 = Previous projects).
+  final int vendorInitialStep;
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
@@ -346,7 +352,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     if (SessionStore.instance.isVendor) {
-      return VendorRegisterPage(bootstrap: home.registerCatalog, editing: true);
+      return VendorRegisterPage(
+        bootstrap: home.registerCatalog,
+        editing: true,
+        initialStep: widget.vendorInitialStep,
+      );
     }
     return ProfileScaffold(
       title: 'Edit Profile',

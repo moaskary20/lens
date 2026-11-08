@@ -21,11 +21,14 @@ class VendorRegisterPage extends StatefulWidget {
     required this.bootstrap,
     this.onSuccess,
     this.editing = false,
+    this.initialStep = 0,
   });
 
   final Map<String, dynamic> bootstrap;
   final VoidCallback? onSuccess;
   final bool editing;
+  /// 0 Identity · 1 Type profile · 2 Previous projects · 3 Pricing · 4 Calendar · 5 Bank
+  final int initialStep;
 
   @override
   State<VendorRegisterPage> createState() => _VendorRegisterPageState();
@@ -118,6 +121,7 @@ class _VendorRegisterPageState extends State<VendorRegisterPage> {
   void initState() {
     super.initState();
     _catalog = RegisterCatalog.fromBootstrap(widget.bootstrap);
+    _step = widget.initialStep.clamp(0, _titles.length - 1);
     if (_editing) {
       _hydrateFromSession();
       _loadProfile();

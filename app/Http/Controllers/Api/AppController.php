@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AppScreen;
 use App\Models\Category;
 use App\Models\City;
+use App\Models\CmsPage;
 use App\Models\Setting;
 use App\Models\Vendor;
 use App\Models\VendorType;
@@ -16,6 +17,7 @@ use App\Support\Egypt;
 use App\Support\Feature;
 use App\Support\Roles;
 use App\Support\SearchEngine;
+use App\Support\SitePages;
 use App\Support\VendorAppProfile;
 use App\Support\VendorProfile;
 use App\Support\VendorRegisterCatalog;
@@ -25,6 +27,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AppController extends Controller
 {
@@ -94,7 +97,7 @@ class AppController extends Controller
         $version = (string) $types->pluck('id')->sort()->implode('-')
             .'.v'.Vendor::query()->marketplaceVisible()->count();
 
-        return Cache::store('file')->remember('lens.app.bootstrap.catalog.v8.'.$version, now()->addMinutes(5), function () use ($types): array {
+        return Cache::store('file')->remember('lens.app.bootstrap.catalog.v9.'.$version, now()->addMinutes(5), function () use ($types): array {
             $categories = Category::query()
                 ->where('is_active', true)
                 ->orderBy('sort_order')
@@ -134,8 +137,45 @@ class AppController extends Controller
                     ->where('is_active', true)
                     ->orderBy('sort_order')
                     ->get(['slug', 'title', 'body', 'cta_label', 'image', 'sort_order']),
+                'policy_pages' => $this->policyPages(),
             ];
         });
+    }
+
+    /**
+     * @return list<array{slug: string, title: string, body: string}>
+     */
+    protected function policyPages(): array
+    {
+        $slugs = ['terms', 'privacy', 'guidelines', 'faqs', 'help', 'about'];
+        $cms = CmsPage::query()
+            ->where('is_active', true)
+            ->whereIn('slug', $slugs)
+            ->get()
+            ->keyBy('slug');
+
+        $pages = [];
+        foreach ($slugs as $slug) {
+            try {
+                $resolved = SitePages::resolve($slug);
+            } catch (\Throwable) {
+                continue;
+            }
+            $cmsPage = $cms->get($slug);
+            $html = filled($cmsPage?->body) ? (string) $cmsPage->body : (string) ($resolved['html'] ?? '');
+            $title = filled($cmsPage?->title) ? (string) $cmsPage->title : (string) ($resolved['title'] ?? Str::headline($slug));
+            $body = trim((string) ($resolved['body'] ?? Str::of(strip_tags($html))->squish()));
+            if ($body === '' && $html === '') {
+                continue;
+            }
+            $pages[] = [
+                'slug' => $slug,
+                'title' => $title,
+                'body' => $body !== '' ? $body : trim(strip_tags($html)),
+            ];
+        }
+
+        return $pages;
     }
 
     public function vendors(Request $request): JsonResponse

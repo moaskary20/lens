@@ -13,8 +13,6 @@ import 'package:lens/features/home/favorite_heart.dart';
 import 'package:lens/features/home/vendor_chat_page.dart';
 import 'package:lens/features/home/vendor_project_page.dart';
 import 'package:lens/features/shell/app_shell.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
-
 void openVendorProfile(BuildContext context, VendorCard vendor, HomeData home, {bool booked = false}) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => VendorProfilePage(vendor: vendor, home: home, booked: booked)),
@@ -390,9 +388,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
               color: const Color(0xB3141518),
               borderRadius: BorderRadius.circular(22),
               child: InkWell(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => PlaceholderPage(title: '$_visibleName showreel')),
-                ),
+                onTap: _openShowreel,
                 borderRadius: BorderRadius.circular(22),
                 child: const Padding(
                   padding: EdgeInsets.fromLTRB(10, 7, 12, 7),
@@ -1139,6 +1135,25 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         ),
       ),
     );
+  }
+
+  void _openShowreel() {
+    _PortfolioProject? videoProject;
+    for (final project in _projectsGallery) {
+      if (project.videoCount > 0 ||
+          project.files.any((file) => file.kind == 'video')) {
+        videoProject = project;
+        break;
+      }
+    }
+    videoProject ??= _projectsGallery.isEmpty ? null : _projectsGallery.first;
+    if (videoProject == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No showreel files uploaded yet.')),
+      );
+      return;
+    }
+    _openProject(videoProject);
   }
 
   Widget _photo(String url) {

@@ -6,6 +6,7 @@ import 'package:lens/core/push_alerts.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/core/widgets/brand_logo.dart';
+import 'package:lens/features/profile/policies_page.dart';
 import 'package:lens/features/profile/profile_scaffold.dart';
 
 class AppSettingsPage extends StatefulWidget {
@@ -23,7 +24,8 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
   late Map<String, dynamic> _settings;
   bool _saving = false;
 
-  bool get _live => LensConfig.useNetwork && SessionStore.instance.isClient;
+  bool get _live =>
+      LensConfig.useNetwork && !SessionStore.instance.isGuest;
   HomeData get home => widget.home;
 
   @override
@@ -168,8 +170,20 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
     return _group('About App', [
       _aboutRow(Icons.info_outline_rounded, 'Lens $_version', 'Marketplace for photographers, studios, and clients in Egypt.'),
       _link(Icons.auto_awesome_outlined, 'What is Lens?', home.tagline, 'Lens helps you find, book, and chat with verified creators. Payments stay in escrow until you approve the work.'),
-      if (home.on('cms')) _link(Icons.description_outlined, 'Terms of Service', 'Booking, payments, and protected delivery', 'Terms for using Lens for booking, payments, and protected delivery.'),
-      if (home.on('cms')) _link(Icons.privacy_tip_outlined, 'Privacy Policy', 'How we store client and vendor data', 'Lens stores account, booking, and chat data to run sessions. Full card numbers are never saved.'),
+      if (home.on('cms'))
+        _link(
+          Icons.description_outlined,
+          'Terms of Service',
+          'Booking, payments, and protected delivery',
+          'terms',
+        ),
+      if (home.on('cms'))
+        _link(
+          Icons.privacy_tip_outlined,
+          'Privacy Policy',
+          'How we store client and vendor data',
+          'privacy',
+        ),
     ]);
   }
 
@@ -181,35 +195,14 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
     );
   }
 
-  Widget _link(IconData icon, String title, String hint, String body) {
+  Widget _link(IconData icon, String title, String hint, String slug) {
     return ListTile(
       leading: Icon(icon, color: LensColors.primary),
       title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
       subtitle: Text(hint, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
       trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF8E8B84)),
-      onTap: () => _sheet(title, body),
+      onTap: () => openPolicyPage(context, home, slug),
     );
   }
 
-  void _sheet(String title, String body) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF141416),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(22, 20, 22, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 10),
-              Text(body, style: const TextStyle(color: Color(0xFFD0CBC3), height: 1.45)),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }

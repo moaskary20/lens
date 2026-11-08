@@ -11,7 +11,7 @@ import 'package:lens/core/widgets/brand_logo.dart';
 import 'package:lens/features/home/book_checkout_page.dart';
 import 'package:lens/features/home/book_draft.dart';
 import 'package:lens/features/home/book_project_catalog.dart';
-import 'package:lens/features/shell/placeholder_page.dart';
+import 'package:lens/features/profile/policies_page.dart';
 
 class BookReviewPage extends StatelessWidget {
   const BookReviewPage({super.key, required this.draft});
@@ -619,9 +619,7 @@ class BookReviewPage extends StatelessWidget {
 
   Widget _policy(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const PlaceholderPage(title: 'Cancellation Policy')),
-      ),
+      onTap: () => openPolicyPage(context, home, 'guidelines'),
       child: _card(
         child: const Row(
           children: [

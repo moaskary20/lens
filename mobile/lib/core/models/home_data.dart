@@ -20,6 +20,7 @@ class HomeData {
     this.banks = const [],
     this.telecomWallets = const [],
     this.vendorRegister = const [],
+    this.policyPages = const [],
     this.voiceInput = true,
     this.moodboardMode = 'after_payment',
   });
@@ -64,6 +65,11 @@ class HomeData {
       banks: (json['banks'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
       telecomWallets: (json['telecom_wallets'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
       vendorRegister: (json['vendor_register'] as List<dynamic>? ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList(),
+      policyPages: (json['policy_pages'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((item) => PolicyPageItem.fromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.slug.isNotEmpty && item.title.isNotEmpty)
+          .toList(),
       voiceInput: json['voice_input_enabled'] != false,
       moodboardMode: json['moodboard_mode']?.toString() ?? 'after_payment',
     );
@@ -86,6 +92,7 @@ class HomeData {
   final List<Map<String, dynamic>> banks;
   final List<Map<String, dynamic>> telecomWallets;
   final List<Map<String, dynamic>> vendorRegister;
+  final List<PolicyPageItem> policyPages;
   final bool voiceInput;
   final String moodboardMode;
 
@@ -100,6 +107,26 @@ class HomeData {
         'telecom_wallets': telecomWallets,
         'vendor_register': vendorRegister,
       };
+}
+
+class PolicyPageItem {
+  const PolicyPageItem({
+    required this.slug,
+    required this.title,
+    required this.body,
+  });
+
+  factory PolicyPageItem.fromJson(Map<String, dynamic> json) {
+    return PolicyPageItem(
+      slug: json['slug']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      body: json['body']?.toString() ?? '',
+    );
+  }
+
+  final String slug;
+  final String title;
+  final String body;
 }
 
 class FilterGroupItem {

@@ -16,6 +16,7 @@ import 'package:lens/features/profile/app_settings_page.dart';
 import 'package:lens/features/profile/edit_profile_page.dart';
 import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/payment_methods_page.dart';
+import 'package:lens/features/profile/policies_page.dart';
 import 'package:lens/features/profile/report_issue_page.dart';
 import 'package:lens/features/profile/wallet_page.dart';
 import 'package:lens/features/shell/placeholder_page.dart';
@@ -76,7 +77,12 @@ class ProfilePage extends StatelessWidget {
               if (data.on('chat'))
                 _row(context, Icons.chat_bubble_outline_rounded, 'Messages', onTap: () => _guard(context, () => _openPage(context, MessagesPage(home: data)))),
               _row(context, Icons.settings_outlined, 'App Settings', onTap: () => _openPage(context, AppSettingsPage(home: data))),
-              _row(context, Icons.description_outlined, 'Policies'),
+              _row(
+                context,
+                Icons.description_outlined,
+                'Policies',
+                onTap: () => _openPage(context, PoliciesPage(home: data)),
+              ),
               if (data.on('issue_reports'))
                 _row(context, Icons.help_outline_rounded, 'Report an Issue', onTap: () => openReportIssue(context)),
               if (signedIn)

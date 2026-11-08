@@ -23,6 +23,7 @@ import 'package:lens/features/home/home_page.dart';
 import 'package:lens/features/home/inbox.dart';
 import 'package:lens/features/home/search_page.dart';
 import 'package:lens/features/profile/app_settings_page.dart';
+import 'package:lens/features/profile/edit_profile_page.dart';
 import 'package:lens/features/profile/messages_page.dart';
 import 'package:lens/features/profile/profile_page.dart';
 import 'package:lens/features/profile/report_issue_page.dart';
@@ -65,6 +66,20 @@ class AppShell extends StatefulWidget {
   }
 
   static void create(BuildContext context) {
+    if (SessionStore.instance.isVendor) {
+      final home = currentHome;
+      if (home != null) {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => EditProfilePage(
+              home: home,
+              vendorInitialStep: 2, // Previous projects
+            ),
+          ),
+        );
+        return;
+      }
+    }
     if (SessionStore.instance.isClient) {
       final home = currentHome;
       if (home != null) {

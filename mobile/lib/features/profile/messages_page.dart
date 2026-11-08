@@ -23,7 +23,8 @@ class _MessagesPageState extends State<MessagesPage> {
   int? _selected;
   bool _loading = false;
 
-  bool get _live => LensConfig.useNetwork && SessionStore.instance.isClient;
+  bool get _live =>
+      LensConfig.useNetwork && !SessionStore.instance.isGuest;
 
   _Project? get _current {
     if (_items.isEmpty) {
@@ -107,7 +108,15 @@ class _MessagesPageState extends State<MessagesPage> {
   void _chat(_Project project) {
     final vendor = project.vendor;
     if (vendor == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This project has no vendor yet.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            SessionStore.instance.isVendor
+                ? 'This project has no client yet.'
+                : 'This project has no vendor yet.',
+          ),
+        ),
+      );
       return;
     }
     Navigator.of(context).push(
@@ -119,6 +128,7 @@ class _MessagesPageState extends State<MessagesPage> {
           location: project.location,
           status: project.status,
           bookingId: project.id,
+          clientId: SessionStore.instance.isVendor ? project.clientId : null,
           phone: project.phone,
           whatsapp: project.whatsapp,
         ),
@@ -138,9 +148,15 @@ class _MessagesPageState extends State<MessagesPage> {
           const SizedBox(height: 16),
           if (_loading) const Center(child: CircularProgressIndicator(color: LensColors.primary)),
           if (!_loading && _items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Text('No current projects yet. Book a creator first.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8E8B84))),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Text(
+                SessionStore.instance.isVendor
+                    ? 'No current projects yet. Incoming bookings will appear here.'
+                    : 'No current projects yet. Book a creator first.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF8E8B84)),
+              ),
             ),
           for (final item in _items) _projectTile(item),
           if (project != null) ...[
@@ -174,7 +190,11 @@ class _MessagesPageState extends State<MessagesPage> {
                     children: [
                       Text(item.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 4),
-                      Text(item.vendor?.displayName ?? 'Creator', style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13)),
+                      Text(
+                        item.vendor?.displayName ??
+                            (SessionStore.instance.isVendor ? 'Client' : 'Creator'),
+                        style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13),
+                      ),
                       if (item.when.isNotEmpty) Text(item.when, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
                     ],
                   ),
@@ -232,6 +252,7 @@ class _Project {
     required this.status,
     required this.phone,
     required this.whatsapp,
+    this.clientId,
     this.vendor,
   });
 
@@ -245,6 +266,9 @@ class _Project {
       status: json['status_label']?.toString() ?? 'Confirmed',
       phone: json['phone']?.toString() ?? '',
       whatsapp: json['whatsapp']?.toString() ?? json['phone']?.toString() ?? '',
+      clientId: json['client_id'] is int
+          ? json['client_id'] as int
+          : int.tryParse('${json['client_id']}'),
       vendor: vendorJson == null ? null : VendorCard.fromJson(vendorJson),
     );
   }
@@ -256,5 +280,6 @@ class _Project {
   final String status;
   final String phone;
   final String whatsapp;
+  final int? clientId;
   final VendorCard? vendor;
 }
