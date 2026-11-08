@@ -82,6 +82,8 @@ class AppAuthTest extends TestCase
         $this->assertEquals('Fahad Studio Light', $clientBookings->json('bookings.0.counterpart'));
         $this->assertSame('01022223344', $clientBookings->json('bookings.0.phone'));
         $this->assertSame('01022223344', $clientBookings->json('bookings.0.whatsapp'));
+        $this->assertTrue($clientBookings->json('bookings.0.can_chat'));
+        $this->assertNotEmpty($clientBookings->json('bookings.0.vendor_id'));
         $this->assertContains($clientBookings->json('bookings.0.group'), ['upcoming', 'completed', 'canceled']);
         $photo = (string) $clientBookings->json('bookings.0.photo');
         $this->assertNotEmpty($photo);

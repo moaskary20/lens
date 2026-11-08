@@ -586,26 +586,16 @@ class _ClientCard extends StatelessWidget {
                 label: 'In-app chat',
                 onTap: () => _openChat(context),
               ),
-              if (item.phone?.isNotEmpty == true)
-                _BookingAction(
-                  icon: Icons.call_outlined,
-                  label: 'Call',
-                  onTap: () => _launchContact(
-                    context,
-                    ContactLaunch.tel(item.phone!),
-                    'the phone app',
-                  ),
-                ),
-              if (item.whatsapp?.isNotEmpty == true)
-                _BookingAction(
-                  icon: Icons.message_outlined,
-                  label: 'WhatsApp',
-                  onTap: () => _launchContact(
-                    context,
-                    ContactLaunch.whatsapp(item.whatsapp!),
-                    'WhatsApp',
-                  ),
-                ),
+              _BookingAction(
+                icon: Icons.call_outlined,
+                label: 'Call',
+                onTap: () => _call(context),
+              ),
+              _BookingAction(
+                icon: Icons.message_outlined,
+                label: 'WhatsApp',
+                onTap: () => _whatsapp(context),
+              ),
             ],
           ),
         ],
@@ -614,10 +604,19 @@ class _ClientCard extends StatelessWidget {
   }
 
   Future<void> _openChat(BuildContext context) async {
+    if (!item.canChat) {
+      _toast(context, 'In-app chat is unavailable right now.');
+      return;
+    }
+    final chatVendor = vendor;
+    if (item.id <= 0 || chatVendor.id <= 0) {
+      _toast(context, 'This booking chat is not ready yet.');
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => VendorChatPage(
-          vendor: vendor,
+          vendor: chatVendor,
           bookingId: item.id,
           projectName: item.displayProject,
           dateLabel: item.dateLabel,
@@ -631,10 +630,26 @@ class _ClientCard extends StatelessWidget {
     );
   }
 
-  Future<void> _launchContact(BuildContext context, Uri uri, String appName) async {
-    final opened = await ContactLaunch.open(uri);
+  Future<void> _call(BuildContext context) async {
+    if (!ContactLaunch.hasNumber(item.phone)) {
+      _toast(context, 'No phone number is available for this creator.');
+      return;
+    }
+    final opened = await ContactLaunch.open(ContactLaunch.tel(item.phone!));
     if (!opened && context.mounted) {
-      _toast(context, 'Could not open $appName.');
+      _toast(context, 'Could not open the phone app.');
+    }
+  }
+
+  Future<void> _whatsapp(BuildContext context) async {
+    final number = item.whatsapp ?? item.phone;
+    if (!ContactLaunch.hasNumber(number)) {
+      _toast(context, 'No WhatsApp number is available for this creator.');
+      return;
+    }
+    final opened = await ContactLaunch.open(ContactLaunch.whatsapp(number!));
+    if (!opened && context.mounted) {
+      _toast(context, 'Could not open WhatsApp.');
     }
   }
 
@@ -1524,17 +1539,6 @@ class _VendorCard extends StatelessWidget {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _launchContact(
-    BuildContext context,
-    Uri uri,
-    String contactMethod,
-  ) async {
-    final launched = await ContactLaunch.open(uri);
-    if (!launched && context.mounted) {
-      _toast(context, 'Could not open $contactMethod.');
-    }
-  }
-
   Future<void> _cancel(BuildContext context) async {
     Map<String, dynamic>? quote;
     if (LensConfig.useNetwork) {
@@ -1712,6 +1716,14 @@ class _VendorCard extends StatelessWidget {
   }
 
   Future<void> _openChat(BuildContext context) async {
+    if (!item.canChat) {
+      _toast(context, 'In-app chat is unavailable right now.');
+      return;
+    }
+    if (item.id <= 0 || item.clientId == null || item.clientId! <= 0) {
+      _toast(context, 'This booking chat is not ready yet.');
+      return;
+    }
     final client = _clientCard;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -1894,32 +1906,44 @@ class _VendorCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (item.clientId != null)
-                _BookingAction(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'In-app chat',
-                  onTap: () => _openChat(context),
-                ),
-              if (item.phone?.isNotEmpty == true)
-                _BookingAction(
-                  icon: Icons.call_outlined,
-                  label: 'Call',
-                  onTap: () => _launchContact(
-                    context,
+              _BookingAction(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: 'In-app chat',
+                onTap: () => _openChat(context),
+              ),
+              _BookingAction(
+                icon: Icons.call_outlined,
+                label: 'Call',
+                onTap: () async {
+                  if (!ContactLaunch.hasNumber(item.phone)) {
+                    _toast(context, 'No phone number is available for this client.');
+                    return;
+                  }
+                  final opened = await ContactLaunch.open(
                     ContactLaunch.tel(item.phone!),
-                    'the phone app',
-                  ),
-                ),
-              if (item.whatsapp?.isNotEmpty == true)
-                _BookingAction(
-                  icon: Icons.message_outlined,
-                  label: 'WhatsApp',
-                  onTap: () => _launchContact(
-                    context,
-                    ContactLaunch.whatsapp(item.whatsapp!),
-                    'WhatsApp',
-                  ),
-                ),
+                  );
+                  if (!opened && context.mounted) {
+                    _toast(context, 'Could not open the phone app.');
+                  }
+                },
+              ),
+              _BookingAction(
+                icon: Icons.message_outlined,
+                label: 'WhatsApp',
+                onTap: () async {
+                  final number = item.whatsapp ?? item.phone;
+                  if (!ContactLaunch.hasNumber(number)) {
+                    _toast(context, 'No WhatsApp number is available for this client.');
+                    return;
+                  }
+                  final opened = await ContactLaunch.open(
+                    ContactLaunch.whatsapp(number!),
+                  );
+                  if (!opened && context.mounted) {
+                    _toast(context, 'Could not open WhatsApp.');
+                  }
+                },
+              ),
               if (_canDeliver)
                 _BookingAction(
                   icon: Icons.cloud_upload_outlined,
@@ -2025,6 +2049,7 @@ class _BookingItem {
     this.vendor,
     this.phone,
     this.whatsapp,
+    this.canChat = true,
     this.dispute,
   });
 
@@ -2075,10 +2100,16 @@ class _BookingItem {
           ? json['client_id'] as int
           : int.tryParse('${json['client_id']}'),
       vendor: vendorJson == null ? null : VendorCard.fromJson(vendorJson),
-      phone: json['phone']?.toString(),
-      whatsapp: json['whatsapp']?.toString(),
+      phone: _BookingItem._contactDigits(json['phone']),
+      whatsapp: _BookingItem._contactDigits(json['whatsapp']),
+      canChat: json['can_chat'] != false,
       dispute: _BookingItem._disputeOf(json['dispute']),
     );
+  }
+
+  static String? _contactDigits(dynamic value) {
+    final digits = ContactLaunch.digits(value?.toString());
+    return digits.isEmpty ? null : digits;
   }
 
   final int id;
@@ -2114,6 +2145,7 @@ class _BookingItem {
   final VendorCard? vendor;
   final String? phone;
   final String? whatsapp;
+  final bool canChat;
   final Map<String, dynamic>? dispute;
 
   VendorCard get fallbackVendor {
@@ -2213,6 +2245,8 @@ List<_BookingItem> _demoClient() {
       role: 'Food Stylist',
       projectName: 'Yasmin Hall wedding',
       photo: VendorPhotos.shots('food_stylist', 0).first,
+      phone: '01011112233',
+      whatsapp: '01011112233',
     ),
     _BookingItem(
       id: 2,
@@ -2231,6 +2265,8 @@ List<_BookingItem> _demoClient() {
       role: 'Photographer',
       projectName: 'Brand portraits',
       photo: VendorPhotos.cover('photographer', 2),
+      phone: '01022223344',
+      whatsapp: '01022223344',
     ),
     _BookingItem(
       id: 3,
@@ -2249,6 +2285,8 @@ List<_BookingItem> _demoClient() {
       role: 'Videographer',
       projectName: 'Product film',
       photo: VendorPhotos.cover('videographer', 1),
+      phone: '01033334455',
+      whatsapp: '01033334455',
     ),
     _BookingItem(
       id: 4,
@@ -2267,6 +2305,8 @@ List<_BookingItem> _demoClient() {
       role: 'Food Stylist',
       projectName: 'Kitchen menu recap',
       photo: VendorPhotos.cover('food_stylist', 1),
+      phone: '01044445566',
+      whatsapp: '01044445566',
     ),
     _BookingItem(
       id: 5,
@@ -2285,6 +2325,8 @@ List<_BookingItem> _demoClient() {
       role: 'Food Photographer',
       projectName: 'Café launch',
       photo: VendorPhotos.cover('food_stylist', 2),
+      phone: '01055556677',
+      whatsapp: '01055556677',
     ),
   ];
 }

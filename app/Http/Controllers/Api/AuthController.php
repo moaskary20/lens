@@ -12,6 +12,7 @@ use Illuminate\Http\UploadedFile;
 use App\Support\AppClient;
 use App\Support\AppPassword;
 use App\Support\Egypt;
+use App\Support\Feature;
 use App\Support\Roles;
 use App\Support\VendorAppProfile;
 use App\Support\VendorPhotos;
@@ -461,11 +462,12 @@ class AuthController extends Controller
             'role' => $vendor?->vendorType?->name_en,
             'project_name' => $booking->project_name ?: ($booking->category?->name_en ? $booking->category->name_en.' session' : 'Creative session'),
             'phone' => $view === 'vendor'
-                ? (preg_replace('/\D+/', '', (string) ($booking->client?->phone ?? '')) ?: null)
-                : (preg_replace('/\D+/', '', (string) ($vendor?->contact_phone ?: $vendor?->whatsapp ?: $vendor?->user?->phone ?: '')) ?: null),
+                ? Egypt::normalizeMobile($booking->client?->phone)
+                : Egypt::normalizeMobile($vendor?->contact_phone ?: $vendor?->whatsapp ?: $vendor?->user?->phone),
             'whatsapp' => $view === 'vendor'
-                ? (preg_replace('/\D+/', '', (string) ($booking->client?->phone ?? '')) ?: null)
-                : (preg_replace('/\D+/', '', (string) ($vendor?->whatsapp ?: $vendor?->contact_phone ?: $vendor?->user?->phone ?: '')) ?: null),
+                ? Egypt::normalizeMobile($booking->client?->phone)
+                : Egypt::normalizeMobile($vendor?->whatsapp ?: $vendor?->contact_phone ?: $vendor?->user?->phone),
+            'can_chat' => Feature::enabled('chat'),
             'vendor_id' => $vendor?->id,
             'client_id' => $view === 'vendor' ? $booking->client_id : null,
             'dispute' => $booking->dispute?->toApp(),
