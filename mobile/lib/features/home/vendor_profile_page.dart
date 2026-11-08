@@ -55,6 +55,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   List<_ReviewItem> _reviews = const [];
   late VendorCard _profile;
   var _loadedFromApi = false;
+  var _loadingProfile = false;
   String _contactPhone = '';
   String _whatsapp = '';
   final _tabScroll = ScrollController();
@@ -88,6 +89,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     _tab = 'Portfolio';
     _hydrateFromCard();
     if (LensConfig.useNetwork) {
+      _loadingProfile = true;
+      _projectsGallery = const [];
       _load();
     }
   }
@@ -144,9 +147,19 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       }
       setState(() {
         _applyApiProfile(payload);
+        _loadingProfile = false;
       });
     } catch (_) {
-      // Keep the listing snapshot when the profile API is offline.
+      if (!mounted) {
+        return;
+      }
+      // Keep the listing snapshot when the profile API is offline — never flash stock shots.
+      setState(() {
+        _loadingProfile = false;
+        if (_projectsGallery.isEmpty) {
+          _projectsGallery = const [];
+        }
+      });
     }
   }
 
@@ -205,7 +218,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
           .map((item) => _PortfolioProject.fromLegacyShot(Map<String, dynamic>.from(item)))
           .where((item) => item.coverUrl.isNotEmpty)
           .toList();
-      _projectsGallery = legacy.isNotEmpty ? legacy : _projectsFor(_profile);
+      // Prefer real portfolio/API work only — no stock placeholder swap after load.
+      _projectsGallery = legacy;
     }
     _packages = (payload['packages'] as List<dynamic>? ?? const [])
         .whereType<Map>()
@@ -950,6 +964,18 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Widget _masonry() {
+    if (_loadingProfile) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 36),
+        child: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.4, color: LensColors.primary),
+          ),
+        ),
+      );
+    }
     final items = _visibleProjects;
     if (items.isEmpty) {
       return const Padding(
