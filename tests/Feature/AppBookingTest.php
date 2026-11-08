@@ -396,4 +396,45 @@ class AppBookingTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('message', 'You can request edits after the creator delivers files.');
     }
+
+    public function test_refuse_opens_dispute_after_delivery(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+        app(\App\Services\DeliveryService::class)->upload($booking->fresh(), 'deliverables/final.jpg', 'final.jpg');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/refuse', [
+                'reason' => 'The final gallery does not match the brief.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'disputed')
+            ->assertJsonPath('message', 'Delivery refused. Admin will review the complaint.');
+
+        $booking->refresh();
+        $this->assertSame('disputed', $booking->status);
+        $this->assertNotNull($booking->dispute);
+        $this->assertSame('The final gallery does not match the brief.', $booking->dispute->reason);
+    }
+
+    public function test_refuse_requires_delivered_files_and_reason(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1003')->firstOrFail();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/refuse', [
+                'reason' => 'Too late.',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'You can refuse only after files are delivered.');
+
+        $delivered = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+        app(\App\Services\DeliveryService::class)->upload($delivered->fresh(), 'deliverables/final.jpg', 'final.jpg');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$delivered->id.'/refuse', [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['reason']);
+    }
 }

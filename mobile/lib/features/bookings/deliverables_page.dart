@@ -563,23 +563,21 @@ class _DeliverablesPageState extends State<DeliverablesPage> {
     final name = (_vendorName ?? widget.vendorName).trim().isEmpty
         ? 'this creator'
         : (_vendorName ?? widget.vendorName);
-    final ok =
-        await showDialog<bool>(
-          context: context,
-          barrierColor: const Color(0x99000000),
-          builder: (dialogContext) => _RefuseConfirm(vendorName: name),
-        ) ??
-        false;
-    if (!ok || !mounted) {
+    final reason = await showDialog<String>(
+      context: context,
+      barrierColor: const Color(0x99000000),
+      builder: (dialogContext) => _RefuseConfirm(vendorName: name),
+    );
+    if (reason == null || reason.trim().isEmpty || !mounted) {
       return;
     }
     final success = await _post(
       '/app/bookings/${widget.bookingId}/refuse',
-      {'reason': 'Client refused this delivery.'},
+      {'reason': reason.trim()},
       'Delivery refused. Admin will review the complaint.',
     );
     if (success && mounted) {
-      await _load();
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -757,10 +755,33 @@ class _WatermarkPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _RefuseConfirm extends StatelessWidget {
+class _RefuseConfirm extends StatefulWidget {
   const _RefuseConfirm({required this.vendorName});
 
   final String vendorName;
+
+  @override
+  State<_RefuseConfirm> createState() => _RefuseConfirmState();
+}
+
+class _RefuseConfirmState extends State<_RefuseConfirm> {
+  final _reason = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _reason.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = 'Add a reason before refusing.');
+      return;
+    }
+    Navigator.pop(context, text);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -773,86 +794,121 @@ class _RefuseConfirm extends StatelessWidget {
           color: const Color(0xFF141414),
           borderRadius: BorderRadius.circular(28),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: const BoxDecoration(
-                color: Color(0xFF2A1214),
-                shape: BoxShape.circle,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2A1214),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Color(0xFFFF3B30), size: 30),
               ),
-              child: const Icon(Icons.close, color: Color(0xFFFF3B30), size: 30),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Are you sure you want to refuse this project?',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                height: 1.25,
+              const SizedBox(height: 18),
+              const Text(
+                'Are you sure you want to refuse this project?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'This will decline the project from $vendorName. You can\'t undo this action.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF8E8B84),
-                fontSize: 14,
-                height: 1.4,
+              const SizedBox(height: 10),
+              Text(
+                'This will decline the project from ${widget.vendorName}. You can\'t undo this action.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF8E8B84),
+                  fontSize: 14,
+                  height: 1.4,
+                ),
               ),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 48,
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Color(0xFF3A3A3E)),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
+              const SizedBox(height: 16),
+              TextField(
+                controller: _reason,
+                maxLines: 3,
+                maxLength: 2000,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                onChanged: (_) {
+                  if (_error != null) {
+                    setState(() => _error = null);
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: 'Why are you refusing this delivery?',
+                  hintStyle: const TextStyle(color: Color(0xFF8E8B84)),
+                  counterText: '',
+                  filled: true,
+                  fillColor: const Color(0xFF1C1C1C),
+                  errorText: _error,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFF3A3A3E)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFF3A3A3E)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFFF3B30)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0xFF3A3A3E)),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: 48,
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF3B30),
-                        foregroundColor: Colors.white,
-                        shape: const StadiumBorder(),
-                      ),
-                      child: const Text(
-                        'Refuse',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: FilledButton(
+                        onPressed: _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF3B30),
+                          foregroundColor: Colors.white,
+                          shape: const StadiumBorder(),
+                        ),
+                        child: const Text(
+                          'Refuse',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

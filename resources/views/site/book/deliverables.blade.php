@@ -33,9 +33,21 @@
             </form>
         </div>
     @else
-        <div class="cta-row" style="margin-top:18px">
-            <form method="post" action="{{ route('site.bookings.approve', $booking) }}">@csrf<button class="ai-btn" type="submit">Approve delivery</button></form>
-            <form method="post" action="{{ route('site.bookings.refuse', $booking) }}">@csrf<button class="ghost-btn" type="submit" style="margin:0">Request changes</button></form>
+        <div class="site-shell-card" style="margin-top:18px">
+            <div class="cta-row" style="margin:0 0 14px">
+                <form method="post" action="{{ route('site.bookings.approve', $booking) }}">@csrf<button class="ai-btn" type="submit">Approve delivery</button></form>
+                <form method="post" action="{{ route('site.bookings.requestEdit', $booking) }}">
+                    @csrf
+                    <input type="hidden" name="change" value="Please revise the delivered files.">
+                    <button class="ghost-btn" type="submit" style="margin:0">Request edit</button>
+                </form>
+            </div>
+            <form method="post" action="{{ route('site.bookings.refuse', $booking) }}" class="site-shell-form">
+                @csrf
+                <label for="refuse-reason">Refuse delivery</label>
+                <textarea id="refuse-reason" name="reason" rows="3" required maxlength="2000" placeholder="Why are you refusing this delivery?"></textarea>
+                <button class="ghost-btn" type="submit" style="margin:0;color:#ff3b30;border-color:#ff3b30">Refuse delivery</button>
+            </form>
         </div>
     @endif
 </section>

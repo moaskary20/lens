@@ -849,6 +849,10 @@ class _ClientCard extends StatelessWidget {
           dispute: item.dispute,
         );
       case 'refuse':
+        if (!const {'delivered', 'in_revision'}.contains(item.status)) {
+          _toast(context, 'You can refuse only after files are delivered.');
+          return;
+        }
         await _promptAction(
           context,
           title: 'Refuse delivery',

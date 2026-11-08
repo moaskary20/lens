@@ -403,11 +403,18 @@ class BookingController extends Controller
 
     public function refuse(Request $request, Booking $booking): JsonResponse
     {
+        abort_unless(Feature::enabled('disputes'), 422, 'Disputes are disabled.');
         $booking = $this->ownedBooking($booking);
         Roles::abortUnlessCan(AppClient::requireUser(), 'open_disputes', 'Disputes are disabled for this role.');
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:2000'],
         ]);
+
+        if (! in_array($booking->status, ['delivered', 'in_revision'], true)) {
+            return response()->json([
+                'message' => 'You can refuse only after files are delivered.',
+            ], 422);
+        }
 
         try {
             $dispute = app(DeliveryService::class)->rejectAndDispute($booking, $booking->client_id, $data['reason']);
