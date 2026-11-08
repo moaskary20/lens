@@ -12,10 +12,14 @@ class LensAlert extends Notification
 {
     use Queueable;
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public function __construct(
         public string $title,
         public string $body,
         public string $event = 'general',
+        public array $data = [],
     ) {}
 
     /**
@@ -56,6 +60,12 @@ class LensAlert extends Notification
             ->getDatabaseMessage();
 
         $payload['event'] = $this->event;
+
+        foreach ($this->data as $key => $value) {
+            if (is_scalar($value) || $value === null) {
+                $payload[$key] = $value;
+            }
+        }
 
         return $payload;
     }

@@ -8,6 +8,7 @@ use App\Models\City;
 use App\Models\Coupon;
 use App\Models\Vendor;
 use App\Models\Dispute;
+use App\Services\BookingWorkflow;
 use App\Services\CancellationService;
 use App\Services\DeliveryService;
 use App\Services\DisputeService;
@@ -301,6 +302,53 @@ class BookingController extends Controller
         }
 
         return response()->json($this->presentCancellationQuote($booking, $actor, $quote));
+    }
+
+    public function accept(Booking $booking): JsonResponse
+    {
+        $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'receive_bookings', 'Booking actions are disabled for this role.');
+        $booking = $this->ownedVendorBooking($booking, $user);
+
+        try {
+            $updated = app(BookingWorkflow::class)->accept($booking);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'status' => $updated->status,
+            'status_label' => 'Accepted',
+            'message' => 'Request accepted. Coordinate with the client and deliver when ready.',
+        ]);
+    }
+
+    public function reject(Request $request, Booking $booking): JsonResponse
+    {
+        $user = AppClient::requireUser();
+        Roles::abortUnlessCan($user, 'receive_bookings', 'Booking actions are disabled for this role.');
+        $booking = $this->ownedVendorBooking($booking, $user);
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $updated = app(BookingWorkflow::class)->reject($booking);
+        } catch (LogicException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        if (filled($data['reason'] ?? null)) {
+            $updated->update([
+                'notes' => trim(($updated->notes ? $updated->notes."\n" : '').'Rejected: '.$data['reason']),
+            ]);
+        }
+
+        return response()->json([
+            'status' => $updated->fresh()->status,
+            'status_label' => 'Rejected',
+            'message' => 'Request declined. The client has been notified.',
+        ]);
     }
 
     public function cancelByVendor(Request $request, Booking $booking): JsonResponse

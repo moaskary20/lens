@@ -34,33 +34,42 @@ class Message extends Model
     {
         static::created(function (Message $message): void {
             $conversation = $message->conversation()->with(['client', 'vendor.user', 'booking'])->first();
-            if (! $conversation || trim((string) $message->body) === '') {
+            $bodyText = trim((string) $message->body);
+            if (! $conversation || $bodyText === '') {
                 return;
             }
 
-            $preview = \Illuminate\Support\Str::limit(trim($message->body), 80);
+            $message->loadMissing('sender');
+            $preview = \Illuminate\Support\Str::limit($bodyText, 80);
             $title = 'New message';
             $body = ($message->sender?->name ?: 'Someone').' wrote: '.$preview;
             $senderId = (int) $message->sender_id;
+            $payload = array_filter([
+                'conversation_id' => (string) $conversation->id,
+                'booking_id' => $conversation->booking_id ? (string) $conversation->booking_id : null,
+            ], fn ($value) => filled($value));
 
             if ($conversation->client && (int) $conversation->client_id !== $senderId) {
-                self::notifyRecipient($conversation->client, $title, $body);
+                self::notifyRecipient($conversation->client, $title, $body, $payload);
             }
 
             $vendorUser = $conversation->vendor?->user;
             if ($vendorUser && (int) $vendorUser->id !== $senderId) {
-                self::notifyRecipient($vendorUser, $title, $body);
+                self::notifyRecipient($vendorUser, $title, $body, $payload);
             }
         });
     }
 
-    protected static function notifyRecipient(User $user, string $title, string $body): void
+    /**
+     * @param  array<string, string>  $data
+     */
+    protected static function notifyRecipient(User $user, string $title, string $body, array $data = []): void
     {
         $settings = \App\Support\ClientPreferences::merge($user->app_settings, $user->locale ?: 'en');
         if (! ($settings['chat_alerts'] ?? true)) {
             return;
         }
 
-        \App\Support\LensNotifier::toUser($user, \App\Support\LensNotifier::MESSAGE, $title, $body);
+        \App\Support\LensNotifier::toUser($user, \App\Support\LensNotifier::MESSAGE, $title, $body, $data);
     }
 }

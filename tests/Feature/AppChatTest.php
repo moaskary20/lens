@@ -91,4 +91,42 @@ class AppChatTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('message.type', 'location');
     }
+
+    public function test_vendor_reply_notifies_the_client(): void
+    {
+        $booking = \App\Models\Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+        $client = User::query()->where('email', 'client@lens.app')->firstOrFail();
+        $before = $client->notifications()
+            ->get()
+            ->filter(fn ($n) => ($n->data['title'] ?? null) === 'New message')
+            ->count();
+
+        $opened = $this->withHeaders(['X-Lens-Client' => 'vendor@lens.app'])
+            ->postJson('/api/app/conversations', [
+                'client_id' => $booking->client_id,
+                'booking_id' => $booking->id,
+            ])
+            ->assertOk();
+
+        $this->withHeaders(['X-Lens-Client' => 'vendor@lens.app'])
+            ->postJson('/api/app/conversations/'.$opened->json('id').'/messages', [
+                'type' => 'text',
+                'body' => 'I can start editing tonight.',
+            ])
+            ->assertCreated();
+
+        $after = $client->fresh()->notifications()
+            ->get()
+            ->filter(fn ($n) => ($n->data['title'] ?? null) === 'New message');
+
+        $this->assertGreaterThan(
+            $before,
+            $after->count(),
+            'Vendor chat replies must create a New message notification for the client.',
+        );
+        $this->assertSame(
+            (string) $opened->json('id'),
+            (string) data_get($after->last()->data, 'conversation_id'),
+        );
+    }
 }

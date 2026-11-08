@@ -43,6 +43,8 @@ Route::get('app/bookings/{booking}/deliverables', [BookingController::class, 'de
 Route::post('app/bookings/{booking}/deliverables', [BookingController::class, 'uploadDelivery']);
 Route::get('app/bookings/{booking}/cancellation-quote', [BookingController::class, 'cancellationQuote']);
 Route::post('app/bookings/{booking}/cancel', [BookingController::class, 'cancelByVendor']);
+Route::post('app/bookings/{booking}/accept', [BookingController::class, 'accept']);
+Route::post('app/bookings/{booking}/reject', [BookingController::class, 'reject']);
 Route::post('app/bookings/{booking}/request-edit', [BookingController::class, 'requestEdit']);
 Route::post('app/bookings/{booking}/approve', [BookingController::class, 'approve']);
 Route::post('app/bookings/{booking}/refuse', [BookingController::class, 'refuse']);

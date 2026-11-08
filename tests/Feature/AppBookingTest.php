@@ -492,4 +492,55 @@ class AppBookingTest extends TestCase
             ->assertJsonPath('id', $booking->dispute->id)
             ->assertJsonPath('message', 'A dispute is already open for this booking.');
     }
+
+    public function test_vendor_can_accept_and_reject_incoming_requests(): void
+    {
+        $headers = ['X-Lens-Client' => 'vendor@lens.app'];
+        $pending = Booking::query()->where('reference', 'LN-1003')->firstOrFail();
+        $this->assertSame('pending', $pending->status);
+
+        $list = $this->withHeaders($headers)
+            ->getJson('/api/app/bookings')
+            ->assertOk();
+        $row = collect($list->json('bookings'))->firstWhere('id', $pending->id);
+        $this->assertNotNull($row);
+        $this->assertTrue((bool) ($row['can_accept'] ?? false));
+        $this->assertTrue((bool) ($row['can_reject'] ?? false));
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$pending->id.'/accept')
+            ->assertOk()
+            ->assertJsonPath('status', 'accepted')
+            ->assertJsonPath('status_label', 'Accepted');
+        $this->assertSame('accepted', $pending->fresh()->status);
+        $this->assertTrue(
+            User::query()->where('email', 'client@lens.app')->firstOrFail()
+                ->notifications()
+                ->get()
+                ->contains(fn ($notification) => ($notification->data['title'] ?? null) === 'Request accepted'),
+        );
+
+        $another = Booking::query()->create([
+            'reference' => 'LN-VENDOR-REJECT',
+            'client_id' => $pending->client_id,
+            'vendor_id' => $pending->vendor_id,
+            'status' => 'pending',
+            'scheduled_at' => now()->addDays(12),
+            'session_price' => 900,
+            'total_paid' => 900,
+            'escrow_status' => 'none',
+            'payout_status' => 'none',
+            'project_name' => 'Reject flow',
+            'package_type' => 'hourly',
+        ]);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$another->id.'/reject', [
+                'reason' => 'Schedule conflict that week.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'rejected');
+        $this->assertSame('rejected', $another->fresh()->status);
+        $this->assertStringContainsString('Schedule conflict', (string) $another->fresh()->notes);
+    }
 }

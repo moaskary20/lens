@@ -468,6 +468,8 @@ class AuthController extends Controller
                 ? Egypt::normalizeMobile($booking->client?->phone)
                 : Egypt::normalizeMobile($vendor?->whatsapp ?: $vendor?->contact_phone ?: $vendor?->user?->phone),
             'can_chat' => Feature::enabled('chat'),
+            'can_accept' => $view === 'vendor' && $booking->status === 'pending',
+            'can_reject' => $view === 'vendor' && $booking->status === 'pending',
             'vendor_id' => $vendor?->id,
             'client_id' => $view === 'vendor' ? $booking->client_id : null,
             'dispute' => $booking->dispute?->toApp(),

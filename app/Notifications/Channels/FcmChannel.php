@@ -25,9 +25,10 @@ class FcmChannel
             $notifiable,
             $notification->title,
             $notification->body,
-            [
-                'event' => $notification->event,
-            ],
+            array_merge(
+                ['event' => $notification->event],
+                $notification->data,
+            ),
         );
     }
 }

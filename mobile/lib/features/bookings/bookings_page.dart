@@ -38,7 +38,7 @@ class BookingsPage extends StatefulWidget {
 class _BookingsPageState extends State<BookingsPage> {
   List<_BookingItem> _items = [];
   bool _loading = false;
-  String _tab = 'upcoming';
+  late String _tab = SessionStore.instance.isVendor ? 'new' : 'upcoming';
 
   @override
   void initState() {
@@ -1400,7 +1400,12 @@ class _VendorBookings extends StatelessWidget {
                         child: Text(
                           items.isEmpty
                               ? 'No bookings yet'
-                              : 'Nothing here for now',
+                              : switch (selectedTab) {
+                                  'new' => 'No new requests',
+                                  'active' => 'Nothing in progress',
+                                  'delivered' => 'No deliveries waiting',
+                                  _ => 'Nothing in history yet',
+                                },
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -1409,13 +1414,15 @@ class _VendorBookings extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Center(
+                      Center(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 36),
+                          padding: const EdgeInsets.symmetric(horizontal: 36),
                           child: Text(
-                            'Your client requests, project files and deliveries will appear here.',
+                            selectedTab == 'new'
+                                ? 'When a client books you, accept or decline the request here — chat notifies them instantly.'
+                                : 'Your client requests, project files and deliveries will appear here.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: LensColors.slate,
                               height: 1.4,
                             ),
@@ -1757,6 +1764,104 @@ class _VendorCard extends StatelessWidget {
     }
   }
 
+  Future<void> _accept(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF191A1F),
+        title: const Text(
+          'Accept this request?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Confirm ${item.displayProject} for ${item.counterpart.isEmpty ? 'this client' : item.counterpart}.',
+          style: const TextStyle(color: Color(0xFFD0CBC3), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+    if (!context.mounted || confirmed != true) {
+      return;
+    }
+    try {
+      final result = await ApiClient().postJson(
+        '/app/bookings/${item.id}/accept',
+        const {},
+      );
+      if (!context.mounted) {
+        return;
+      }
+      _toast(context, result['message']?.toString() ?? 'Request accepted.');
+      await onReload();
+    } catch (error) {
+      if (context.mounted) {
+        _toast(context, error.toString().replaceFirst('ApiException: ', ''));
+      }
+    }
+  }
+
+  Future<void> _reject(BuildContext context) async {
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF191A1F),
+        title: const Text(
+          'Decline this request?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: reason,
+          maxLines: 3,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Optional note for your records',
+            hintStyle: TextStyle(color: LensColors.slate),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep request'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Decline'),
+          ),
+        ],
+      ),
+    );
+    final note = reason.text.trim();
+    reason.dispose();
+    if (!context.mounted || confirmed != true) {
+      return;
+    }
+    try {
+      final result = await ApiClient().postJson(
+        '/app/bookings/${item.id}/reject',
+        note.isEmpty ? const {} : {'reason': note},
+      );
+      if (!context.mounted) {
+        return;
+      }
+      _toast(context, result['message']?.toString() ?? 'Request declined.');
+      await onReload();
+    } catch (error) {
+      if (context.mounted) {
+        _toast(context, error.toString().replaceFirst('ApiException: ', ''));
+      }
+    }
+  }
+
   VendorCard get _clientCard {
     final name = item.counterpart.isEmpty ? 'Client' : item.counterpart;
     final parts = name
@@ -1897,7 +2002,7 @@ class _VendorCard extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(top: 9),
               child: Text(
-                'New request — contact the client to coordinate.',
+                'New request — accept to confirm, or chat with the client first.',
                 style: TextStyle(color: LensColors.slate, fontSize: 12),
               ),
             ),
@@ -1906,6 +2011,19 @@ class _VendorCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
+              if (item.canAccept)
+                _BookingAction(
+                  icon: Icons.thumb_up_alt_outlined,
+                  label: 'Accept',
+                  highlighted: true,
+                  onTap: () => _accept(context),
+                ),
+              if (item.canReject)
+                _BookingAction(
+                  icon: Icons.thumb_down_alt_outlined,
+                  label: 'Decline',
+                  onTap: () => _reject(context),
+                ),
               _BookingAction(
                 icon: Icons.chat_bubble_outline_rounded,
                 label: 'In-app chat',
@@ -1948,7 +2066,7 @@ class _VendorCard extends StatelessWidget {
                 _BookingAction(
                   icon: Icons.cloud_upload_outlined,
                   label: 'Project delivery',
-                  highlighted: true,
+                  highlighted: item.status != 'pending',
                   onTap: () => _openDelivery(context),
                 ),
               if (_canCancel)
@@ -2050,6 +2168,8 @@ class _BookingItem {
     this.phone,
     this.whatsapp,
     this.canChat = true,
+    this.canAccept = false,
+    this.canReject = false,
     this.dispute,
   });
 
@@ -2103,6 +2223,14 @@ class _BookingItem {
       phone: _BookingItem._contactDigits(json['phone']),
       whatsapp: _BookingItem._contactDigits(json['whatsapp']),
       canChat: json['can_chat'] != false,
+      canAccept: json['can_accept'] == true ||
+          (json['can_accept'] == null &&
+              status == 'pending' &&
+              json['client_id'] != null),
+      canReject: json['can_reject'] == true ||
+          (json['can_reject'] == null &&
+              status == 'pending' &&
+              json['client_id'] != null),
       dispute: _BookingItem._disputeOf(json['dispute']),
     );
   }
@@ -2146,6 +2274,8 @@ class _BookingItem {
   final String? phone;
   final String? whatsapp;
   final bool canChat;
+  final bool canAccept;
+  final bool canReject;
   final Map<String, dynamic>? dispute;
 
   VendorCard get fallbackVendor {
@@ -2348,6 +2478,11 @@ List<_BookingItem> _demoVendor() {
       total: 1980,
       counterpart: 'Sarah Bennett',
       role: 'Client',
+      clientId: 10,
+      phone: '01011112233',
+      whatsapp: '01011112233',
+      canAccept: true,
+      canReject: true,
     ),
     _BookingItem(
       id: 2,

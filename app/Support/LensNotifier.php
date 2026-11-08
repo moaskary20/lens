@@ -145,18 +145,24 @@ class LensNotifier
             ->all();
     }
 
-    public static function toUser(?User $user, string $event, string $title, string $body): void
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function toUser(?User $user, string $event, string $title, string $body, array $data = []): void
     {
         if (self::$muted || ! $user || ! Feature::enabled('notifications') || ! self::eventEnabled($event)) {
             return;
         }
 
-        $user->notify(new LensAlert($title, $body, $event));
+        $user->notify(new LensAlert($title, $body, $event, $data));
     }
 
-    public static function vendor(?Vendor $vendor, string $event, string $title, string $body): void
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function vendor(?Vendor $vendor, string $event, string $title, string $body, array $data = []): void
     {
-        self::toUser($vendor?->user, $event, $title, $body);
+        self::toUser($vendor?->user, $event, $title, $body, $data);
     }
 
     public static function staff(string $event, string $title, string $body, ?int $exceptUserId = null): void
