@@ -187,14 +187,24 @@ class AppBookingTest extends TestCase
             ->assertJsonFragment(['project_name' => 'Yasmin Hall wedding'])
             ->assertJsonFragment(['project_name' => 'Zamalek rooftop session']);
 
-        $this->withHeaders($headers)
+        $deliverables = $this->withHeaders($headers)
             ->getJson('/api/app/bookings/'.$booking->id.'/deliverables')
             ->assertOk()
             ->assertJsonPath('project_name', 'Yasmin Hall wedding')
             ->assertJsonPath('deliverables.0.name', 'final.jpg')
             ->assertJsonPath('total', 1980)
             ->assertJsonPath('watermarked', true)
-            ->assertJsonPath('preview.watermark_text', 'Lens Protected');
+            ->assertJsonPath('preview.watermark_text', 'Lens Protected')
+            ->assertJsonPath('can_request_edit', true)
+            ->assertJsonPath('can_approve', true)
+            ->assertJsonPath('can_refuse', true);
+
+        $fileUrl = (string) $deliverables->json('deliverables.0.url');
+        $this->assertNotEmpty($fileUrl);
+        $this->assertTrue(str_starts_with($fileUrl, 'http://') || str_starts_with($fileUrl, 'https://'));
+        $vendorPhoto = (string) $deliverables->json('vendor_photo');
+        $this->assertNotEmpty($vendorPhoto);
+        $this->assertTrue(str_starts_with($vendorPhoto, 'http://') || str_starts_with($vendorPhoto, 'https://'));
 
         $this->withHeaders($headers)
             ->postJson('/api/app/bookings/'.$booking->id.'/request-edit', [

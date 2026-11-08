@@ -19,6 +19,8 @@ use App\Support\Roles;
 use App\Support\Finance;
 use App\Support\StorageQuota;
 use App\Support\Travel;
+use App\Support\VendorAppProfile;
+use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -211,17 +213,24 @@ class BookingController extends Controller
                 ]);
         }
 
+        $slug = $vendor?->vendorType?->slug ?? 'photographer';
+        $vendorId = (int) ($vendor?->id ?? 1);
+
         return response()->json([
             'project_name' => $booking->project_name ?: 'Session files',
             'vendor_name' => $vendor?->display_name,
             'vendor_type' => $vendor?->vendorType?->name_en,
-            'vendor_type_slug' => $vendor?->vendorType?->slug,
-            'vendor_photo' => $this->publicFile($vendor?->profile_photo),
+            'vendor_type_slug' => $slug,
+            'vendor_photo' => VendorAppProfile::publicUrl($vendor?->profile_photo)
+                ?: VendorPhotos::portrait($slug, $vendorId),
             'date_label' => $booking->scheduled_at?->format('M j, Y'),
             'total' => (float) ($booking->total_paid ?: $booking->session_price ?: 0),
             'status' => $booking->status,
             'watermark_text' => $state['watermark_text'],
             'watermarked' => $watermarked,
+            'can_request_edit' => in_array($booking->status, ['delivered', 'in_revision'], true),
+            'can_approve' => in_array($booking->status, ['delivered', 'in_revision', 'checked_in'], true),
+            'can_refuse' => in_array($booking->status, ['delivered', 'in_revision'], true),
             'preview' => $state,
             'deliverables' => $files->values()->all(),
         ]);
@@ -686,7 +695,12 @@ class BookingController extends Controller
             return $path;
         }
 
-        return asset('storage/'.$path);
+        $relative = ltrim(str_replace('\\', '/', $path), '/');
+        if (str_starts_with($relative, 'storage/')) {
+            $relative = substr($relative, strlen('storage/'));
+        }
+
+        return asset('storage/'.$relative);
     }
 
     protected function previewFileName(?string $title, int $index): string
