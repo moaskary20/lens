@@ -112,12 +112,18 @@
                                 @if($role === 'vendor')
                                     <form method="post" action="{{ route('site.bookings.cancel', $booking['id']) }}">@csrf<button class="ghost-btn" type="submit" style="margin:0">Cancel</button></form>
                                 @endif
-                                <form method="post" action="{{ route('site.bookings.dispute', $booking['id']) }}">
-                                    @csrf
-                                    <input type="hidden" name="kind" value="dispute">
-                                    <input type="hidden" name="reason" value="Issue reported from website bookings">
-                                    <button class="ghost-btn" type="submit" style="margin:0">Dispute</button>
-                                </form>
+                                @if(! in_array($booking['status'] ?? '', ['cancelled', 'failed', 'refunded', 'approved', 'completed'], true))
+                                    <details class="booking-dispute-form">
+                                        <summary class="ghost-btn" style="margin:0;cursor:pointer;list-style:none">Open dispute</summary>
+                                        <form method="post" action="{{ route('site.bookings.dispute', $booking['id']) }}" class="site-shell-form" style="margin-top:10px;min-width:220px">
+                                            @csrf
+                                            <input type="hidden" name="kind" value="dispute">
+                                            <label for="dispute-reason-{{ $booking['id'] }}">What happened?</label>
+                                            <textarea id="dispute-reason-{{ $booking['id'] }}" name="reason" rows="3" required maxlength="2000" placeholder="Describe the issue for Lens support"></textarea>
+                                            <button class="ghost-btn" type="submit" style="margin:0;color:#ff5a1f;border-color:#ff5a1f">Send dispute</button>
+                                        </form>
+                                    </details>
+                                @endif
                             </div>
                         </div>
                     </article>

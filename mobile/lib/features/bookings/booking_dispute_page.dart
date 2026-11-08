@@ -3,6 +3,7 @@ import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 
 Future<bool> openBookingDispute(
   BuildContext context, {
@@ -21,25 +22,36 @@ Future<bool> openBookingDispute(
     PageRouteBuilder<bool>(
       transitionDuration: const Duration(milliseconds: 560),
       reverseTransitionDuration: const Duration(milliseconds: 340),
-      pageBuilder: (context, animation, secondaryAnimation) => BookingDisputePage(
-        bookingId: bookingId,
-        reference: reference,
-        vendorName: vendorName,
-        vendorRole: vendorRole,
-        projectName: projectName,
-        dateLabel: dateLabel,
-        total: total,
-        photo: photo,
-        status: status,
-        dispute: dispute,
-      ),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          BookingDisputePage(
+            bookingId: bookingId,
+            reference: reference,
+            vendorName: vendorName,
+            vendorRole: vendorRole,
+            projectName: projectName,
+            dateLabel: dateLabel,
+            total: total,
+            photo: photo,
+            status: status,
+            dispute: dispute,
+          ),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
         return FadeTransition(
           opacity: curved,
           child: SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(curved),
-            child: ScaleTransition(scale: Tween<double>(begin: 0.96, end: 1).animate(curved), child: child),
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.06),
+              end: Offset.zero,
+            ).animate(curved),
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
+              child: child,
+            ),
           ),
         );
       },
@@ -78,10 +90,21 @@ class BookingDisputePage extends StatefulWidget {
   State<BookingDisputePage> createState() => _BookingDisputePageState();
 }
 
-class _BookingDisputePageState extends State<BookingDisputePage> with TickerProviderStateMixin {
+class _BookingDisputePageState extends State<BookingDisputePage>
+    with TickerProviderStateMixin {
   static const _kinds = [
-    ('dispute', Icons.gavel_rounded, 'Dispute', 'Hold escrow until admin decides.'),
-    ('complaint', Icons.report_gmailerrorred_outlined, 'Complaint', 'Flag the session for staff review.'),
+    (
+      'dispute',
+      Icons.gavel_rounded,
+      'Dispute',
+      'Hold escrow until admin decides.',
+    ),
+    (
+      'complaint',
+      Icons.report_gmailerrorred_outlined,
+      'Complaint',
+      'Flag the session for staff review.',
+    ),
   ];
   static const _reasons = [
     (Icons.high_quality_outlined, 'Delivery quality'),
@@ -99,19 +122,41 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
   String _kind = 'dispute';
   String? _reason;
   bool _sending = false;
+  bool _loadingExisting = false;
   String? _error;
   Map<String, dynamic>? _opened;
   bool _justOpened = false;
 
-  bool get _live => LensConfig.useNetwork && SessionStore.instance.isClient;
-  bool get _closedSession => const {'cancelled', 'failed', 'refunded', 'approved', 'completed'}.contains(widget.status);
-  bool get _canSend => !_sending && !_closedSession && _opened == null && _reason != null && _details.text.trim().length >= 8;
+  bool get _live =>
+      LensConfig.useNetwork &&
+      (SessionStore.instance.isClient || SessionStore.instance.isVendor);
+  bool get _closedSession => const {
+    'cancelled',
+    'failed',
+    'refunded',
+    'approved',
+    'completed',
+  }.contains(widget.status);
+  bool get _canSend =>
+      !_sending &&
+      !_loadingExisting &&
+      !_closedSession &&
+      _opened == null &&
+      widget.bookingId > 0 &&
+      _reason != null &&
+      _details.text.trim().length >= 8;
 
   @override
   void initState() {
     super.initState();
-    _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
-    _sentMotion = AnimationController(vsync: this, duration: const Duration(milliseconds: 720));
+    _enter = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+    _sentMotion = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 720),
+    );
     _opened = widget.dispute;
     if (_opened != null) {
       _sentMotion.value = 1;
@@ -121,6 +166,7 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
         setState(() {});
       }
     });
+    _refreshExisting();
   }
 
   @override
@@ -131,6 +177,52 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
     super.dispose();
   }
 
+  Future<void> _refreshExisting() async {
+    if (!_live || widget.bookingId <= 0) {
+      return;
+    }
+    if (widget.dispute == null && widget.status != 'disputed') {
+      return;
+    }
+    setState(() => _loadingExisting = true);
+    try {
+      final payload = await _api.getJson(
+        '/app/bookings/${widget.bookingId}/dispute',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _opened = payload;
+        _loadingExisting = false;
+        _sentMotion.value = 1;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _loadingExisting = false);
+    }
+  }
+
+  String? _resolveUrl(String? url) {
+    final raw = url?.trim();
+    if (raw == null || raw.isEmpty || raw.toLowerCase() == 'null') {
+      return null;
+    }
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+    final base = LensConfig.apiBaseUrl.replaceAll(RegExp(r'/api/?$'), '');
+    if (raw.startsWith('/')) {
+      return '$base$raw';
+    }
+    if (raw.startsWith('storage/')) {
+      return '$base/$raw';
+    }
+    return '$base/storage/$raw';
+  }
+
   Future<void> _send() async {
     if (!_canSend) {
       return;
@@ -139,7 +231,7 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
       _sending = true;
       _error = null;
     });
-    final reason = '$_reason. ${_details.text.trim()}';
+    final reason = '${_reason!}. ${_details.text.trim()}';
     var payload = <String, dynamic>{
       'id': widget.bookingId,
       'kind': _kind,
@@ -161,7 +253,9 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
         }
         setState(() {
           _sending = false;
-          _error = error is ApiException ? error.message : 'Could not open the dispute.';
+          _error = error is ApiException
+              ? error.message
+              : 'Could not open the dispute.';
         });
         return;
       }
@@ -189,11 +283,17 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
               children: [
                 _header(),
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 420),
-                    switchInCurve: Curves.easeOutCubic,
-                    child: _opened == null ? _form() : _status(),
-                  ),
+                  child: _loadingExisting && _opened == null
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: LensColors.primary,
+                          ),
+                        )
+                      : AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 420),
+                          switchInCurve: Curves.easeOutCubic,
+                          child: _opened == null ? _form() : _status(),
+                        ),
                 ),
               ],
             ),
@@ -211,17 +311,21 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
           IconButton(
             tooltip: 'Back',
             onPressed: () => Navigator.of(context).pop(_opened != null),
-            icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
           ),
-          const Expanded(
-            child: Text('Disputes', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-          ),
+          const Expanded(child: Center(child: BrandHeader(height: 36))),
+          const SizedBox(width: 48),
         ],
       ),
     );
   }
 
   Widget _form() {
+    final narrow = MediaQuery.sizeOf(context).width < 360;
     return Column(
       key: const ValueKey('form'),
       children: [
@@ -236,7 +340,14 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
               _Reveal(
                 animation: _enter,
                 start: 0.16,
-                child: const Text('What do you want to open?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                child: const Text(
+                  'What do you want to open?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               _Reveal(animation: _enter, start: 0.2, child: _kindsRow()),
@@ -244,7 +355,14 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
               _Reveal(
                 animation: _enter,
                 start: 0.26,
-                child: const Text('Why?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                child: const Text(
+                  'Why?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               _Reveal(animation: _enter, start: 0.3, child: _reasonWrap()),
@@ -254,12 +372,21 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
                 const SizedBox(height: 14),
                 const Text(
                   'This session is closed. Lens can no longer open a dispute on it.',
-                  style: TextStyle(color: Color(0xFFFF8A7A), fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Color(0xFFFF8A7A),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
               if (_error != null) ...[
                 const SizedBox(height: 14),
-                Text(_error!, style: const TextStyle(color: Color(0xFFFF8A7A), fontWeight: FontWeight.w700)),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    color: Color(0xFFFF8A7A),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ],
           ),
@@ -278,14 +405,32 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
               child: _sending
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Stack(
-                      alignment: Alignment.center,
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
                       children: [
-                        Text('Send to Lens support', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                        Align(alignment: Alignment.centerRight, child: Icon(Icons.chevron_right_rounded, size: 26)),
+                        Expanded(
+                          child: Text(
+                            narrow ? 'Send to support' : 'Send to Lens support',
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded, size: 26),
                       ],
                     ),
             ),
@@ -306,7 +451,13 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
           colors: [Color(0xFF2A150E), Color(0xFF120E0C)],
         ),
         border: Border.all(color: const Color(0x66FF5A1F)),
-        boxShadow: [BoxShadow(color: LensColors.primary.withValues(alpha: 0.18), blurRadius: 28, spreadRadius: -6)],
+        boxShadow: [
+          BoxShadow(
+            color: LensColors.primary.withValues(alpha: 0.18),
+            blurRadius: 28,
+            spreadRadius: -6,
+          ),
+        ],
       ),
       child: const Row(
         children: [
@@ -316,11 +467,22 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Hold escrow. Ask Lens.', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                Text(
+                  'Hold escrow. Ask Lens.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 SizedBox(height: 4),
                 Text(
                   'The case lands in admin Disputes. Money stays held until staff refund, pay, split, or close.',
-                  style: TextStyle(color: Color(0xFFB0ABA3), fontSize: 13, height: 1.35),
+                  style: TextStyle(
+                    color: Color(0xFFB0ABA3),
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -331,6 +493,7 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
   }
 
   Widget _bookingCard() {
+    final photo = _resolveUrl(widget.photo);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -345,9 +508,17 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
             child: SizedBox(
               width: 56,
               height: 56,
-              child: widget.photo == null
-                  ? const ColoredBox(color: LensColors.graphite, child: Icon(Icons.person, color: LensColors.cream))
-                  : Image.network(widget.photo!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: LensColors.graphite)),
+              child: photo == null
+                  ? const ColoredBox(
+                      color: LensColors.graphite,
+                      child: Icon(Icons.person, color: LensColors.cream),
+                    )
+                  : Image.network(
+                      photo,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const ColoredBox(color: LensColors.graphite),
+                    ),
             ),
           ),
           const SizedBox(width: 12),
@@ -355,11 +526,34 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.vendorName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                Text(
+                  widget.vendorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(widget.projectName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: LensColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+                Text(
+                  widget.projectName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: LensColors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text('${widget.reference}  ·  ${widget.dateLabel}', style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12)),
+                Text(
+                  '${widget.reference}  ·  ${widget.dateLabel}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -407,12 +601,20 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('What happened?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+        const Text(
+          'What happened?',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: _details,
           maxLines: 5,
           maxLength: 2000,
+          enabled: !_sending,
           style: const TextStyle(color: Colors.white, fontSize: 15),
           cursorColor: LensColors.primary,
           decoration: InputDecoration(
@@ -420,10 +622,25 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
             hintStyle: const TextStyle(color: Color(0xFF6F6C66)),
             filled: true,
             fillColor: const Color(0xFF161412),
-            counterStyle: const TextStyle(color: Color(0xFF6F6C66), fontSize: 11),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2A2A2E))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: LensColors.primary, width: 1.4)),
+            counterStyle: const TextStyle(
+              color: Color(0xFF6F6C66),
+              fontSize: 11,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFF2A2A2E)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: LensColors.primary,
+                width: 1.4,
+              ),
+            ),
           ),
         ),
       ],
@@ -440,8 +657,12 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
       key: const ValueKey('status'),
       animation: _sentMotion,
       builder: (context, _) {
-        final t = Curves.easeOutBack.transform(_sentMotion.value.clamp(0.0, 1.0));
-        final glow = _sentMotion.value < 0.45 ? _sentMotion.value / 0.45 : 1 - ((_sentMotion.value - 0.45) / 0.55) * 0.28;
+        final t = Curves.easeOutBack.transform(
+          _sentMotion.value.clamp(0.0, 1.0),
+        );
+        final glow = _sentMotion.value < 0.45
+            ? _sentMotion.value / 0.45
+            : 1 - ((_sentMotion.value - 0.45) / 0.55) * 0.28;
         return ListView(
           padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
           children: [
@@ -455,10 +676,23 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF14100C),
-                    border: Border.all(color: const Color(0xFFFF7A3D), width: 3),
-                    boxShadow: [BoxShadow(color: LensColors.primary.withValues(alpha: 0.55 * glow), blurRadius: 22 + 18 * glow, spreadRadius: 2)],
+                    border: Border.all(
+                      color: const Color(0xFFFF7A3D),
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: LensColors.primary.withValues(alpha: 0.55 * glow),
+                        blurRadius: 22 + 18 * glow,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.balance_rounded, color: Colors.white, size: 44),
+                  child: const Icon(
+                    Icons.balance_rounded,
+                    color: Colors.white,
+                    size: 44,
+                  ),
                 ),
               ),
             ),
@@ -466,13 +700,22 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
             Text(
               _justOpened ? 'Sent to admin.' : 'Case on file.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800, height: 1.1),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+              ),
             ),
             const SizedBox(height: 10),
             const Text(
               'Quality & Support will review booking, chat, and escrow before moving money.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFFB0ABA3), fontSize: 15, height: 1.4),
+              style: TextStyle(
+                color: Color(0xFFB0ABA3),
+                fontSize: 15,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 24),
             Container(
@@ -503,8 +746,15 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
               height: 54,
               child: FilledButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                style: FilledButton.styleFrom(backgroundColor: LensColors.primary, foregroundColor: Colors.white, shape: const StadiumBorder()),
-                child: const Text('Back to bookings', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: LensColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text(
+                  'Back to bookings',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
               ),
             ),
           ],
@@ -517,8 +767,27 @@ class _BookingDisputePageState extends State<BookingDisputePage> with TickerProv
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 78, child: Text(label, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 13, fontWeight: FontWeight.w700))),
-        Expanded(child: Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14))),
+        SizedBox(
+          width: 78,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF8E8B84),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -535,7 +804,12 @@ class _HeroMark extends StatelessWidget {
       decoration: BoxDecoration(
         color: LensColors.primary,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: LensColors.primary.withValues(alpha: 0.45), blurRadius: 16)],
+        boxShadow: [
+          BoxShadow(
+            color: LensColors.primary.withValues(alpha: 0.45),
+            blurRadius: 16,
+          ),
+        ],
       ),
       child: const Icon(Icons.balance_rounded, color: Colors.white),
     );
@@ -568,18 +842,40 @@ class _KindCard extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF3A1A10) : const Color(0xFF161412),
+            color: selected
+                ? const Color(0xFF3A1A10)
+                : const Color(0xFF161412),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: selected ? LensColors.primary : const Color(0xFF2A2A2E), width: selected ? 1.4 : 1),
+            border: Border.all(
+              color: selected ? LensColors.primary : const Color(0xFF2A2A2E),
+              width: selected ? 1.4 : 1,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: selected ? LensColors.primary : const Color(0xFFD0CBC3)),
+              Icon(
+                icon,
+                color: selected ? LensColors.primary : const Color(0xFFD0CBC3),
+              ),
               const SizedBox(height: 10),
-              Text(title, style: TextStyle(color: selected ? Colors.white : const Color(0xFFD0CBC3), fontWeight: FontWeight.w800, fontSize: 14)),
+              Text(
+                title,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFD0CBC3),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(subtitle, style: const TextStyle(color: Color(0xFF8E8B84), fontSize: 11.5, height: 1.3)),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF8E8B84),
+                  fontSize: 11.5,
+                  height: 1.3,
+                ),
+              ),
             ],
           ),
         ),
@@ -589,7 +885,12 @@ class _KindCard extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({required this.icon, required this.label, required this.selected, required this.onTap});
+  const _Chip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -607,16 +908,31 @@ class _Chip extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF3A1A10) : const Color(0xFF161412),
+            color: selected
+                ? const Color(0xFF3A1A10)
+                : const Color(0xFF161412),
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: selected ? LensColors.primary : const Color(0xFF2A2A2E)),
+            border: Border.all(
+              color: selected ? LensColors.primary : const Color(0xFF2A2A2E),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: selected ? LensColors.primary : const Color(0xFFD0CBC3)),
+              Icon(
+                icon,
+                size: 16,
+                color: selected ? LensColors.primary : const Color(0xFFD0CBC3),
+              ),
               const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: selected ? Colors.white : const Color(0xFFD0CBC3), fontWeight: FontWeight.w700, fontSize: 12.5)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFD0CBC3),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
             ],
           ),
         ),
@@ -626,7 +942,11 @@ class _Chip extends StatelessWidget {
 }
 
 class _Reveal extends StatelessWidget {
-  const _Reveal({required this.animation, required this.start, required this.child});
+  const _Reveal({
+    required this.animation,
+    required this.start,
+    required this.child,
+  });
 
   final Animation<double> animation;
   final double start;
@@ -636,12 +956,19 @@ class _Reveal extends StatelessWidget {
   Widget build(BuildContext context) {
     final curved = CurvedAnimation(
       parent: animation,
-      curve: Interval(start.clamp(0, 0.75), (start + 0.34).clamp(0.2, 1), curve: Curves.easeOutCubic),
+      curve: Interval(
+        start.clamp(0, 0.75),
+        (start + 0.34).clamp(0.2, 1),
+        curve: Curves.easeOutCubic,
+      ),
     );
     return FadeTransition(
       opacity: curved,
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(curved),
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.08),
+          end: Offset.zero,
+        ).animate(curved),
         child: child,
       ),
     );
@@ -656,9 +983,21 @@ class _AmbientGlow extends StatelessWidget {
     return const IgnorePointer(
       child: Stack(
         children: [
-          Positioned(top: -70, right: -40, child: _Blob(size: 220, color: Color(0x33FF5A1F))),
-          Positioned(top: 280, left: -90, child: _Blob(size: 180, color: Color(0x18FF5A1F))),
-          Positioned(bottom: 60, right: -70, child: _Blob(size: 160, color: Color(0x14FF5A1F))),
+          Positioned(
+            top: -70,
+            right: -40,
+            child: _Blob(size: 220, color: Color(0x33FF5A1F)),
+          ),
+          Positioned(
+            top: 280,
+            left: -90,
+            child: _Blob(size: 180, color: Color(0x18FF5A1F)),
+          ),
+          Positioned(
+            bottom: 60,
+            right: -70,
+            child: _Blob(size: 160, color: Color(0x14FF5A1F)),
+          ),
         ],
       ),
     );

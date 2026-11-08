@@ -475,6 +475,10 @@ class BookingController extends Controller
             'reason' => ['required', 'string', 'max:2000'],
         ]);
 
+        $hadOpenCase = $booking->dispute()
+            ->whereIn('status', ['open', 'reviewing'])
+            ->exists();
+
         try {
             $dispute = app(DisputeService::class)->open(
                 $booking,
@@ -488,8 +492,10 @@ class BookingController extends Controller
 
         return response()->json([
             ...$dispute->toApp(),
-            'message' => 'Dispute opened. Escrow stays held until Lens support decides.',
-        ], 201);
+            'message' => $hadOpenCase
+                ? 'A dispute is already open for this booking.'
+                : 'Dispute opened. Escrow stays held until Lens support decides.',
+        ], $hadOpenCase ? 200 : 201);
     }
 
     protected function ownedBooking(Booking $booking): Booking

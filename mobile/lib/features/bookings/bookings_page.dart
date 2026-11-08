@@ -835,7 +835,7 @@ class _ClientCard extends StatelessWidget {
           );
         }
       case 'dispute':
-        await openBookingDispute(
+        final disputed = await openBookingDispute(
           context,
           bookingId: item.id,
           reference: item.reference,
@@ -848,6 +848,9 @@ class _ClientCard extends StatelessWidget {
           status: item.status,
           dispute: item.dispute,
         );
+        if (disputed) {
+          onReload?.call();
+        }
       case 'refuse':
         if (!const {'delivered', 'in_revision'}.contains(item.status)) {
           _toast(context, 'You can refuse only after files are delivered.');

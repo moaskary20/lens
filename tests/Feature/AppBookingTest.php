@@ -437,4 +437,41 @@ class AppBookingTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['reason']);
     }
+
+    public function test_client_can_open_and_view_dispute(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
+        app(\App\Services\DeliveryService::class)->upload($booking->fresh(), 'deliverables/final.jpg', 'final.jpg');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/dispute', [
+                'kind' => 'dispute',
+                'reason' => 'Delivery quality. Shadows are too harsh on the cake.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('kind', 'dispute')
+            ->assertJsonPath('status', 'open')
+            ->assertJsonPath('message', 'Dispute opened. Escrow stays held until Lens support decides.');
+
+        $booking->refresh();
+        $this->assertSame('disputed', $booking->status);
+        $this->assertNotNull($booking->dispute);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/app/bookings/'.$booking->id.'/dispute')
+            ->assertOk()
+            ->assertJsonPath('id', $booking->dispute->id)
+            ->assertJsonPath('kind_label', 'Dispute')
+            ->assertJsonPath('status_label', 'Open');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/dispute', [
+                'kind' => 'complaint',
+                'reason' => 'Second note should reuse the open case.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('id', $booking->dispute->id)
+            ->assertJsonPath('message', 'A dispute is already open for this booking.');
+    }
 }
