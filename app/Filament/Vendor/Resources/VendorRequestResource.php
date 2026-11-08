@@ -84,6 +84,8 @@ class VendorRequestResource extends Resource
                 TextColumn::make('reference')->label('Reference')->searchable(),
                 TextColumn::make('client.name')->label('Client')->searchable(),
                 TextColumn::make('project_name')->label('Project')->limit(24)->toggleable(),
+                TextColumn::make('project_type')->label('Type')->toggleable(),
+                TextColumn::make('client_brief')->label('Brief')->limit(36)->wrap()->toggleable(),
                 TextColumn::make('package_type')->label('Package')->formatStateUsing(fn (?string $state): string => str_replace('_', ' ', $state ?? '—')),
                 TextColumn::make('location_text')->label('Location')->limit(22)->toggleable(),
                 TextColumn::make('scheduled_at')->label('When')->dateTime('Y-m-d H:i'),
@@ -106,6 +108,13 @@ class VendorRequestResource extends Resource
                 ]),
             ])
             ->recordActions([
+                Action::make('viewBrief')
+                    ->label('View request')
+                    ->icon(Heroicon::OutlinedDocumentText)
+                    ->modalHeading(fn (Booking $record): string => $record->project_name ?: $record->reference)
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalContent(fn (Booking $record) => view('filament.vendor.booking-brief', ['booking' => $record])),
                 Action::make('accept')
                     ->label('Accept')
                     ->icon(Heroicon::OutlinedHandThumbUp)

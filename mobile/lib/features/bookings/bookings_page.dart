@@ -1764,6 +1764,133 @@ class _VendorCard extends StatelessWidget {
     }
   }
 
+  Future<void> _openRequestDetails(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF141518),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        final details = item.projectDetails.entries.toList();
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              14,
+              20,
+              20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3A3D45),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    item.displayProject,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.reference,
+                    style: const TextStyle(
+                      color: LensColors.slate,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _RequestDetailBlock(
+                    label: 'Client',
+                    value: item.counterpart.isEmpty ? 'Client' : item.counterpart,
+                  ),
+                  if (item.projectType.trim().isNotEmpty)
+                    _RequestDetailBlock(
+                      label: 'Project type',
+                      value: item.projectType,
+                    ),
+                  _RequestDetailBlock(
+                    label: 'Client brief',
+                    value: item.clientBrief.trim().isEmpty
+                        ? 'No brief was added.'
+                        : item.clientBrief,
+                  ),
+                  if (details.isNotEmpty) ...[
+                    const Text(
+                      'Project details',
+                      style: TextStyle(
+                        color: LensColors.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...details.map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          '${entry.key}: ${entry.value}',
+                          style: const TextStyle(
+                            color: Color(0xFFD0CBC3),
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  if (item.package.trim().isNotEmpty)
+                    _RequestDetailBlock(
+                      label: 'Package',
+                      value: item.durationHours != null
+                          ? '${item.package} · ${item.durationHours!.toStringAsFixed(item.durationHours! % 1 == 0 ? 0 : 1)} hours'
+                          : item.package,
+                    ),
+                  if (item.when.trim().isNotEmpty)
+                    _RequestDetailBlock(label: 'When', value: item.when),
+                  if (item.location.trim().isNotEmpty)
+                    _RequestDetailBlock(label: 'Location', value: item.location),
+                  if (item.total > 0)
+                    _RequestDetailBlock(
+                      label: 'Total',
+                      value: 'EGP ${item.total.toStringAsFixed(0)}',
+                    ),
+                  if (item.notes.trim().isNotEmpty)
+                    _RequestDetailBlock(
+                      label: 'Notes / moodboard',
+                      value: item.notes,
+                    ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _accept(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2011,11 +2138,18 @@ class _VendorCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
+              if (item.hasRequestDetails)
+                _BookingAction(
+                  icon: Icons.description_outlined,
+                  label: 'View request',
+                  highlighted: true,
+                  onTap: () => _openRequestDetails(context),
+                ),
               if (item.canAccept)
                 _BookingAction(
                   icon: Icons.thumb_up_alt_outlined,
                   label: 'Accept',
-                  highlighted: true,
+                  highlighted: !item.hasRequestDetails,
                   onTap: () => _accept(context),
                 ),
               if (item.canReject)
@@ -2082,6 +2216,42 @@ class _VendorCard extends StatelessWidget {
                   onTap: () => _complain(context),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestDetailBlock extends StatelessWidget {
+  const _RequestDetailBlock({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: LensColors.primary,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFFD0CBC3),
+              height: 1.45,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -2170,6 +2340,11 @@ class _BookingItem {
     this.canChat = true,
     this.canAccept = false,
     this.canReject = false,
+    this.projectType = '',
+    this.clientBrief = '',
+    this.notes = '',
+    this.durationHours,
+    this.projectDetails = const {},
     this.dispute,
   });
 
@@ -2231,8 +2406,34 @@ class _BookingItem {
           (json['can_reject'] == null &&
               status == 'pending' &&
               json['client_id'] != null),
+      projectType: json['project_type']?.toString() ?? '',
+      clientBrief: json['client_brief']?.toString() ?? '',
+      notes: json['notes']?.toString() ?? '',
+      durationHours: json['duration_hours'] is num
+          ? (json['duration_hours'] as num).toDouble()
+          : double.tryParse('${json['duration_hours']}'),
+      projectDetails: _BookingItem._detailsOf(json['project_details']),
       dispute: _BookingItem._disputeOf(json['dispute']),
     );
+  }
+
+  static Map<String, String> _detailsOf(dynamic raw) {
+    if (raw is! Map) {
+      return const {};
+    }
+    final out = <String, String>{};
+    raw.forEach((key, value) {
+      final label = key.toString().trim();
+      if (label.isEmpty || value == null) {
+        return;
+      }
+      final text = value.toString().trim();
+      if (text.isEmpty || text.toLowerCase() == 'null') {
+        return;
+      }
+      out[label.replaceAll('_', ' ')] = text;
+    });
+    return out;
   }
 
   static String? _contactDigits(dynamic value) {
@@ -2276,7 +2477,20 @@ class _BookingItem {
   final bool canChat;
   final bool canAccept;
   final bool canReject;
+  final String projectType;
+  final String clientBrief;
+  final String notes;
+  final double? durationHours;
+  final Map<String, String> projectDetails;
   final Map<String, dynamic>? dispute;
+
+  bool get hasRequestDetails =>
+      clientBrief.trim().isNotEmpty ||
+      projectType.trim().isNotEmpty ||
+      notes.trim().isNotEmpty ||
+      projectDetails.isNotEmpty ||
+      package.trim().isNotEmpty ||
+      location.trim().isNotEmpty;
 
   VendorCard get fallbackVendor {
     final name = counterpart.isEmpty ? 'Creator' : counterpart;
@@ -2483,6 +2697,14 @@ List<_BookingItem> _demoVendor() {
       whatsapp: '01011112233',
       canAccept: true,
       canReject: true,
+      projectType: 'Weddings & Parties',
+      clientBrief:
+          'Rooftop couple portraits at golden hour. Soft natural light, 40 edited photos.',
+      projectDetails: const {
+        'style': 'Natural light',
+        'deliverables': '40 edited photos',
+      },
+      durationHours: 6,
     ),
     _BookingItem(
       id: 2,

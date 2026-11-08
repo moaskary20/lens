@@ -289,11 +289,22 @@ class AppBookingTest extends TestCase
         $headers = ['X-Lens-Client' => 'vendor@lens.app'];
         $booking = Booking::query()->where('reference', 'LN-1001')->firstOrFail();
 
-        $this->withHeaders($headers)
+        $booking->update([
+            'client_brief' => 'Wedding recap at Yasmin Hall with soft light portraits.',
+            'project_type' => 'Weddings & Parties',
+            'project_details' => ['style' => 'Natural light', 'shots' => '50 edited'],
+        ]);
+
+        $list = $this->withHeaders($headers)
             ->getJson('/api/app/bookings')
-            ->assertOk()
-            ->assertJsonPath('bookings.0.client_id', $booking->client_id)
-            ->assertJsonPath('bookings.0.phone', '01011112233');
+            ->assertOk();
+        $row = collect($list->json('bookings'))->firstWhere('id', $booking->id);
+        $this->assertNotNull($row);
+        $this->assertSame($booking->client_id, $row['client_id'] ?? null);
+        $this->assertSame('01011112233', $row['phone'] ?? null);
+        $this->assertSame('Wedding recap at Yasmin Hall with soft light portraits.', $row['client_brief'] ?? null);
+        $this->assertSame('Weddings & Parties', $row['project_type'] ?? null);
+        $this->assertSame('Natural light', data_get($row, 'project_details.style'));
 
         $chat = $this->withHeaders($headers)
             ->postJson('/api/app/conversations', [
