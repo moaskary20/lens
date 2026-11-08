@@ -415,8 +415,10 @@ class _ClientCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = item.badgeColors;
+    final narrow = MediaQuery.sizeOf(context).width < 380;
+    final photoSize = narrow ? 64.0 : 76.0;
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(narrow ? 12 : 14),
       decoration: BoxDecoration(
         color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(22),
@@ -431,9 +433,10 @@ class _ClientCard extends StatelessWidget {
                 onTap: () => _openVendor(context),
                 child: _VendorPhoto(
                   url: item.photo ?? vendor.profilePhotoUrl ?? vendor.coverUrl,
+                  size: photoSize,
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: narrow ? 10 : 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,18 +450,19 @@ class _ClientCard extends StatelessWidget {
                               item.counterpart,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
-                                fontSize: 16,
+                                fontSize: narrow ? 15 : 16,
                               ),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
+                            horizontal: 8,
+                            vertical: 3,
                           ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(99),
@@ -466,17 +470,21 @@ class _ClientCard extends StatelessWidget {
                           ),
                           child: Text(
                             item.badge,
+                            maxLines: 1,
                             style: TextStyle(
                               color: colors.$1,
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 2),
                         PopupMenuButton<String>(
                           tooltip: 'Booking actions',
                           padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
                           color: const Color(0xFF1A1A1A),
                           icon: const Icon(
                             Icons.more_horiz,
@@ -531,37 +539,23 @@ class _ClientCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         item.role,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF8E8B84),
-                          fontSize: 13,
+                          fontSize: 12,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              _meta(
-                                Icons.calendar_today_outlined,
-                                item.dateLabel,
-                              ),
-                              _meta(Icons.access_time_rounded, item.timeLabel),
-                              _meta(Icons.location_on_outlined, item.location),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _action(context, item),
-                      ],
-                    ),
                   ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          _meta(Icons.calendar_today_outlined, item.dateLabel),
+          _meta(Icons.access_time_rounded, item.timeLabel),
+          _meta(Icons.location_on_outlined, item.location),
           const SizedBox(height: 10),
           GestureDetector(
             onTap: () => _openProject(context),
@@ -576,6 +570,11 @@ class _ClientCard extends StatelessWidget {
                 height: 1.25,
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _action(context, item),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -644,7 +643,7 @@ class _ClientCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
           Icon(icon, color: const Color(0xFF8E8B84), size: 15),
@@ -652,7 +651,14 @@ class _ClientCard extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: Color(0xFFD0CBC3), fontSize: 13),
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFD0CBC3),
+                fontSize: 13,
+                height: 1.2,
+              ),
             ),
           ),
         ],
@@ -662,6 +668,7 @@ class _ClientCard extends StatelessWidget {
 
   Widget _action(BuildContext context, _BookingItem item) {
     final cancel = item.group == 'upcoming' && _canCancelStatus(item.status);
+    final narrow = MediaQuery.sizeOf(context).width < 380;
     return OutlinedButton.icon(
       onPressed: () {
         if (cancel) {
@@ -675,7 +682,9 @@ class _ClientCard extends StatelessWidget {
         size: 16,
       ),
       label: Text(
-        cancel ? 'Cancel Booking' : 'View Details',
+        cancel
+            ? (narrow ? 'Cancel' : 'Cancel Booking')
+            : (narrow ? 'Details' : 'View Details'),
         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
       ),
       style: OutlinedButton.styleFrom(
@@ -954,24 +963,44 @@ class _ClientCard extends StatelessWidget {
 }
 
 class _VendorPhoto extends StatelessWidget {
-  const _VendorPhoto({this.url});
+  const _VendorPhoto({this.url, this.size = 76});
 
   final String? url;
+  final double size;
+
+  String? get _resolved {
+    final raw = url?.trim();
+    if (raw == null || raw.isEmpty || raw.toLowerCase() == 'null') {
+      return null;
+    }
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+    final base = LensConfig.apiBaseUrl.replaceAll(RegExp(r'/api/?$'), '');
+    if (raw.startsWith('/')) {
+      return '$base$raw';
+    }
+    if (raw.startsWith('storage/')) {
+      return '$base/$raw';
+    }
+    return '$base/storage/$raw';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final resolved = _resolved;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: SizedBox(
-        width: 96,
-        height: 96,
-        child: url == null
+        width: size,
+        height: size,
+        child: resolved == null
             ? const ColoredBox(
                 color: LensColors.graphite,
                 child: Icon(Icons.person, color: LensColors.cream),
               )
             : Image.network(
-                url!,
+                resolved,
                 fit: BoxFit.cover,
                 alignment: Alignment.center,
                 filterQuality: FilterQuality.high,
