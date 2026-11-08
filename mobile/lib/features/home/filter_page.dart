@@ -1838,21 +1838,15 @@ class _FilterPageState extends State<FilterPage> {
             overlayColor: LensColors.primary.withValues(alpha: 0.18),
             rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 10),
             rangeTrackShape: const RoundedRectRangeSliderTrackShape(),
-            rangeValueIndicatorShape: const PaddleRangeSliderValueIndicatorShape(),
-            showValueIndicator: ShowValueIndicator.alwaysVisible,
-            valueIndicatorColor: LensColors.primary,
-            valueIndicatorTextStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+            // Custom labels already render above the track; always-visible paddles
+            // leak as orange dots at the top of the screen on this filter page.
+            showValueIndicator: ShowValueIndicator.never,
             trackHeight: 4,
           ),
           child: RangeSlider(
             min: min,
             max: max,
             divisions: divisions,
-            labels: RangeLabels(startLabel, endLabel),
             values: safe,
             onChanged: (next) {
               onChanged(_clampRange(next, min, max));
