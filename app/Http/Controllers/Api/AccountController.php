@@ -21,6 +21,7 @@ use App\Support\Feature;
 use App\Support\Finance;
 use App\Support\Roles;
 use App\Support\VendorAppProfile;
+use App\Support\VendorPhotos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -532,8 +533,10 @@ class AccountController extends Controller
                 'rating_avg' => (float) ($vendor?->rating_avg ?: 0),
                 'rating_count' => (int) ($vendor?->rating_count ?: 0),
                 'badges' => [],
-                'cover_url' => $vendor?->cover_image,
-                'profile_photo_url' => $vendor?->profile_photo,
+                'cover_url' => VendorAppProfile::publicUrl($vendor?->cover_image)
+                    ?: VendorPhotos::cover($vendor?->vendorType?->slug ?? 'photographer', (int) ($vendor?->id ?? 1)),
+                'profile_photo_url' => VendorAppProfile::publicUrl($vendor?->profile_photo)
+                    ?: VendorPhotos::portrait($vendor?->vendorType?->slug ?? 'photographer', (int) ($vendor?->id ?? 1)),
                 'initials' => mb_strtoupper(mb_substr((string) $vendor?->display_name, 0, 1)),
                 'tags' => [],
                 'verified' => $vendor?->verification_status === 'verified',

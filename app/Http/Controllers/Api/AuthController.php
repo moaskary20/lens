@@ -417,12 +417,14 @@ class AuthController extends Controller
     {
         $vendor = $booking->vendor;
         $slug = $vendor?->vendorType?->slug ?? 'photographer';
+        $vendorId = (int) ($vendor?->id ?? 1);
         $counterpart = $view === 'vendor'
             ? ($booking->client?->name ?: 'Client')
             : ($vendor?->display_name ?: 'Creator');
-        $photo = $view === 'vendor'
-            ? null
-            : ($vendor?->profile_photo ?: VendorPhotos::cover($slug, (int) ($vendor?->id ?? 1)));
+        $profileUrl = VendorAppProfile::publicUrl($vendor?->profile_photo)
+            ?: VendorPhotos::portrait($slug, $vendorId);
+        $coverUrl = VendorAppProfile::publicUrl($vendor?->cover_image)
+            ?: VendorPhotos::cover($slug, $vendorId);
         $start = $booking->scheduled_at?->timezone(config('app.timezone'));
         $end = $start?->copy()->addHours($booking->durationHours());
         $group = match ($booking->status) {
@@ -454,7 +456,7 @@ class AuthController extends Controller
             'location' => $booking->location_text ?: ($vendor?->city?->name_en ? $vendor->city->name_en.', Egypt' : 'Egypt'),
             'total' => (float) ($booking->total_paid ?: $booking->session_price ?: 0),
             'counterpart' => $counterpart,
-            'photo' => $view === 'vendor' ? $booking->client?->avatarUrl() : $photo,
+            'photo' => $view === 'vendor' ? $booking->client?->avatarUrl() : $profileUrl,
             'vendor_type' => $vendor?->vendorType?->name_en,
             'role' => $vendor?->vendorType?->name_en,
             'project_name' => $booking->project_name ?: ($booking->category?->name_en ? $booking->category->name_en.' session' : 'Creative session'),
@@ -477,8 +479,8 @@ class AuthController extends Controller
                 'rating_avg' => (float) ($vendor?->rating_avg ?: 0),
                 'rating_count' => (int) ($vendor?->rating_count ?: 0),
                 'badges' => $vendor?->badges?->pluck('slug')->values()->all() ?? [],
-                'cover_url' => $vendor?->cover_image,
-                'profile_photo_url' => $vendor?->profile_photo ?: $photo,
+                'cover_url' => $coverUrl,
+                'profile_photo_url' => $profileUrl,
                 'initials' => mb_strtoupper(mb_substr((string) ($vendor?->display_name ?: 'C'), 0, 1)),
                 'tags' => [],
                 'verified' => $vendor?->verification_status === 'verified',

@@ -83,6 +83,15 @@ class AppAuthTest extends TestCase
         $this->assertSame('01022223344', $clientBookings->json('bookings.0.phone'));
         $this->assertSame('01022223344', $clientBookings->json('bookings.0.whatsapp'));
         $this->assertContains($clientBookings->json('bookings.0.group'), ['upcoming', 'completed', 'canceled']);
+        $photo = (string) $clientBookings->json('bookings.0.photo');
+        $this->assertNotEmpty($photo);
+        $this->assertTrue(str_starts_with($photo, 'http://') || str_starts_with($photo, 'https://'));
+        $profilePhoto = (string) $clientBookings->json('bookings.0.vendor.profile_photo_url');
+        $this->assertNotEmpty($profilePhoto);
+        $this->assertTrue(str_starts_with($profilePhoto, 'http://') || str_starts_with($profilePhoto, 'https://'));
+        $cover = (string) $clientBookings->json('bookings.0.vendor.cover_url');
+        $this->assertNotEmpty($cover);
+        $this->assertTrue(str_starts_with($cover, 'http://') || str_starts_with($cover, 'https://'));
         $this->assertIsArray($clientBookings->json('summary'));
         $this->assertEquals(
             count($clientBookings->json('bookings')),
