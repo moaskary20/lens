@@ -8,6 +8,7 @@ import 'package:lens/core/api/api_client.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/session_store.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 
 class RequestEditPage extends StatefulWidget {
   const RequestEditPage({
@@ -162,20 +163,7 @@ class _RequestEditPageState extends State<RequestEditPage> {
             ),
           ),
           const Expanded(
-            child: Column(
-              children: [
-                Icon(Icons.auto_awesome, color: _orange, size: 18),
-                Text(
-                  'lens',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20,
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
+            child: Center(child: BrandHeader(height: 36)),
           ),
           const SizedBox(width: 48),
         ],
