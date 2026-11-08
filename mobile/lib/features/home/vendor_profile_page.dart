@@ -489,7 +489,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
           ],
         ),
         if (_social.isNotEmpty) ...[
-          const SizedBox(height: 14),
+          SizedBox(height: booked ? 10 : 14),
           _socialFollowers(),
         ],
       ],
@@ -664,8 +664,9 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
 
   Widget _stats() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      padding: const EdgeInsets.only(top: 16),
+      // Booked identity uses Transform.translate(-28) which leaves empty layout space; pull this up.
+      margin: EdgeInsets.fromLTRB(16, _hasBooking ? -18 : 16, 16, 8),
+      padding: EdgeInsets.only(top: _hasBooking ? 12 : 16),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFF2A2D34), width: 1)),
       ),
