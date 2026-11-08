@@ -468,7 +468,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Deliverables'), findsOneWidget);
     expect(find.text('Request edit'), findsOneWidget);
-    expect(find.text('Approved delivery'), findsOneWidget);
+    expect(find.text('Approve delivery'), findsOneWidget);
     await tester.tap(find.text('Deliverables'));
     await tester.pumpAndSettle();
     expect(find.text('Approve Delivery'), findsOneWidget);

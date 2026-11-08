@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lens/core/config.dart';
 import 'package:lens/core/theme/lens_colors.dart';
+import 'package:lens/core/widgets/brand_logo.dart';
 
 Future<bool> showApproveDeliverySheet(
   BuildContext context, {
@@ -60,12 +61,31 @@ class ApproveDeliverySheet extends StatelessWidget {
     return 'EGP $buffer';
   }
 
+  String? _resolveUrl(String? url) {
+    final raw = url?.trim();
+    if (raw == null || raw.isEmpty || raw.toLowerCase() == 'null') {
+      return null;
+    }
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+    final base = LensConfig.apiBaseUrl.replaceAll(RegExp(r'/api/?$'), '');
+    if (raw.startsWith('/')) {
+      return '$base$raw';
+    }
+    if (raw.startsWith('storage/')) {
+      return '$base/$raw';
+    }
+    return '$base/storage/$raw';
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = vendorName.trim().isEmpty ? 'Creator' : vendorName;
     final role = vendorRole.trim();
     final project = projectName.trim().isEmpty ? 'Session' : projectName;
-    final photo = vendorPhoto;
+    final photo = _resolveUrl(vendorPhoto);
+    final narrow = MediaQuery.sizeOf(context).width < 360;
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -85,9 +105,14 @@ class ApproveDeliverySheet extends StatelessWidget {
                   Container(
                     width: 42,
                     height: 4,
-                    decoration: BoxDecoration(color: const Color(0xFF3A4048), borderRadius: BorderRadius.circular(99)),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3A4048),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
+                  const BrandHeader(height: 32),
+                  const SizedBox(height: 14),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
@@ -98,21 +123,37 @@ class ApproveDeliverySheet extends StatelessWidget {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: const Color(0xFF1A120E),
-                              border: Border.all(color: LensColors.primary, width: 2.4),
+                              border: Border.all(
+                                color: LensColors.primary,
+                                width: 2.4,
+                              ),
                             ),
-                            child: const Icon(Icons.check_rounded, color: LensColors.primary, size: 28),
+                            child: const Icon(
+                              Icons.check_rounded,
+                              color: LensColors.primary,
+                              size: 28,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           const Text(
                             'Approve this delivery?',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, height: 1.15),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              height: 1.15,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           const Text(
                             'Approval unlocks your original files and releases the protected payment to the creator.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: _muted, fontSize: 14, height: 1.4),
+                            style: TextStyle(
+                              color: _muted,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
                           ),
                           const SizedBox(height: 18),
                           _cardBox(
@@ -123,18 +164,53 @@ class ApproveDeliverySheet extends StatelessWidget {
                                     CircleAvatar(
                                       radius: 22,
                                       backgroundColor: LensColors.graphite,
-                                      backgroundImage: LensConfig.useNetwork && photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
-                                      child: LensConfig.useNetwork && photo != null && photo.isNotEmpty
+                                      backgroundImage:
+                                          LensConfig.useNetwork &&
+                                              photo != null &&
+                                              photo.isNotEmpty
+                                          ? NetworkImage(photo)
+                                          : null,
+                                      child:
+                                          LensConfig.useNetwork &&
+                                              photo != null &&
+                                              photo.isNotEmpty
                                           ? null
-                                          : Text(name.substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                          : Text(
+                                              name
+                                                  .substring(0, 1)
+                                                  .toUpperCase(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                                          if (role.isNotEmpty) Text(role, style: const TextStyle(color: _muted, fontSize: 13)),
+                                          Text(
+                                            name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          if (role.isNotEmpty)
+                                            Text(
+                                              role,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: _muted,
+                                                fontSize: 13,
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
@@ -144,12 +220,20 @@ class ApproveDeliverySheet extends StatelessWidget {
                                   padding: EdgeInsets.symmetric(vertical: 12),
                                   child: Divider(height: 1, color: _stroke),
                                 ),
-                                _meta(Icons.description_outlined, 'Booking', project),
+                                _meta(
+                                  Icons.description_outlined,
+                                  'Booking',
+                                  project,
+                                ),
                                 const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 12),
                                   child: Divider(height: 1, color: _stroke),
                                 ),
-                                _meta(Icons.credit_card_outlined, 'Total payment', _amount),
+                                _meta(
+                                  Icons.credit_card_outlined,
+                                  'Total payment',
+                                  _amount,
+                                ),
                               ],
                             ),
                           ),
@@ -158,7 +242,11 @@ class ApproveDeliverySheet extends StatelessWidget {
                             child: const Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.info_outline, color: _icon, size: 18),
+                                Icon(
+                                  Icons.info_outline,
+                                  color: _icon,
+                                  size: 18,
+                                ),
                                 SizedBox(width: 10),
                                 Expanded(
                                   child: Text.rich(
@@ -166,11 +254,21 @@ class ApproveDeliverySheet extends StatelessWidget {
                                       children: [
                                         TextSpan(
                                           text: 'This action cannot be undone.\n',
-                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, height: 1.35),
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13,
+                                            height: 1.35,
+                                          ),
                                         ),
                                         TextSpan(
-                                          text: 'Once you approve, the files will be permanently unlocked and the payment will be released to the creator.',
-                                          style: TextStyle(color: _muted, fontSize: 13, height: 1.35),
+                                          text:
+                                              'Once you approve, the files will be permanently unlocked and the payment will be released to the creator.',
+                                          style: TextStyle(
+                                            color: _muted,
+                                            fontSize: 13,
+                                            height: 1.35,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -193,13 +291,25 @@ class ApproveDeliverySheet extends StatelessWidget {
                         backgroundColor: LensColors.primary,
                         foregroundColor: Colors.white,
                         shape: const StadiumBorder(),
-                        padding: const EdgeInsets.symmetric(horizontal: 22),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
                       ),
-                      child: const Stack(
-                        alignment: Alignment.center,
+                      child: Row(
                         children: [
-                          Text('Approve & Release Funds', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                          Align(alignment: Alignment.centerRight, child: Icon(Icons.chevron_right_rounded, size: 24)),
+                          Expanded(
+                            child: Text(
+                              narrow
+                                  ? 'Approve & release'
+                                  : 'Approve & Release Funds',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, size: 24),
                         ],
                       ),
                     ),
@@ -212,10 +322,19 @@ class ApproveDeliverySheet extends StatelessWidget {
                       onPressed: () => Navigator.pop(context, false),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: LensColors.primary,
-                        side: const BorderSide(color: LensColors.primary, width: 1.5),
+                        side: const BorderSide(
+                          color: LensColors.primary,
+                          width: 1.5,
+                        ),
                         shape: const StadiumBorder(),
                       ),
-                      child: const Text('Keep Reviewing', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                      child: const Text(
+                        'Keep Reviewing',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -250,7 +369,16 @@ class ApproveDeliverySheet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label, style: const TextStyle(color: _muted, fontSize: 13)),
-              Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+              Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
             ],
           ),
         ),

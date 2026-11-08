@@ -597,26 +597,36 @@ class _DeliverablesPageState extends State<DeliverablesPage> {
     if (!ok || !mounted) {
       return;
     }
-    final success = await _post(
+    final result = await _postPayload(
       '/app/bookings/${widget.bookingId}/approve',
       const {},
       'Delivery approved. Files are unlocked.',
     );
-    if (success && mounted) {
-      await _load();
+    if (!result.success || !mounted) {
+      return;
     }
+    setState(() {
+      _unlocked = result.payload?['downloads_unlocked'] != false;
+      _watermarked = result.payload?['watermarked'] == true;
+      _canApprove = false;
+      _canRefuse = false;
+      _canRequestEdit = false;
+      _status = result.payload?['status']?.toString() ?? 'approved';
+    });
+    await _load();
   }
 
-  Future<bool> _post(
+  Future<({bool success, Map<String, dynamic>? payload})> _postPayload(
     String path,
     Map<String, dynamic> body,
     String fallback,
   ) async {
     var message = fallback;
     var success = !_live;
+    Map<String, dynamic>? payload;
     if (_live) {
       try {
-        final payload = await ApiClient().postJson(path, body);
+        payload = await ApiClient().postJson(path, body);
         message = payload['message']?.toString() ?? fallback;
         success = true;
       } catch (error) {
@@ -629,7 +639,16 @@ class _DeliverablesPageState extends State<DeliverablesPage> {
     if (mounted) {
       _toast(message);
     }
-    return success;
+    return (success: success, payload: payload);
+  }
+
+  Future<bool> _post(
+    String path,
+    Map<String, dynamic> body,
+    String fallback,
+  ) async {
+    final result = await _postPayload(path, body, fallback);
+    return result.success;
   }
 
   void _toast(String message) {

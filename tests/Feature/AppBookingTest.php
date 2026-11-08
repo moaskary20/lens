@@ -218,7 +218,25 @@ class AppBookingTest extends TestCase
         $this->withHeaders($headers)
             ->postJson('/api/app/bookings/'.$booking->id.'/approve')
             ->assertOk()
-            ->assertJsonPath('status', 'approved');
+            ->assertJsonPath('status', 'approved')
+            ->assertJsonPath('downloads_unlocked', true)
+            ->assertJsonPath('watermarked', false)
+            ->assertJsonPath('message', 'Delivery approved. Files are unlocked.');
+
+        $booking->refresh();
+        $this->assertSame('approved', $booking->status);
+        $this->assertTrue((bool) $booking->deliverables()->where('is_unlocked', true)->exists());
+    }
+
+    public function test_approve_requires_delivered_status(): void
+    {
+        $headers = ['X-Lens-Client' => 'client@lens.app'];
+        $booking = Booking::query()->where('reference', 'LN-1003')->firstOrFail();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/app/bookings/'.$booking->id.'/approve')
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Approve is available after delivery.');
     }
 
     public function test_client_cancel_uses_matching_cancellation_policy(): void

@@ -389,14 +389,26 @@ class BookingController extends Controller
         $booking = $this->ownedBooking($booking);
         Roles::abortUnlessCan(AppClient::requireUser(), 'approve_payouts', 'Approving delivery is disabled for this role.');
 
+        if (! in_array($booking->status, ['delivered', 'in_revision', 'checked_in'], true)) {
+            return response()->json([
+                'message' => 'Approve is available after delivery.',
+            ], 422);
+        }
+
         try {
             $updated = app(DeliveryService::class)->approve($booking);
         } catch (LogicException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
+        $preview = app(DeliveryService::class)->previewState($updated);
+
         return response()->json([
             'status' => $updated->status,
+            'escrow_status' => $updated->escrow_status,
+            'payout_status' => $updated->payout_status,
+            'watermarked' => (bool) ($preview['watermarked'] ?? false),
+            'downloads_unlocked' => (bool) ($preview['downloads_unlocked'] ?? true),
             'message' => 'Delivery approved. Files are unlocked.',
         ]);
     }

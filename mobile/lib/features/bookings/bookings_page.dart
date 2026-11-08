@@ -510,7 +510,7 @@ class _ClientCard extends StatelessWidget {
                             const PopupMenuItem(
                               value: 'approve',
                               child: Text(
-                                'Approved delivery',
+                                'Approve delivery',
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),
@@ -818,6 +818,14 @@ class _ClientCard extends StatelessWidget {
           onReload?.call();
         }
       case 'approve':
+        if (!const {
+          'delivered',
+          'in_revision',
+          'checked_in',
+        }.contains(item.status)) {
+          _toast(context, 'Approve is available after delivery.');
+          return;
+        }
         final ok = await showApproveDeliverySheet(
           context,
           vendorName: item.counterpart,
@@ -919,53 +927,35 @@ class _ClientCard extends StatelessWidget {
     }
   }
 
-  Future<bool> _confirm(BuildContext context, String message) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            backgroundColor: const Color(0xFF161412),
-            content: Text(message, style: const TextStyle(color: Colors.white)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: LensColors.primary,
-                ),
-                child: const Text('Approved delivery'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  Future<void> _post(
+  Future<bool> _post(
     BuildContext context,
     String path,
     Map<String, dynamic> body,
     String fallback,
   ) async {
     var message = fallback;
+    var success = !(LensConfig.useNetwork && SessionStore.instance.isClient);
     if (LensConfig.useNetwork && SessionStore.instance.isClient) {
       try {
         final payload = await ApiClient().postJson(path, body);
         message = payload['message']?.toString() ?? fallback;
+        success = true;
       } catch (error) {
         message = error is ApiException
             ? error.message
             : 'Could not update this booking.';
+        success = false;
       }
     }
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
-      onReload?.call();
+      if (success) {
+        onReload?.call();
+      }
     }
+    return success;
   }
 }
 
