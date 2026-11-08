@@ -60,7 +60,7 @@ class PlatformSettings extends Page
             'support_phone' => '',
             'default_locale' => 'en',
             'maintenance_mode' => false,
-            'force_update' => false,
+            'force_update' => true,
             'android_min_version' => '',
             'ios_min_version' => '',
             'android_store_url' => 'https://play.google.com/store/apps/details?id=app.lens.lens',
@@ -107,29 +107,30 @@ class PlatformSettings extends Page
                     Textarea::make('about')->label('About the platform')->columnSpanFull(),
                 ])->columns(2),
                 Section::make('Mobile force update')
-                    ->description('Checked on every app open (before home). Turn Force update on, set the minimum version above the old build, and users cannot use the app until they install from the store.')
+                    ->description('On every app launch Lens reads the live store version (Play / App Store) and blocks outdated installs until they update. You can also set a manual minimum as a floor.')
                     ->schema([
                         Toggle::make('force_update')
                             ->label('Force update')
-                            ->helperText('When on, outdated installs are blocked until they update from the store.'),
+                            ->helperText('Keep on. Outdated installs are blocked with a mandatory store update screen.'),
                         TextInput::make('android_min_version')
-                            ->label('Android minimum version')
-                            ->placeholder('5.5.6')
-                            ->helperText('Must be higher than old installs (current store builds use versionName like 5.5.5). Leave blank to skip Android.'),
+                            ->label('Android minimum version (optional floor)')
+                            ->placeholder('6.6.7')
+                            ->helperText('Optional. Lens also reads the live Play Store version and uses the higher of the two.'),
                         TextInput::make('ios_min_version')
-                            ->label('iOS minimum version')
-                            ->placeholder('5.5.6')
-                            ->helperText('Compare against CFBundleShortVersionString. Leave blank to skip iOS.'),
+                            ->label('iOS minimum version (optional floor)')
+                            ->placeholder('6.6.7')
+                            ->helperText('Optional. Lens also reads the live App Store version when the App Store URL includes an id.'),
                         TextInput::make('android_store_url')
                             ->label('Google Play URL')
                             ->url()
                             ->required()
                             ->default('https://play.google.com/store/apps/details?id=app.lens.lens')
-                            ->helperText('Play Store listing for Lens.'),
+                            ->helperText('Play Store listing for Lens (used for version check + Update button).'),
                         TextInput::make('ios_store_url')
                             ->label('App Store URL')
                             ->url()
-                            ->placeholder('https://apps.apple.com/app/idXXXXXXXX'),
+                            ->placeholder('https://apps.apple.com/app/idXXXXXXXX')
+                            ->helperText('Must include /id123… so Lens can look up the live iOS version.'),
                         TextInput::make('update_title')
                             ->label('Update title')
                             ->maxLength(80),

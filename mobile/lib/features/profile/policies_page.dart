@@ -3,15 +3,34 @@ import 'package:lens/core/models/home_data.dart';
 import 'package:lens/core/theme/lens_colors.dart';
 import 'package:lens/features/profile/profile_scaffold.dart';
 
-class PoliciesPage extends StatelessWidget {
+class PoliciesPage extends StatefulWidget {
   const PoliciesPage({super.key, required this.home, this.initialSlug});
 
   final HomeData home;
   final String? initialSlug;
 
   @override
+  State<PoliciesPage> createState() => _PoliciesPageState();
+}
+
+class _PoliciesPageState extends State<PoliciesPage> {
+  String? _openSlug;
+
+  @override
+  void initState() {
+    super.initState();
+    final pages = widget.home.policyPages;
+    final initial = widget.initialSlug;
+    if (initial != null && pages.any((page) => page.slug == initial)) {
+      _openSlug = initial;
+    } else if (pages.isNotEmpty) {
+      _openSlug = pages.first.slug;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final pages = home.policyPages;
+    final pages = widget.home.policyPages;
     return ProfileScaffold(
       title: 'Policies',
       child: pages.isEmpty
@@ -26,43 +45,75 @@ class PoliciesPage extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
               itemCount: pages.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final page = pages[index];
-                return Material(
-                  color: const Color(0xFF161412),
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
+                final open = _openSlug == page.slug;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161412),
                     borderRadius: BorderRadius.circular(16),
-                    onTap: () => _open(context, page),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 15,
+                    border: Border.all(
+                      color: open
+                          ? LensColors.primary.withValues(alpha: 0.45)
+                          : const Color(0xFF2A2A2E),
+                    ),
+                  ),
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      dividerColor: Colors.transparent,
+                      splashColor: LensColors.primary.withValues(alpha: 0.08),
+                      highlightColor: Colors.transparent,
+                    ),
+                    child: ExpansionTile(
+                      key: ValueKey<String>('policy-${page.slug}-$_openSlug'),
+                      initiallyExpanded: open,
+                      maintainState: true,
+                      onExpansionChanged: (expanded) {
+                        setState(() {
+                          _openSlug = expanded ? page.slug : null;
+                        });
+                      },
+                      tilePadding: const EdgeInsets.fromLTRB(14, 2, 10, 2),
+                      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      leading: Icon(
+                        open
+                            ? Icons.description_rounded
+                            : Icons.description_outlined,
+                        color: LensColors.primary,
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.description_outlined,
-                            color: LensColors.primary,
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              page.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                              ),
+                      title: Text(
+                        page.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      trailing: AnimatedRotation(
+                        turns: open ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: const Icon(
+                          Icons.expand_more_rounded,
+                          color: Color(0xFF8E8B84),
+                        ),
+                      ),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            page.body.isEmpty
+                                ? 'Content unavailable.'
+                                : page.body,
+                            style: const TextStyle(
+                              color: Color(0xFFD0CBC3),
+                              height: 1.5,
+                              fontSize: 14,
                             ),
                           ),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            color: Color(0xFF8E8B84),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -70,55 +121,13 @@ class PoliciesPage extends StatelessWidget {
             ),
     );
   }
-
-  void _open(BuildContext context, PolicyPageItem page) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _PolicyDetailPage(page: page),
-      ),
-    );
-  }
 }
 
-class _PolicyDetailPage extends StatelessWidget {
-  const _PolicyDetailPage({required this.page});
-
-  final PolicyPageItem page;
-
-  @override
-  Widget build(BuildContext context) {
-    return ProfileScaffold(
-      title: page.title,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        child: Text(
-          page.body.isEmpty ? 'Content unavailable.' : page.body,
-          style: const TextStyle(
-            color: Color(0xFFD0CBC3),
-            height: 1.5,
-            fontSize: 14.5,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Opens a CMS policy by slug when available from bootstrap.
+/// Opens Policies with the matching CMS slug expanded.
 void openPolicyPage(BuildContext context, HomeData home, String slug) {
-  final match = home.policyPages.cast<PolicyPageItem?>().firstWhere(
-        (item) => item?.slug == slug,
-        orElse: () => null,
-      );
-  if (match == null) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => PoliciesPage(home: home)),
-    );
-    return;
-  }
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => _PolicyDetailPage(page: match),
+      builder: (_) => PoliciesPage(home: home, initialSlug: slug),
     ),
   );
 }

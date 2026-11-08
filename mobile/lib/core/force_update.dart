@@ -28,14 +28,26 @@ class ForceUpdatePolicy {
             ?.toString()
             .trim() ??
         '';
+    final configured = (android
+                ? map['android_min_version']
+                : map['ios_min_version'])
+            ?.toString()
+            .trim() ??
+        '';
+    final storeVersion = (android
+                ? map['android_store_version']
+                : map['ios_store_version'])
+            ?.toString()
+            .trim() ??
+        '';
+    final required = _higherVersion(configured, storeVersion);
+    // Default to forced updates whenever a target version exists.
+    final force = map.containsKey('force_update')
+        ? map['force_update'] == true
+        : required.isNotEmpty;
     return ForceUpdatePolicy(
-      force: map['force_update'] == true,
-      minVersion: (android
-                  ? map['android_min_version']
-                  : map['ios_min_version'])
-              ?.toString()
-              .trim() ??
-          '',
+      force: force,
+      minVersion: required,
       storeUrl: store.isNotEmpty
           ? store
           : (android ? playStoreUrl : 'https://apps.apple.com'),
@@ -46,6 +58,16 @@ class ForceUpdatePolicy {
           ? map['message'].toString().trim()
           : 'A new version of Lens is available on the store. Please update before continuing.',
     );
+  }
+
+  static String _higherVersion(String left, String right) {
+    if (left.isEmpty) {
+      return right;
+    }
+    if (right.isEmpty) {
+      return left;
+    }
+    return ForceUpdate.compareVersions(left, right) >= 0 ? left : right;
   }
 
   final bool force;

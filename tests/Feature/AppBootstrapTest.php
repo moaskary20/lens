@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Setting;
+use App\Support\AppUpdate;
 use Database\Seeders\LensSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -25,6 +27,11 @@ class AppBootstrapTest extends TestCase
 
     public function test_mobile_bootstrap_exposes_force_update_policy(): void
     {
+        Http::fake([
+            'play.google.com/*' => Http::response('[[["10.0.1"]]]', 200),
+            'itunes.apple.com/*' => Http::response(['results' => [['version' => '10.0.2']]], 200),
+        ]);
+
         Setting::setValue('platform.force_update', true);
         Setting::setValue('platform.android_min_version', '9.9.9');
         Setting::setValue('platform.ios_min_version', '9.9.8');
@@ -36,12 +43,16 @@ class AppBootstrapTest extends TestCase
         $this->getJson('/api/app/bootstrap')
             ->assertOk()
             ->assertJsonPath('app_update.force_update', true)
-            ->assertJsonPath('app_update.android_min_version', '9.9.9')
-            ->assertJsonPath('app_update.ios_min_version', '9.9.8')
+            ->assertJsonPath('app_update.android_min_version', '10.0.1')
+            ->assertJsonPath('app_update.ios_min_version', '10.0.2')
+            ->assertJsonPath('app_update.android_store_version', '10.0.1')
+            ->assertJsonPath('app_update.ios_store_version', '10.0.2')
             ->assertJsonPath('app_update.android_store_url', 'https://play.google.com/store/apps/details?id=app.lens.lens')
             ->assertJsonPath('app_update.ios_store_url', 'https://apps.apple.com/app/id123')
             ->assertJsonPath('app_update.title', 'Update Lens')
             ->assertJsonPath('app_update.message', 'Please update to continue.');
+
+        $this->assertSame(1, AppUpdate::compareVersions('10.0.1', '9.9.9'));
     }
 
     public function test_mobile_home_payload_follows_admin_features(): void

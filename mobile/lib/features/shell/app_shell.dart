@@ -209,6 +209,7 @@ class AppShellState extends State<AppShell>
           context,
           bootstrap: _bootstrap,
           fetchLive: true,
+          liveTimeout: const Duration(seconds: 5),
         ),
       );
     }

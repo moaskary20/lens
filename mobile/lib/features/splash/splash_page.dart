@@ -187,7 +187,8 @@ class _SplashPageState extends State<SplashPage> {
         final blocked = await ForceUpdate.enforce(
           context,
           bootstrap: _payload,
-          fetchLive: false,
+          fetchLive: true,
+          liveTimeout: const Duration(seconds: 5),
         );
         if (blocked || !mounted) {
           return;

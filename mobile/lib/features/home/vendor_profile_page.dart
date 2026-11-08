@@ -301,11 +301,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
             children: [
               _hero(),
               Padding(
-                padding: EdgeInsets.fromLTRB(16, _hasBooking ? 0 : 16, 16, 0),
-                child: Transform.translate(
-                  offset: Offset(0, _hasBooking ? -28 : 0),
-                  child: _identity(location),
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _identity(location),
               ),
               _stats(),
               _tabBar(),
@@ -695,19 +692,17 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   }
 
   Widget _avatar() {
-    final size = booked ? 96.0 : 108.0;
+    const size = 108.0;
     final photo = (vendor.profilePhotoUrl != null && vendor.profilePhotoUrl!.isNotEmpty)
         ? vendor.profilePhotoUrl!
         : (_loadedFromApi ? '' : (VendorPhotos.portrait(vendor.vendorType, vendor.id)));
-    final radius = booked ? size / 2 : 24.0;
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: LensColors.charcoal,
-        borderRadius: BorderRadius.circular(radius),
-        border: booked ? Border.all(color: LensColors.charcoal, width: 3) : null,
+        borderRadius: BorderRadius.circular(24),
       ),
       clipBehavior: Clip.antiAlias,
       child: LensConfig.useNetwork && photo.isNotEmpty
@@ -736,9 +731,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
 
   Widget _stats() {
     return Container(
-      // Booked identity uses Transform.translate(-28) which leaves empty layout space; pull this up.
-      margin: EdgeInsets.fromLTRB(16, _hasBooking ? -18 : 16, 16, 8),
-      padding: EdgeInsets.only(top: _hasBooking ? 12 : 16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.only(top: 16),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFF2A2D34), width: 1)),
       ),
